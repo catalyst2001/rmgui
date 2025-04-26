@@ -1,0 +1,293 @@
+#include <algorithm>
+#include "rmgui.h"
+
+bool rm_widget::add_child(rm_widget* p_child)
+{
+  /* prevent add nullptr */
+  if (!p_child)
+    return false;
+
+  /* prevent enter infinity loop in any event and stack overflowing */
+  if (this == p_child)
+    return false;
+
+  /* if element with no childs */
+  if(!m_elem_flags.has_childs())
+    return false;
+
+  /* have parent? */
+  p_child->grab_globals_from(this);
+  m_childs.push_back(p_child);
+  root_update();
+  return true;
+}
+
+bool rm_widget::remove_child(rm_widget* p_child)
+{
+  /* prevent remove nullptr */
+  if (!p_child)
+    return false;
+
+  /* if element with no childs */
+  if (!m_elem_flags.has_childs())
+    return false;
+
+  _childs_vec::iterator it = std::find(m_childs.begin(), m_childs.end(), p_child);
+  if (it != m_childs.end()) {
+    /* child found */
+    m_childs.erase(it);
+    p_child->on_event(PARENT_CHANGED, this);
+    p_child->set_parent(nullptr);
+  }
+  return true;
+}
+
+void rm_widget::set_parent(rm_widget* p_parent)
+{
+  m_pparent = p_parent;
+  root_update();
+}
+
+void rm_surface::event_dispatcher(rm_widget* p_elem)
+{
+  EXGUI_UNUSED(p_elem);
+}
+
+void rm_surface::keybd_dispatcher(rm_widget* p_elem, int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
+{
+  p_elem->on_keybd(sc, vk, state);
+  /* element has childs? */
+  if (p_elem->get_elem_flags().has_childs() && p_elem->get_elem_flags().has_notify_childs()) {
+    /* recursive enum childs */
+    for (size_t i = 0; i < p_elem->get_num_childs(); i++) {
+      /* enter recursively */
+      keybd_dispatcher(p_elem->get_child(i), sc, vk, state);
+    }
+  }
+}
+
+#if 0
+void rmgui_surface::text_input_dispatcher(rmgui_widget* p_elem, int sym)
+{
+  p_elem->on_text_input(sym);
+  /* element has childs? */
+  if (p_elem->get_elem_flags().has_childs() && p_elem->get_elem_flags().has_notify_childs()) {
+    /* recursive enum childs */
+    for (size_t i = 0; i < p_elem->get_num_childs(); i++) {
+      /* enter recursively */
+      text_input_dispatcher(p_elem->get_child(i), sym);
+    }
+  }
+}
+#endif
+
+void rm_surface::mouse_dispatcher(rm_widget* p_elem,
+  EXGUI_MOUSE_EVENT event,
+  EXGUI_KEY vk,
+  EXGUI_KEY_STATE state,
+  rmgui_vector2& cursor_pos)
+{
+  bool b_cursor_inside = p_elem->get_bbox().inside(cursor_pos);
+  bool b_global_receive_events = p_elem->get_elem_flags().is_set(EXGUI_FLAG_GLOBAL);
+  p_elem->m_elem_flags.toggle_bits(EXGUI_FLAG_HOVERED, b_cursor_inside);
+  if (p_elem->get_elem_flags().has_childs() && p_elem->get_elem_flags().has_notify_childs()) {
+    for (int i = (int)p_elem->get_num_childs() - 1; i >= 0; i--) {
+      mouse_dispatcher(p_elem->get_child(i), event, vk, state, cursor_pos);
+    }
+  }
+
+  if (b_cursor_inside || b_global_receive_events) {
+    p_elem->on_mouse(event, vk, state, cursor_pos);
+    if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN &&
+      p_elem != this && 
+      !b_global_receive_events) {
+      m_pfocus = p_elem;
+      printf("updated focus to element %s\n", p_elem->get_classname());
+      return;
+    }
+  }
+}
+
+
+void rm_surface::build_draw_cache_recursive(rm_widget* p_elem)
+{
+  /* is visible? */
+  if (p_elem->get_elem_flags().has_visible() && m_pfocus != p_elem) { //TODO: K.D. skip focused widget
+    /* add element to draw path container */
+    m_draw_cache.push_back(p_elem);
+    /* element has childs? */
+    if (p_elem->get_elem_flags().has_childs()) {
+      /* recursive enum childs */
+      for (size_t i = 0; i < p_elem->get_num_childs(); i++) {
+        /* enter recursively */
+        build_draw_cache_recursive(p_elem->get_child(i));
+      }
+    }
+  }
+}
+
+void rm_surface::rebuild_draw_cache()
+{
+  m_draw_cache.clear();
+  build_draw_cache_recursive(this);
+  if (m_pfocus)
+    m_draw_cache.push_back(m_pfocus); //TODO: K.D. add last focused widget
+}
+
+void rm_surface::draw()
+{
+  nvgBeginFrame(m_pctx, m_relative.width, m_relative.height, 1.f);
+  for (size_t i = 0; i < m_draw_cache.size(); i++) {
+    rm_widget* pwidget = m_draw_cache[i];
+    rm_rect& outer_rect = pwidget->get_absolute();
+    nvgSave(m_pctx);
+    nvgScissor(m_pctx, outer_rect.x, outer_rect.y, outer_rect.width, outer_rect.height);
+    nvgTranslate(m_pctx, outer_rect.x, outer_rect.y);
+    pwidget->on_draw(m_pctx);
+    //nvgResetTransform(m_pctx);
+    nvgResetScissor(m_pctx);
+    nvgRestore(m_pctx);
+  }
+  nvgEndFrame(m_pctx);
+}
+
+void rm_surface::keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
+{
+  keybd_dispatcher(this, sc, vk, state);
+}
+
+void rm_surface::textinput(int sym)
+{
+#if 0
+  text_input_dispatcher(this, sym);
+#endif
+  if (m_pfocus)
+    m_pfocus->on_text_input(sym);
+}
+
+void rm_surface::mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, int x, int y)
+{
+  rmgui_vector2 mouse_pos(x, y);
+  mouse_dispatcher(this, event, vk, state, mouse_pos);
+}
+
+void rm_surface::resize(int width, int height)
+{
+  m_relative.width = m_absolute.width = width;
+  m_relative.height = m_absolute.height = height;
+}
+
+rm_image rm_surface::load_image_from_memory(const void* psrc, size_t srclen, int flags)
+{
+  rm_image handle;
+  set_handle_value(handle, nvgCreateImageMem(m_pctx, flags, (uint8_t*)psrc, (int)srclen));
+  return handle;
+}
+
+rm_image rm_surface::load_image(const char* pfilename, int flags)
+{
+  rm_image handle;
+  set_handle_value(handle, nvgCreateImage(m_pctx, pfilename, flags));
+  return handle;
+}
+
+void rm_surface::free_image(rm_image& image)
+{
+  if (image.is_valid()) {
+    nvgDeleteImage(m_pctx, image.get_handle());
+    set_handle_value(image, image.get_invalid()); //NOTE: K.D. invalidate
+  }
+}
+
+rm_font rm_surface::load_font_from_memory(const void* psrc_ttf_mem, size_t srclen, const char* pfontname)
+{
+  rm_font font;
+  set_handle_value(font, nvgCreateFontMem(m_pctx, pfontname, (uint8_t * )psrc_ttf_mem, static_cast<int>(srclen), 0));
+  return font;
+}
+
+rm_font rm_surface::load_font(const char* pfilename, const char* pfontname)
+{
+  rm_font font;
+  set_handle_value(font, nvgCreateFont(m_pctx, pfontname, pfilename));
+  return font;
+}
+
+void rm_surface::free_font(rm_font& font)
+{
+  //NOTE: K.D. nvg not free fonts
+}
+
+rm_surface::rm_surface(NVGcontext* p_ctx, int width, int height, irmgui_sysdf* p_sysdf) : rm_widget(0, 0, width, height, nullptr, "ui_root_node")
+{
+  m_psysdf = p_sysdf;
+  set_root(this);
+  m_pctx = p_ctx;
+  m_pfocus = nullptr;
+}
+
+rm_surface::~rm_surface()
+{
+}
+
+void rm_window::on_draw(NVGcontext* p_ctx)
+{
+  nvgSave(p_ctx);
+  rm_window_style* p_style = get_style();
+  assert(p_style && "rmgui_window::on_draw(): window style is not set! Use rmgui_window::set_style(rmgui_wi1ndow_style *)");
+  int b_is_active = (int)(get_elem_flags().is_focused() || get_elem_flags().is_hovered());
+  /* draw window background */
+  nvgBeginPath(p_ctx);
+  nvgFillColor(p_ctx, p_style->get_background_color(b_is_active));
+  nvgRoundedRectVarying(p_ctx,
+    m_relative.x, m_relative.y, m_relative.width, m_relative.height,
+    p_style->get_corner_radius(LEFT_TOP), p_style->get_corner_radius(RIGHT_TOP), 0, 0);
+  nvgFill(p_ctx);
+
+
+  //nvgTranslate()
+
+
+  nvgFontFaceId(p_ctx, get_font());
+  nvgFontSize(p_ctx, p_style->get_font_size());
+
+  nvgRestore(p_ctx);
+}
+
+rm_window::rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags, uint32_t uflags, void* p_userptr) :
+  rm_widget(x, y, width, height, p_parent, "ui_window", flags, uflags, p_userptr)
+{
+}
+
+rm_window::~rm_window()
+{
+}
+
+bool rmgui_timer::has_elapsed(irmgui_sysdf* p_sysdf)
+{
+  float current_time = p_sysdf->get_time();
+  if (current_time > m_next_time) {
+    m_curr_time = current_time;
+    m_next_time = m_curr_time + m_interval;
+    return true;
+  }
+  return false;
+}
+
+void rmgui_utl::draw_border_frame(NVGcontext* ctx, rm_rect& rect, uint32_t mode, const NVGcolor colors[])
+{
+  const NVGcolor& color = colors[mode];
+
+  //nvgBeginPath(ctx);
+  //nvgStrokeWidth(ctx, 1.0f);
+  //nvgRoundedRect(ctx, mPos.x() + 0.5f, mPos.y() + (mPushed ? 0.5f : 1.5f), mSize.x() - 1,
+  //  mSize.y() - 1 - (mPushed ? 0.0f : 1.0f), mTheme->mButtonCornerRadius);
+  //nvgStrokeColor(ctx, mTheme->mBorderLight);
+  //nvgStroke(ctx);
+
+  //nvgBeginPath(ctx);
+  //nvgRoundedRect(ctx, mPos.x() + 0.5f, mPos.y() + 0.5f, mSize.x() - 1,
+  //  mSize.y() - 2, mTheme->mButtonCornerRadius);
+  //nvgStrokeColor(ctx, mTheme->mBorderDark);
+  //nvgStroke(ctx);
+}

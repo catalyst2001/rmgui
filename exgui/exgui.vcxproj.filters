@@ -1,0 +1,84 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="exgui">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="vendor">
+      <UniqueIdentifier>{7ff55d53-98de-4145-926f-ba9f74dcda09}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vendor\stb">
+      <UniqueIdentifier>{ab662b44-1f92-4c46-9573-844e8d6beec1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vendor\nanovg">
+      <UniqueIdentifier>{9ab97792-37bb-46f6-a765-8948df1cd246}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vendor\glad">
+      <UniqueIdentifier>{316bd543-6cfb-48a1-be4c-bbde085e7993}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vendor\glfw">
+      <UniqueIdentifier>{10536642-ca67-4886-816e-d692e590aa48}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="launcher">
+      <UniqueIdentifier>{8db13552-ca80-4bed-8e15-60c5136583fd}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="exgui\rmgui.cpp">
+      <Filter>exgui</Filter>
+    </ClCompile>
+    <ClCompile Include="vendor\nanovg\nanovg.c">
+      <Filter>vendor\nanovg</Filter>
+    </ClCompile>
+    <ClCompile Include="vendor\nanovg\blendish.c">
+      <Filter>vendor\nanovg</Filter>
+    </ClCompile>
+    <ClCompile Include="exgui\rmgui_controls.cpp">
+      <Filter>exgui</Filter>
+    </ClCompile>
+    <ClCompile Include="vendor\glad\src\glad.c">
+      <Filter>vendor\glad</Filter>
+    </ClCompile>
+    <ClCompile Include="blendish_test.cpp">
+      <Filter>exgui</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="exgui\rmgui.h">
+      <Filter>exgui</Filter>
+    </ClInclude>
+    <ClInclude Include="vendor\nanovg\nanovg.h">
+      <Filter>vendor\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="vendor\nanovg\nanovg_gl.h">
+      <Filter>vendor\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="vendor\nanovg\nanovg_gl_utils.h">
+      <Filter>vendor\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="vendor\nanovg\blendish.h">
+      <Filter>vendor\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="vendor\nanovg\fontstash.h">
+      <Filter>vendor\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="vendor\stb\stb_image.h">
+      <Filter>vendor\stb</Filter>
+    </ClInclude>
+    <ClInclude Include="exgui\rmgui_controls.h">
+      <Filter>exgui</Filter>
+    </ClInclude>
+    <ClInclude Include="vendor\glad\include\glad\glad.h">
+      <Filter>vendor\glad</Filter>
+    </ClInclude>
+    <ClInclude Include="vendor\glad\include\KHR\khrplatform.h">
+      <Filter>vendor\glad</Filter>
+    </ClInclude>
+    <ClInclude Include="vendor\GLFW\glfw3.h">
+      <Filter>vendor\glfw</Filter>
+    </ClInclude>
+    <ClInclude Include="blendish_test.h" />
+  </ItemGroup>
+</Project>
