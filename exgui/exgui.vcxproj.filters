@@ -44,6 +44,9 @@
     <ClCompile Include="blendish_test.cpp">
       <Filter>exgui</Filter>
     </ClCompile>
+    <ClCompile Include="rmgui_resources.cpp">
+      <Filter>exgui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="exgui\rmgui.h">
@@ -80,5 +83,6 @@
       <Filter>vendor\glfw</Filter>
     </ClInclude>
     <ClInclude Include="blendish_test.h" />
+    <ClInclude Include="rmgui_resources.h" />
   </ItemGroup>
 </Project>

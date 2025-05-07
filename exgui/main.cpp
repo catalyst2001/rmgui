@@ -7,6 +7,7 @@
 #include <iostream>
 #include <vector>
 #include "blendish_test.h"
+#include "rmgui_resources.h"
 
 // Глобальный указатель на корневую поверхность GUI для использования в колбэках
 static rm_surface* g_gui = nullptr;
@@ -269,6 +270,11 @@ int main() {
     printf("can't load font!\n");
   }
 
+  rm_font fontawesome = gui->load_font_from_memory(fontawesomewebfont, FONT_SIZE, "fontawesome");
+  if (!fontawesome.is_valid()) {
+    printf("failed to load icons font\n");
+  }
+
   rm_image image_pat = gui->load_image("ipat.png", NVG_IMAGE_REPEATX);
   if (!image_pat.is_valid()) {
     printf("can't load image\n");
@@ -281,10 +287,13 @@ int main() {
   default_style.apply_defaults();
   rm_window* pwindow = new rm_window(gui, 10, 10, 500, 500);
   pwindow->set_style(&default_style);
+  pwindow->set_zindex(-1);
 
   rm_image_button* imgButton = new rm_image_button(pwindow, 50, 50, 200, 40, "idle-button-login.png");
   rm_button* textButton = new rm_button(pwindow, 300, 50, 200, 100, "Test Button");
-  rm_label* label = new rm_label(pwindow, 50, 200, "Test Label");
+  rm_label* label = new rm_label(pwindow, 50, 200, ICON_FA_ANCHOR " " ICON_FA_SIGNAL " " ICON_FA_HOME " " u8"\uf025");
+  label->set_font(fontawesome);
+
   rm_text_input* textInput = new rm_text_input(pwindow, 300, 200, 200, 40, RMGUI_TEXT_INPUT_SINGLELINE);
 
   static rm_checkbox_style style;
@@ -297,6 +306,7 @@ int main() {
 
   std::vector<std::string> comboItems = { "Item 1", "Item 2", "Item 3" };
   rm_combobox* combobox = new rm_combobox(pwindow, 300, 300, 200, 40, comboItems);
+
   rm_slider* slider = new rm_slider(pwindow, 50, 400, 400, 40, 0.0f, 100.0f, 50.0f,
     [](rm_slider *psilder) {
       printf("slider value changed: %f\n", psilder->get_value());

@@ -470,17 +470,18 @@ protected:
 protected:
   using _childs_vec = std::vector<rm_widget*>;
   _childs_vec      m_childs;
-  rm_widget    *m_proot;
-  rm_widget    *m_pparent;
+  rm_widget       *m_proot;
+  rm_widget       *m_pparent;
   void            *m_puserptr;
   irmgui_sysdf    *m_psysdf;
   rmgui_flags_elem m_elem_flags;
   uint32_t         m_user_flags;
   rm_font          m_font;
   char             m_szclass[32];
-  rm_bbox       m_bbox;
-  rm_rect       m_relative;
-  rm_rect       m_absolute;
+  rm_bbox          m_bbox;
+  rm_rect          m_relative;
+  rm_rect          m_absolute;
+  int              m_zindex;
 
   inline rm_widget* get_root() { return m_proot; }
 
@@ -514,7 +515,7 @@ public:
   rm_widget(int x, int y, int width, int height, rm_widget *p_parent, const char *p_classname,
     uint32_t flags = EXGUI_FLAG_DEFAULT, 
     uint32_t uflags = 0, void *p_userptr = nullptr) : m_proot(nullptr),
-    m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr) {
+    m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_zindex(0) {
     m_elem_flags = flags;
     m_user_flags = uflags;
     m_absolute = rm_rect(x, y, width, height);
@@ -570,19 +571,45 @@ public:
   inline void           set_font(rm_font font) { m_font = font; }
   inline rm_font        get_font() { return m_font; }
 
+  /* layers */
+  inline void           set_zindex(int zidx) { m_zindex = zidx; }
+  inline int            get_zindex() const { return m_zindex; }
+
   void move(int newx, int newy)  {
     move_recursive(this, newx, newy);
   }
 };
 
+struct layer_draw_cache {
+  int zindex;
+  std::vector<rm_widget*> m_cache;
+  layer_draw_cache(int zidx) : zindex(zidx) {}
+
+  operator int() const { return zindex; }
+  inline int get_zindex() const { return zindex; }
+
+  void add_widget(rm_widget* pwidget) {
+    m_cache.push_back(pwidget);
+  }
+
+  void clear() {
+    m_cache.clear();
+  }
+
+  inline size_t size() const { return m_cache.size(); }
+  inline rm_widget *get_widget(size_t idx) {
+    assert(idx < m_cache.size() && "idx out of bounds");
+    return m_cache[idx];
+  }
+};
+
 class rm_surface : public rm_widget, rm_object_accrssor
 {
-  using rmgui_draw_cache = std::vector<rm_widget*>;
-  rmgui_draw_cache m_draw_cache;
-  NVGcontext   *m_pctx;
-  rm_widget    *m_pfocus;
+  NVGcontext                   *m_pctx;
+  rm_widget                    *m_pfocus;
+  std::vector<layer_draw_cache *> m_layers;
 
-  void        build_draw_cache_recursive(rm_widget *p_elem);
+  void build_draw_cache_recursive(rm_widget *p_elem);
 
   /* event notifier functions */
   static void event_dispatcher(rm_widget *p_elem);
@@ -599,6 +626,7 @@ class rm_surface : public rm_widget, rm_object_accrssor
 //protected:
 public:
   void rebuild_draw_cache();
+  layer_draw_cache* get_layer_by_zid(int zid);
 
 public:
   rm_surface(NVGcontext *p_ctx, int width, int height, irmgui_sysdf *p_sysdf);

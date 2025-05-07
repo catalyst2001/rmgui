@@ -295,8 +295,9 @@ bool rm_checkbox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STAT
 }
 
 rm_combobox::rm_combobox(rm_widget* p_parent, int x, int y, int width, int height, const std::vector<std::string>& items)
-  : rm_widget(x, y, width, height, p_parent, "ui_combobox", EXGUI_FLAG_DEFAULT | EXGUI_FLAG_GLOBAL| EXGUI_FLAG_DISABLE_SCISSOR), m_items(items), m_selected(0), m_expanded(false)
+  : rm_widget(x, y, width, height, p_parent, "ui_combobox", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL|EXGUI_FLAG_DISABLE_SCISSOR), m_items(items), m_selected(0), m_expanded(false)
 {
+  set_zindex(1); //topmost
 }
 
 rm_combobox::~rm_combobox() {}
