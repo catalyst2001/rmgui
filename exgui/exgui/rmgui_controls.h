@@ -62,11 +62,52 @@ public:
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
 };
 
-class rm_checkbox : public rm_widget {
-  bool m_checked;
-  std::string m_label;
+/**
+* CHECKBOX
+*/
+class rm_checkbox_style {
+  rmgui_vector2 m_text_offset;
+  NVGcolor      m_text_color;
+  NVGcolor      m_bkg_color;
+  NVGcolor      m_mark_color;
+  NVGcolor      m_border_color;
+  int           m_check_size;
+  float         m_font_size;
 public:
-  rm_checkbox(rm_widget* p_parent, int x, int y, int size, const std::string& label);
+  rm_checkbox_style() :
+    m_text_offset(5.f, 0.f),
+    m_text_color(nvgRGB(255, 255, 255)),
+    m_bkg_color(nvgRGB(255, 255, 255)),
+    m_mark_color(nvgRGB(0, 0, 0)),
+    m_border_color(nvgRGB(0, 0, 0)),
+    m_check_size(20),
+    m_font_size(18.f) {}
+
+  /* selectors  */
+  inline const rmgui_vector2& get_text_offsets() const { return m_text_offset; }
+  inline const NVGcolor& get_text_color() const { return m_text_color; }
+  inline const NVGcolor& get_background_color() const { return m_bkg_color; }
+  inline const NVGcolor& get_mark_color() const { return m_mark_color; }
+  inline const NVGcolor& get_border_color() const { return m_border_color; }
+  inline int             get_check_size() const { return m_check_size; }
+  inline float           get_font_size() const { return m_font_size; }
+
+  /* modifiers */
+  inline void set_text_offsets(rmgui_vector2 offset) { m_text_offset = offset; }
+  inline void set_text_color(NVGcolor clr) { m_text_color = clr; }
+  inline void set_background_color(NVGcolor clr) { m_bkg_color = clr; }
+  inline void set_mark_color(NVGcolor clr) { m_mark_color = clr; }
+  inline void set_border_color(NVGcolor clr) { m_border_color = clr; }
+  inline void set_check_size(int newsize) { m_check_size = newsize; }
+  inline void set_font_size(float fsize) { m_font_size = fsize; }
+};
+
+class rm_checkbox : public rm_widget {
+  bool               m_checked;
+  std::string        m_label;
+  rm_checkbox_style *m_pstyle;
+public:
+  rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style *pstyle, const std::string& label);
   virtual ~rm_checkbox();
   virtual void on_draw(NVGcontext* p_ctx) override;
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
@@ -83,13 +124,22 @@ public:
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
 };
 
+class rm_slider;
+using rm_slider_callback = void(*)(rm_slider *pslider);
+
 class rm_slider : public rm_widget {
-  float m_min;
-  float m_max;
-  float m_value;
-  bool m_dragging;
+  float   m_min;
+  float   m_max;
+  float   m_value;
+  bool    m_dragging;
+  float   m_last_value;
+  rm_slider_callback m_pcallback;
+  rm_rect m_inner_rect;
+  float   m_thumb_size;
+  void    compute_value(rmgui_vector2& cursor_pos);
+  void    compute_inner_and_thumb();
 public:
-  rm_slider(rm_widget* p_parent, int x, int y, int width, int height, float min, float max, float initial);
+  rm_slider(rm_widget* p_parent, int x, int y, int width, int height, float min, float max, float initial, rm_slider_callback pcallback=nullptr);
   virtual ~rm_slider();
   virtual void on_draw(NVGcontext* p_ctx) override;
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos);

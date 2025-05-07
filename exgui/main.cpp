@@ -277,17 +277,33 @@ int main() {
   gui->set_font(default_font);
   g_gui = gui;
 
-  rm_image_button* imgButton = new rm_image_button(gui, 50, 50, 200, 100, "idle-button-login.png");
-  rm_button* textButton = new rm_button(gui, 300, 50, 200, 100, "Test Button");
-  rm_label* label = new rm_label(gui, 50, 200, "Test Label");
-  rm_text_input* textInput = new rm_text_input(gui, 300, 200, 200, 40, RMGUI_TEXT_INPUT_MULTILINE);
-  rm_checkbox* checkbox = new rm_checkbox(gui, 50, 300, 30, u8"рашн текст");
+  static rm_window_style default_style;
+  default_style.apply_defaults();
+  rm_window* pwindow = new rm_window(gui, 10, 10, 500, 500);
+  pwindow->set_style(&default_style);
+
+  rm_image_button* imgButton = new rm_image_button(pwindow, 50, 50, 200, 40, "idle-button-login.png");
+  rm_button* textButton = new rm_button(pwindow, 300, 50, 200, 100, "Test Button");
+  rm_label* label = new rm_label(pwindow, 50, 200, "Test Label");
+  rm_text_input* textInput = new rm_text_input(pwindow, 300, 200, 200, 40, RMGUI_TEXT_INPUT_SINGLELINE);
+
+  static rm_checkbox_style style;
+  style.set_font_size(10.f);
+  style.set_background_color(nvgRGB(20, 20, 20));
+  style.set_border_color(nvgRGB(255, 255, 255));
+  style.set_mark_color(nvgRGB(111, 111, 255));
+  rm_checkbox* checkbox = new rm_checkbox(pwindow, 50, 300, 100, &style, u8"рашн текст");
+  rm_checkbox* checkbox2 = new rm_checkbox(pwindow, 150, 300, 100, &style, u8"рашн текст");
 
   std::vector<std::string> comboItems = { "Item 1", "Item 2", "Item 3" };
-  rm_combobox* combobox = new rm_combobox(gui, 300, 300, 200, 40, comboItems);
-  rm_slider* slider = new rm_slider(gui, 50, 400, 400, 40, 0.0f, 100.0f, 50.0f);
-  rm_progress_base* progress = new rm_progress_base(gui, 50, 350, 300, 10, 0.f, 5.f);
-  rm_progress_image* progress2 = new rm_progress_image(gui, 50, 350 + 10 + 5, 300, 10, image_pat, 0.f, 1.f, 0.f, 5.f);
+  rm_combobox* combobox = new rm_combobox(pwindow, 300, 300, 200, 40, comboItems);
+  rm_slider* slider = new rm_slider(pwindow, 50, 400, 400, 40, 0.0f, 100.0f, 50.0f,
+    [](rm_slider *psilder) {
+      printf("slider value changed: %f\n", psilder->get_value());
+    }
+  );
+  rm_progress_base* progress = new rm_progress_base(pwindow, 50, 350, 300, 10, 0.f, 5.f);
+  rm_progress_image* progress2 = new rm_progress_image(pwindow, 50, 350 + 10 + 5, 300, 10, image_pat, 0.f, 1.f, 0.f, 5.f);
  
   glfwSetCursorPosCallback(window, cursor_position_callback);
   glfwSetMouseButtonCallback(window, mouse_button_callback);

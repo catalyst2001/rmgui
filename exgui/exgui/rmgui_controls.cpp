@@ -245,8 +245,8 @@ void rm_text_input::on_text_input(int sym) {
   }
 }
 
-rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int size, const std::string& label)
-  : rm_widget(x, y, size, size, p_parent, "ui_checkbox"), m_checked(false), m_label(label)
+rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style* pstyle, const std::string& label)
+  : rm_widget(x, y, width, pstyle->get_check_size(), p_parent, "ui_checkbox"), m_checked(false), m_label(label), m_pstyle(pstyle)
 {
 }
 
@@ -256,26 +256,33 @@ void rm_checkbox::on_draw(NVGcontext* p_ctx) {
   m_bbox.from_rect(m_absolute);
   nvgFontFaceId(p_ctx, get_font());
 
+  /* paint background */
   nvgBeginPath(p_ctx);
-  nvgRect(p_ctx, m_relative.x, m_relative.y, m_relative.width, m_relative.height);
-  nvgFillColor(p_ctx, nvgRGBA(255, 255, 255, 255));
+  nvgRect(p_ctx, m_relative.x, m_relative.y, m_relative.height, m_relative.height);
+  nvgFillColor(p_ctx, m_pstyle->get_background_color());
   nvgFill(p_ctx);
-  nvgStrokeColor(p_ctx, nvgRGBA(0, 0, 0, 255));
+  nvgStrokeColor(p_ctx, m_pstyle->get_border_color());
   nvgStroke(p_ctx);
 
   if (m_checked) {
+    /* draw mark */
     nvgBeginPath(p_ctx);
     nvgMoveTo(p_ctx, m_relative.x + 3, m_relative.y + m_relative.height / 2);
-    nvgLineTo(p_ctx, m_relative.x + m_relative.width / 2, m_relative.y + m_relative.height - 3);
-    nvgLineTo(p_ctx, m_relative.x + m_relative.width - 3, m_relative.y + 3);
-    nvgStrokeColor(p_ctx, nvgRGBA(0, 200, 0, 255));
+    nvgLineTo(p_ctx, m_relative.x + m_relative.height / 2, m_relative.y + m_relative.height - 3);
+    nvgLineTo(p_ctx, m_relative.x + m_relative.height - 3, m_relative.y + 3);
+    nvgStrokeColor(p_ctx, m_pstyle->get_mark_color());
     nvgStroke(p_ctx);
   }
 
-  nvgFontSize(p_ctx, 18.0f);
+  nvgFontSize(p_ctx, m_pstyle->get_font_size());
   nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-  nvgFillColor(p_ctx, nvgRGBA(255, 255, 255, 255));
-  nvgText(p_ctx, m_relative.x + m_relative.width + 5, m_relative.y + m_relative.height / 2.0f, m_label.c_str(), nullptr);
+  nvgFillColor(p_ctx, m_pstyle->get_text_color());
+
+  const rmgui_vector2& text_offsets = m_pstyle->get_text_offsets();
+  nvgText(p_ctx, m_relative.x + m_relative.height + text_offsets.x,
+    (m_relative.y + m_relative.height / 2.0f) + text_offsets.y, 
+    m_label.c_str(),
+    nullptr);
 }
 
 bool rm_checkbox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) {
@@ -288,7 +295,7 @@ bool rm_checkbox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STAT
 }
 
 rm_combobox::rm_combobox(rm_widget* p_parent, int x, int y, int width, int height, const std::vector<std::string>& items)
-  : rm_widget(x, y, width, height, p_parent, "ui_combobox", EXGUI_FLAG_DEFAULT | EXGUI_FLAG_GLOBAL), m_items(items), m_selected(0), m_expanded(false)
+  : rm_widget(x, y, width, height, p_parent, "ui_combobox", EXGUI_FLAG_DEFAULT | EXGUI_FLAG_GLOBAL| EXGUI_FLAG_DISABLE_SCISSOR), m_items(items), m_selected(0), m_expanded(false)
 {
 }
 
@@ -334,7 +341,7 @@ bool rm_combobox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STAT
       return true;
     }
     else if (m_expanded) {
-      float itemYStart = m_relative.y + m_relative.height;
+      float itemYStart = m_absolute.y + m_relative.height;
       float itemHeight = m_relative.height;
       int index = (int)((cursor_pos.y - itemYStart) / itemHeight);
       if (index >= 0 && index < (int)m_items.size()) {
@@ -348,9 +355,34 @@ bool rm_combobox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STAT
   return false;
 }
 
-rm_slider::rm_slider(rm_widget* p_parent, int x, int y, int width, int height, float min, float max, float initial)
-  : rm_widget(x, y, width, height, p_parent, "ui_slider", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL), m_min(min), m_max(max), m_value(initial), m_dragging(false)
+void rm_slider::compute_value(rmgui_vector2& cursor_pos)
 {
+  float localX = cursor_pos.x - (m_absolute.x + m_thumb_size);
+  float fraction = localX / m_inner_rect.width;
+  fraction = std::max(0.f, std::min(1.f, fraction));
+  m_value = m_min + fraction * (m_max - m_min);
+  if (m_last_value != m_value) {
+    m_last_value = m_value;
+    if (m_pcallback) {
+      m_pcallback(this);
+    }
+  }
+}
+
+void rm_slider::compute_inner_and_thumb()
+{
+  m_thumb_size = m_relative.height / 2.5f;
+  m_inner_rect.x = m_relative.x + m_thumb_size;
+  m_inner_rect.y = m_relative.y;
+  m_inner_rect.width = m_relative.width - m_thumb_size * 2.f;
+  m_inner_rect.height = m_relative.height;
+}
+
+rm_slider::rm_slider(rm_widget* p_parent, int x, int y, int width, int height, float min, float max, float initial, rm_slider_callback pcallback)
+  : rm_widget(x, y, width, height, p_parent, "ui_slider", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL), 
+  m_min(min), m_max(max), m_value(initial), m_dragging(false), m_pcallback(pcallback)
+{
+  compute_inner_and_thumb();
 }
 
 rm_slider::~rm_slider() {}
@@ -358,18 +390,18 @@ rm_slider::~rm_slider() {}
 void rm_slider::on_draw(NVGcontext* p_ctx) {
   m_bbox.from_rect(m_absolute);
 
-  float trackY = m_relative.y + m_relative.height / 2.0f;
+  float trackY = m_inner_rect.y + m_inner_rect.height / 2.0f;
   nvgBeginPath(p_ctx);
-  nvgMoveTo(p_ctx, m_relative.x, trackY);
-  nvgLineTo(p_ctx, m_relative.x + m_relative.width, trackY);
+  nvgMoveTo(p_ctx, m_inner_rect.x, trackY);
+  nvgLineTo(p_ctx, m_inner_rect.x + m_inner_rect.width, trackY);
   nvgStrokeColor(p_ctx, nvgRGBA(150, 150, 150, 255));
   nvgStroke(p_ctx);
 
   float fraction = (m_value - m_min) / (m_max - m_min);
-  float thumbX = m_relative.x + fraction * m_relative.width;
+  float thumbX = m_inner_rect.x + fraction * m_inner_rect.width;
 
   nvgBeginPath(p_ctx);
-  nvgCircle(p_ctx, thumbX, trackY, m_relative.height / 2.5f);
+  nvgCircle(p_ctx, thumbX, trackY, m_inner_rect.height / 2.5f);
   nvgFillColor(p_ctx, nvgRGBA(100, 100, 250, 255));
   nvgFill(p_ctx);
 }
@@ -377,6 +409,7 @@ void rm_slider::on_draw(NVGcontext* p_ctx) {
 bool rm_slider::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) {
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
     m_dragging = true;
+    compute_value(cursor_pos);
     return true;
   }
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == UP) {
@@ -384,11 +417,7 @@ bool rm_slider::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE 
     return true;
   }
   if (m_dragging && event == EXGUI_MOUSE_EVENT_MOVE) {
-    float localX = cursor_pos.x - m_absolute.x;
-    float fraction = localX / m_relative.width;
-    fraction = std::max(0.f, std::min(1.f, fraction));
-    m_value = m_min + fraction * (m_max - m_min);
-    std::cout << "Slider value: " << m_value << std::endl;
+    compute_value(cursor_pos);
     return true;
   }
   return false;

@@ -1,3 +1,5 @@
 /exgui/x64
 *.exe
 /x64
+/.vs/exgui/v17
+/.vs/exgui/FileContentIndex

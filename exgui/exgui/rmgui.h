@@ -30,7 +30,7 @@
 
 /* utils */
 #define EXGUI_COUNTOF(x) (sizeof(x) / sizeof(x[0]))
-#define EXGUI_UNUSED(x) (void)(x)
+#define RMGUI_UNUSED(x) (void)(x)
 
 /**
 * object base class
@@ -306,6 +306,7 @@ enum EXGUI_EVENT : uint32_t {
 #define EXGUI_FLAG_DRAGGED       (1 << 9)
 
 #define EXGUI_FLAG_GLOBAL        (1 << 10)
+#define EXGUI_FLAG_DISABLE_SCISSOR (1 << 11)
 
 /* default flags for each widget */
 #define EXGUI_FLAG_DEFAULT       (EXGUI_FLAG_VISIBLE|EXGUI_FLAG_ACTIVE|EXGUI_FLAG_NOTIFY_CHILDS|EXGUI_FLAG_HAS_SYM|EXGUI_FLAG_HAS_KEYBD|EXGUI_FLAG_HAS_MOUSE|EXGUI_FLAG_HAS_CHILDS)
@@ -443,26 +444,26 @@ class rm_widget : protected irmgui_widget
 protected:
   /* irmgui_element empty impls */
   virtual bool on_event(EXGUI_EVENT event, rm_widget *p_from) {
-    EXGUI_UNUSED(event);
-    EXGUI_UNUSED(p_from);
+    RMGUI_UNUSED(event);
+    RMGUI_UNUSED(p_from);
     return true;
   }
   virtual void on_draw(NVGcontext* p_ctx) {
-    EXGUI_UNUSED(p_ctx);
+    RMGUI_UNUSED(p_ctx);
   }
   virtual void on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state) {
-    EXGUI_UNUSED(sc);
-    EXGUI_UNUSED(vk);
-    EXGUI_UNUSED(state);
+    RMGUI_UNUSED(sc);
+    RMGUI_UNUSED(vk);
+    RMGUI_UNUSED(state);
   }
   virtual void on_text_input(int sym) {
-    EXGUI_UNUSED(sym);
+    RMGUI_UNUSED(sym);
   }
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) {
-    EXGUI_UNUSED(event);
-    EXGUI_UNUSED(vk);
-    EXGUI_UNUSED(state);
-    EXGUI_UNUSED(cursor_pos);
+    RMGUI_UNUSED(event);
+    RMGUI_UNUSED(vk);
+    RMGUI_UNUSED(state);
+    RMGUI_UNUSED(cursor_pos);
     return false;
   }
 
@@ -495,6 +496,8 @@ protected:
 
   /* perform update root draw cache */
   inline void root_update() { /*((rmgui_surface *)m_proot)->rebuild_draw_cache();*/ }
+
+  static void move_recursive(rm_widget *pwidget, float newx, float newy);
 
 public:
   void set_classname(const char* p_clsn) {
@@ -566,6 +569,10 @@ public:
   /* font */
   inline void           set_font(rm_font font) { m_font = font; }
   inline rm_font        get_font() { return m_font; }
+
+  void move(int newx, int newy)  {
+    move_recursive(this, newx, newy);
+  }
 };
 
 class rm_surface : public rm_widget, rm_object_accrssor
@@ -584,7 +591,7 @@ class rm_surface : public rm_widget, rm_object_accrssor
 #if 0
   static void text_input_dispatcher(rmgui_widget *p_elem, int sym);
 #endif
-  void        mouse_dispatcher(rm_widget *p_elem, 
+  void mouse_dispatcher(rm_widget *p_elem,
     EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, 
     EXGUI_KEY_STATE state, rmgui_vector2 &cursor_pos);
 
@@ -742,6 +749,28 @@ public:
   inline float     get_titlebar_height() { return m_titlebar_height; }
   inline NVGcolor &get_top_gradient_color() { return m_window_top_gradient; }
   inline NVGcolor &get_bottom_gradient_color() { return m_window_bottom_gradient; }
+
+  /* setters */
+  void apply_defaults() {
+    set_corner_radius(LEFT_TOP, 5.f);
+    set_corner_radius(RIGHT_TOP, 5.f);
+    set_corner_radius(RIGHT_BOTTOM, 5.f);
+    set_corner_radius(LEFT_BOTTOM, 5.f);
+
+    m_title_font_size = 1.f;
+    m_title_font_blur_factor = 0.f;
+    m_title_font_color = nvgRGBA(255, 255, 255, 255);
+    m_title_font_shadow_color = nvgRGBA(128, 128, 128, 128);
+    m_active_background_color = nvgRGBA(40, 40, 40, 128);
+    m_inactive_background_color = nvgRGBA(20, 20, 20, 128);
+
+    m_titlebar_height=10.f;
+    m_titlebar_background_color = nvgRGBA(111, 111, 255, 128);
+    m_titlebar_shadow_color = nvgRGBA(20, 20, 20, 128);
+    m_titlebar_shadow_alpha_color = nvgRGBA(20, 20, 20, 128);
+    m_window_top_gradient = nvgRGBA(40, 40, 40, 255);
+    m_window_bottom_gradient = nvgRGBA(45, 45, 45, 255);
+  }
 };
 
 /**
@@ -760,6 +789,7 @@ class rm_window : public rm_widget, public rm_styled<rm_window_style>
 
   /* paint window background */
   virtual void on_draw(NVGcontext* p_ctx);
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos);
 
 public:
   rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags = EXGUI_FLAG_DEFAULT, uint32_t uflags = 0, void* p_userptr = nullptr);

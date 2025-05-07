@@ -1,5 +1,16 @@
-#include <algorithm>
+﻿#include <algorithm>
 #include "rmgui.h"
+
+void rm_widget::move_recursive(rm_widget* pwidget, float newx, float newy)
+{
+  pwidget->m_absolute.x += newx;
+  pwidget->m_absolute.y += newy;
+  for (size_t i = 0; i < pwidget->get_num_childs(); i++) {
+    rm_widget* pchild = pwidget->get_child(i);
+    assert(pchild && "pchild was nullptr");
+    move_recursive(pchild, newx, newy);
+  }
+}
 
 bool rm_widget::add_child(rm_widget* p_child)
 {
@@ -50,7 +61,7 @@ void rm_widget::set_parent(rm_widget* p_parent)
 
 void rm_surface::event_dispatcher(rm_widget* p_elem)
 {
-  EXGUI_UNUSED(p_elem);
+  RMGUI_UNUSED(p_elem);
 }
 
 void rm_surface::keybd_dispatcher(rm_widget* p_elem, int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
@@ -87,31 +98,55 @@ void rm_surface::mouse_dispatcher(rm_widget* p_elem,
   EXGUI_KEY_STATE state,
   rmgui_vector2& cursor_pos)
 {
+//  bool b_cursor_inside = p_elem->get_bbox().inside(cursor_pos);
+//  bool b_global_receive_events = p_elem->get_elem_flags().is_set(EXGUI_FLAG_GLOBAL);
+//
+//  if (b_cursor_inside || b_global_receive_events) {
+//    p_elem->on_mouse(event, vk, state, cursor_pos);
+//    if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && p_elem != this) {
+//      if (b_global_receive_events && !b_cursor_inside) 
+//        goto __perform_notify_childs; //HACK: K.D. change logic and remove goto!
+//      
+//      m_pfocus = p_elem;
+//      printf("updated focus to element %s\n", p_elem->get_classname());
+//    }
+//  }
+//
+//__perform_notify_childs:
+//  p_elem->m_elem_flags.toggle_bits(EXGUI_FLAG_HOVERED, b_cursor_inside);
+//  if (p_elem->get_elem_flags().has_childs() && p_elem->get_elem_flags().has_notify_childs()) {
+//    for (int i = 0; i < p_elem->get_num_childs(); i++) {
+//      mouse_dispatcher(p_elem->get_child(i), event, vk, state, cursor_pos);
+//    }
+//  }
   bool b_cursor_inside = p_elem->get_bbox().inside(cursor_pos);
   bool b_global_receive_events = p_elem->get_elem_flags().is_set(EXGUI_FLAG_GLOBAL);
-  p_elem->m_elem_flags.toggle_bits(EXGUI_FLAG_HOVERED, b_cursor_inside);
-  if (p_elem->get_elem_flags().has_childs() && p_elem->get_elem_flags().has_notify_childs()) {
-    for (int i = (int)p_elem->get_num_childs() - 1; i >= 0; i--) {
-      mouse_dispatcher(p_elem->get_child(i), event, vk, state, cursor_pos);
-    }
-  }
 
   if (b_cursor_inside || b_global_receive_events) {
     p_elem->on_mouse(event, vk, state, cursor_pos);
-    if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN &&
-      p_elem != this && 
-      !b_global_receive_events) {
-      m_pfocus = p_elem;
-      printf("updated focus to element %s\n", p_elem->get_classname());
-      return;
+
+    if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && p_elem != this) {
+      if (!(b_global_receive_events && !b_cursor_inside)) {
+        m_pfocus = p_elem;
+        printf("updated focus to element %s\n", p_elem->get_classname());
+      }
+    }
+  }
+
+  p_elem->m_elem_flags.toggle_bits(EXGUI_FLAG_HOVERED, b_cursor_inside);
+
+  if (p_elem->get_elem_flags().has_childs() &&
+    p_elem->get_elem_flags().has_notify_childs())
+  {
+    for (int i = 0; i < p_elem->get_num_childs(); i++) {
+      mouse_dispatcher(p_elem->get_child(i), event, vk, state, cursor_pos);
     }
   }
 }
 
-
 void rm_surface::build_draw_cache_recursive(rm_widget* p_elem)
 {
-  /* is visible? */
+  ///* is visible? */
   if (p_elem->get_elem_flags().has_visible() && m_pfocus != p_elem) { //TODO: K.D. skip focused widget
     /* add element to draw path container */
     m_draw_cache.push_back(p_elem);
@@ -141,7 +176,11 @@ void rm_surface::draw()
     rm_widget* pwidget = m_draw_cache[i];
     rm_rect& outer_rect = pwidget->get_absolute();
     nvgSave(m_pctx);
-    nvgScissor(m_pctx, outer_rect.x, outer_rect.y, outer_rect.width, outer_rect.height);
+
+    /* disabled scissoring? */
+    if(!pwidget->get_elem_flags().is_set(EXGUI_FLAG_DISABLE_SCISSOR))
+      nvgScissor(m_pctx, outer_rect.x, outer_rect.y, outer_rect.width, outer_rect.height);
+
     nvgTranslate(m_pctx, outer_rect.x, outer_rect.y);
     pwidget->on_draw(m_pctx);
     //nvgResetTransform(m_pctx);
@@ -232,7 +271,7 @@ rm_surface::~rm_surface()
 
 void rm_window::on_draw(NVGcontext* p_ctx)
 {
-  nvgSave(p_ctx);
+  //nvgSave(p_ctx);
   rm_window_style* p_style = get_style();
   assert(p_style && "rmgui_window::on_draw(): window style is not set! Use rmgui_window::set_style(rmgui_wi1ndow_style *)");
   int b_is_active = (int)(get_elem_flags().is_focused() || get_elem_flags().is_hovered());
@@ -241,17 +280,21 @@ void rm_window::on_draw(NVGcontext* p_ctx)
   nvgFillColor(p_ctx, p_style->get_background_color(b_is_active));
   nvgRoundedRectVarying(p_ctx,
     m_relative.x, m_relative.y, m_relative.width, m_relative.height,
-    p_style->get_corner_radius(LEFT_TOP), p_style->get_corner_radius(RIGHT_TOP), 0, 0);
+    p_style->get_corner_radius(LEFT_TOP), p_style->get_corner_radius(RIGHT_TOP),
+    p_style->get_corner_radius(RIGHT_BOTTOM), p_style->get_corner_radius(LEFT_BOTTOM));
   nvgFill(p_ctx);
 
+  //nvgFontFaceId(p_ctx, get_font());
+  //nvgFontSize(p_ctx, p_style->get_font_size());
+}
 
-  //nvgTranslate()
-
-
-  nvgFontFaceId(p_ctx, get_font());
-  nvgFontSize(p_ctx, p_style->get_font_size());
-
-  nvgRestore(p_ctx);
+bool rm_window::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos)
+{
+  //move(
+  //  cursor_pos.x - m_absolute.x,
+  //  cursor_pos.y - m_absolute.y
+  //);
+  return true;
 }
 
 rm_window::rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags, uint32_t uflags, void* p_userptr) :
