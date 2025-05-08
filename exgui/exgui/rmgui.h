@@ -649,6 +649,7 @@ public:
   /* fonts */
   rm_font  load_font_from_memory(const void* psrc_ttf_mem, size_t srclen, const char* pfontname);
   rm_font  load_font(const char* pfilename, const char *pfontname);
+  rm_font  find_font(const char* pfontname);
   void     free_font(rm_font& font);
 };
 

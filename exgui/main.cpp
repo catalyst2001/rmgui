@@ -291,7 +291,7 @@ int main() {
 
   rm_image_button* imgButton = new rm_image_button(pwindow, 50, 50, 200, 40, "idle-button-login.png");
   rm_button* textButton = new rm_button(pwindow, 300, 50, 200, 100, "Test Button");
-  rm_label* label = new rm_label(pwindow, 50, 200, ICON_FA_ANCHOR " " ICON_FA_SIGNAL " " ICON_FA_HOME " " u8"\uf025");
+  rm_label* label = new rm_label(pwindow, 50, 200, ICON_FA_CHECK " " ICON_FA_SIGNAL " " ICON_FA_HOME " " u8"\uf025");
   label->set_font(fontawesome);
 
   rm_text_input* textInput = new rm_text_input(pwindow, 300, 200, 200, 40, RMGUI_TEXT_INPUT_SINGLELINE);
