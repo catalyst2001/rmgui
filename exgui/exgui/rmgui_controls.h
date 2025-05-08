@@ -65,7 +65,7 @@ public:
 /**
 * CHECKBOX
 */
-class rm_checkbox_style {
+class rm_checkbox_style : public rm_corners_style {
   rmgui_vector2 m_text_offset;
   NVGcolor      m_text_color;
   NVGcolor      m_bkg_color;
@@ -102,10 +102,10 @@ public:
   inline void set_font_size(float fsize) { m_font_size = fsize; }
 };
 
-class rm_checkbox : public rm_widget {
+class rm_checkbox : public rm_widget, public rm_styled<rm_checkbox_style> {
   bool               m_checked;
   std::string        m_label;
-  rm_checkbox_style *m_pstyle;
+  rm_font            m_icon_font;
 public:
   rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style *pstyle, const std::string& label);
   virtual ~rm_checkbox();

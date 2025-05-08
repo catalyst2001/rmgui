@@ -307,6 +307,7 @@ rm_surface::rm_surface(NVGcontext* p_ctx, int width, int height, irmgui_sysdf* p
   set_root(this);
   m_pctx = p_ctx;
   m_pfocus = nullptr;
+  load_font_from_memory(fontawesomewebfont, FONT_SIZE, "fontawesome");
 }
 
 rm_surface::~rm_surface()

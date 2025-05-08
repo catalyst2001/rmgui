@@ -7,7 +7,6 @@
 #include <iostream>
 #include <vector>
 #include "blendish_test.h"
-#include "rmgui_resources.h"
 
 // Глобальный указатель на корневую поверхность GUI для использования в колбэках
 static rm_surface* g_gui = nullptr;
@@ -270,11 +269,6 @@ int main() {
     printf("can't load font!\n");
   }
 
-  rm_font fontawesome = gui->load_font_from_memory(fontawesomewebfont, FONT_SIZE, "fontawesome");
-  if (!fontawesome.is_valid()) {
-    printf("failed to load icons font\n");
-  }
-
   rm_image image_pat = gui->load_image("ipat.png", NVG_IMAGE_REPEATX);
   if (!image_pat.is_valid()) {
     printf("can't load image\n");
@@ -291,16 +285,19 @@ int main() {
 
   rm_image_button* imgButton = new rm_image_button(pwindow, 50, 50, 200, 40, "idle-button-login.png");
   rm_button* textButton = new rm_button(pwindow, 300, 50, 200, 100, "Test Button");
-  rm_label* label = new rm_label(pwindow, 50, 200, ICON_FA_CHECK " " ICON_FA_SIGNAL " " ICON_FA_HOME " " u8"\uf025");
-  label->set_font(fontawesome);
+  rm_label* label = new rm_label(pwindow, 50, 200, "this is rm_label");
 
   rm_text_input* textInput = new rm_text_input(pwindow, 300, 200, 200, 40, RMGUI_TEXT_INPUT_SINGLELINE);
 
   static rm_checkbox_style style;
   style.set_font_size(10.f);
   style.set_background_color(nvgRGB(20, 20, 20));
-  style.set_border_color(nvgRGB(255, 255, 255));
+  style.set_border_color(nvgRGB(80, 80, 80));
   style.set_mark_color(nvgRGB(111, 111, 255));
+  style.set_corner_radius(LEFT_TOP, 4.f);
+  style.set_corner_radius(RIGHT_TOP, 4.f);
+  style.set_corner_radius(RIGHT_BOTTOM, 4.f);
+  style.set_corner_radius(LEFT_BOTTOM, 4.f);
   rm_checkbox* checkbox = new rm_checkbox(pwindow, 50, 300, 100, &style, u8"рашн текст");
   rm_checkbox* checkbox2 = new rm_checkbox(pwindow, 150, 300, 100, &style, u8"рашн текст");
 

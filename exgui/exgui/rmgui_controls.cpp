@@ -246,43 +246,53 @@ void rm_text_input::on_text_input(int sym) {
 }
 
 rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style* pstyle, const std::string& label)
-  : rm_widget(x, y, width, pstyle->get_check_size(), p_parent, "ui_checkbox"), m_checked(false), m_label(label), m_pstyle(pstyle)
+  : rm_widget(x, y, width, pstyle->get_check_size(), p_parent, "ui_checkbox"), m_checked(false), m_label(label)
 {
+  set_style(pstyle);
+  m_icon_font = m_proot->find_font("fontawesome");
+  assert(m_icon_font.is_valid() && "'fontawesome' not loaded");
 }
 
 rm_checkbox::~rm_checkbox() {}
 
 void rm_checkbox::on_draw(NVGcontext* p_ctx) {
+  float xo, yo;
   m_bbox.from_rect(m_absolute);
   nvgFontFaceId(p_ctx, get_font());
 
   /* paint background */
   nvgBeginPath(p_ctx);
-  nvgRect(p_ctx, m_relative.x, m_relative.y, m_relative.height, m_relative.height);
+  nvgRoundedRectVarying(p_ctx,
+    m_relative.x, m_relative.y, m_relative.height, m_relative.height,
+    m_pstyle->get_corner_radius(LEFT_TOP),
+    m_pstyle->get_corner_radius(RIGHT_TOP),
+    m_pstyle->get_corner_radius(RIGHT_BOTTOM),
+    m_pstyle->get_corner_radius(LEFT_BOTTOM)
+  );
   nvgFillColor(p_ctx, m_pstyle->get_background_color());
   nvgFill(p_ctx);
+  nvgStrokeWidth(p_ctx, 1.f);
   nvgStrokeColor(p_ctx, m_pstyle->get_border_color());
   nvgStroke(p_ctx);
 
   if (m_checked) {
     /* draw mark */
-    nvgBeginPath(p_ctx);
-    nvgMoveTo(p_ctx, m_relative.x + 3, m_relative.y + m_relative.height / 2);
-    nvgLineTo(p_ctx, m_relative.x + m_relative.height / 2, m_relative.y + m_relative.height - 3);
-    nvgLineTo(p_ctx, m_relative.x + m_relative.height - 3, m_relative.y + 3);
-    nvgStrokeColor(p_ctx, m_pstyle->get_mark_color());
-    nvgStroke(p_ctx);
+    nvgFontFaceId(p_ctx, m_icon_font);
+    nvgFontSize(p_ctx, 16.f);
+    nvgTextAlign(p_ctx, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+    nvgFillColor(p_ctx, m_pstyle->get_text_color());
+    xo = m_relative.height / 2.f;
+    yo = m_relative.height / 2.f;
+    nvgText(p_ctx, m_relative.x + xo, m_relative.y + yo, ICON_FA_CHECK, nullptr);
   }
 
+  nvgFontFaceId(p_ctx, get_font());
   nvgFontSize(p_ctx, m_pstyle->get_font_size());
   nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
   nvgFillColor(p_ctx, m_pstyle->get_text_color());
 
   const rmgui_vector2& text_offsets = m_pstyle->get_text_offsets();
-  nvgText(p_ctx, m_relative.x + m_relative.height + text_offsets.x,
-    (m_relative.y + m_relative.height / 2.0f) + text_offsets.y, 
-    m_label.c_str(),
-    nullptr);
+  nvgText(p_ctx, m_relative.x + m_relative.height + text_offsets.x, (m_relative.y + m_relative.height / 2.0f) + text_offsets.y, m_label.c_str(), nullptr);
 }
 
 bool rm_checkbox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) {

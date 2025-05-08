@@ -1,32 +1,34 @@
-/**
-* MIT License
-* Copyright (c) 2024. Kirill Deryabin  kd@allalg.org
-* 
-* Retained Mode GUI (RmGUI)
-* 
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-* 
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
-* 
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*/
+//
+// Copyright (c) 2024 Inradian Developments
+// Retained Mode GUI (RmGUI) based on NanoVG
+// 
+// This software is provided 'as-is', without any express or implied
+// warranty.  In no event will the authors be held liable for any damages
+// arising from the use of this software.
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+// 1. The origin of this software must not be misrepresented; you must not
+//    claim that you wrote the original software. If you use this software
+//    in a product, an acknowledgment in the product documentation would be
+//    appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//    misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+// 
+// Authors:
+//  Mikko Mononen   memon@inside.org (NanoVG author)
+//  Kirill Deryabin "catalyst" kd@allalg.ru
+//  Daniil Runin "Daniluk2"
+//  Igor Shubin "Okay+++"
+//
+
 #pragma once
 #include "nanovg.h"
 #include <vector>
 #include <string>
 #include <cassert>
+#include "rmgui_resources.h"
 
 /* utils */
 #define EXGUI_COUNTOF(x) (sizeof(x) / sizeof(x[0]))
@@ -439,7 +441,7 @@ class rm_widget : protected irmgui_widget
 {
   /* allow rmgui_root class to call irmgui_element vmethods */
   friend class rm_surface;
-  inline void set_root(rm_widget* p_root) { m_proot = p_root; }
+  inline void set_root(rm_surface* p_root) { m_proot = p_root; }
 
 protected:
   /* irmgui_element empty impls */
@@ -470,7 +472,7 @@ protected:
 protected:
   using _childs_vec = std::vector<rm_widget*>;
   _childs_vec      m_childs;
-  rm_widget       *m_proot;
+  rm_surface      *m_proot;
   rm_widget       *m_pparent;
   void            *m_puserptr;
   irmgui_sysdf    *m_psysdf;
@@ -483,7 +485,7 @@ protected:
   rm_rect          m_absolute;
   int              m_zindex;
 
-  inline rm_widget* get_root() { return m_proot; }
+  inline rm_surface* get_root() { return m_proot; }
 
   ///* rmgui_root::rebuild_draw_cache accessor class */
   //class rmgui_root_update_acessor : public rmgui_root {
@@ -529,7 +531,7 @@ public:
 
     /* set font from root */
     if (m_proot)
-      set_font(m_proot->get_font());
+      set_font(((rm_widget *)m_proot)->get_font());
 
     set_classname(p_classname);
   }
@@ -698,13 +700,14 @@ public:
 template<class _dst_style_type>
 class rm_styled
 {
-  rm_style_base* m_pstyle;
+protected:
+  _dst_style_type* m_pstyle;
 public:
   rm_styled() : m_pstyle(nullptr) {}
   ~rm_styled() {}
 
-  inline _dst_style_type* get_style() { return reinterpret_cast<_dst_style_type*>(m_pstyle); }
-  inline void             set_style(rm_style_base* p_style) { m_pstyle = p_style; }
+  inline _dst_style_type* get_style() { return m_pstyle; }
+  inline void             set_style(_dst_style_type* p_style) { m_pstyle = p_style; }
 };
 
 enum EXGUI_CORNER : uint32_t {
