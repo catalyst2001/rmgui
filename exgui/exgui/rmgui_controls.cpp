@@ -82,10 +82,10 @@ rm_image_button::~rm_image_button() {
 
 void rm_image_button::on_draw(NVGcontext* p_ctx) {
   m_bbox.from_rect(m_absolute);
-  nvgBeginPath(p_ctx);
-  nvgRect(p_ctx, m_relative.x, m_relative.y, m_relative.width, m_relative.height);
-  nvgFillColor(p_ctx, nvgRGBA(200, 200, 200, 255));
-  nvgFill(p_ctx);
+  //nvgBeginPath(p_ctx);
+  //nvgRect(p_ctx, m_relative.x, m_relative.y, m_relative.width, m_relative.height);
+  //nvgFillColor(p_ctx, nvgRGBA(200, 200, 200, 255));
+  //nvgFill(p_ctx);
 
   if (m_image && m_image->imageId != -1) {
     NVGpaint imgPaint = nvgImagePattern(p_ctx,
@@ -573,4 +573,29 @@ void rm_scroll_base::draw(NVGcontext* p_ctx, const rm_rect& back, float pos)
   // paint background
 
   // paint thumb
+}
+
+void rm_animation::on_draw(NVGcontext* p_ctx)
+{
+  rmgui_vector2 pos(m_relative.width / 2.f, m_relative.height / 2.f);
+  nvgTranslate(p_ctx, pos.x, pos.y);
+  nvgRotate(p_ctx, m_angle);
+  nvgScale(p_ctx, m_scale, m_scale);
+  nvgTranslate(p_ctx, -pos.x, -pos.y);
+  nvgBeginPath(p_ctx);
+  NVGpaint imgPaint = nvgImagePattern(p_ctx, m_relative.x, m_relative.y, m_relative.width, m_relative.height, 0.0f, m_image, 1.0f);
+  nvgBeginPath(p_ctx);
+  nvgRoundedRect(p_ctx, m_relative.x, m_relative.y, m_relative.width, m_relative.height, 4.0f);
+  nvgFillPaint(p_ctx, imgPaint);
+  nvgFill(p_ctx);
+  m_angle += m_speed * m_proot->get_delta_time();
+}
+
+rm_animation::rm_animation(rm_widget* p_parent, int x, int y, int width, int height, rm_image img, float start_angle, float scale, float speed) :
+  rm_widget(x, y, width, height, p_parent, "ui_animation"), m_image(img), m_speed(speed), m_angle(start_angle), m_scale(scale)
+{
+}
+
+rm_animation::~rm_animation()
+{
 }

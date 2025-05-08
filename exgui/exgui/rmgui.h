@@ -623,9 +623,11 @@ struct layer_draw_cache {
 
 class rm_surface : public rm_widget, rm_object_accrssor
 {
-  NVGcontext                   *m_pctx;
-  rm_widget                    *m_pfocus;
-  std::vector<layer_draw_cache *> m_layers;
+  using _vec_layers = std::vector<layer_draw_cache*>;
+  _vec_layers m_layers;
+  NVGcontext *m_pctx;
+  rm_widget  *m_pfocus;
+  float       m_delta_time;
 
   void build_draw_cache_recursive(rm_widget *p_elem);
 
@@ -644,20 +646,23 @@ class rm_surface : public rm_widget, rm_object_accrssor
 //protected:
 public:
   void rebuild_draw_cache();
-  layer_draw_cache* get_layer_by_zid(int zid);
+  layer_draw_cache* get_layer_by_zindex(int zid);
 
 public:
   rm_surface(NVGcontext *p_ctx, int width, int height, irmgui_sysdf *p_sysdf);
   ~rm_surface();
 
   /* main events */
-  void draw();
+  void draw(float dt);
   void keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state);
   void textinput(int sym);
   void mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, int x, int y);
   void resize(int width, int height);
 
   NVGcontext* get_context() { return m_pctx; }
+
+  /* delta time */
+  inline float get_delta_time() const { return m_delta_time; }
 
   /* images */
   rm_image load_image_from_memory(const void *psrc, size_t srclen, int flags);
@@ -718,16 +723,6 @@ public:
 */
 
 /**
-* style base class
-*/
-class rm_style_base
-{
-public:
-  rm_style_base() {}
-  ~rm_style_base() {}
-};
-
-/**
 * styled widget base class
 */
 template<class _dst_style_type>
@@ -773,7 +768,7 @@ public:
 /**
 * Window
 */
-class rm_window_style : public rm_style_base, public rm_corners_style
+class rm_window_style : public rm_corners_style
 {
 protected:
   float    m_title_font_size;

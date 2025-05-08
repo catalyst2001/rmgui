@@ -283,25 +283,32 @@ int main() {
   pwindow->set_style(&default_style);
   pwindow->set_zindex(-1);
 
-  rm_image_button* imgButton = new rm_image_button(pwindow, 50, 50, 200, 40, "idle-button-login.png");
-  rm_button* textButton = new rm_button(pwindow, 300, 50, 200, 100, "Test Button");
-  rm_label* label = new rm_label(pwindow, 50, 200, "this is rm_label");
-
-  rm_text_input* textInput = new rm_text_input(pwindow, 300, 200, 200, 40, RMGUI_TEXT_INPUT_SINGLELINE);
+  rm_image_button* imgButton = new rm_image_button(pwindow, 20, 20, 200, 40, "idle-button-login.png");
+  rm_button* textButton = new rm_button(pwindow, 200 + 20 + 10, 20, 200, 40, "Test Button");
+  rm_label* label = new rm_label(pwindow, 20, 40 + 30, "this is rm_label");
+  rm_text_input* textInput = new rm_text_input(pwindow, 300, 100, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
 
   static rm_checkbox_style style;
-  style.set_font_size(10.f);
+  style.set_font_size(14.f);
   style.set_background_color(nvgRGB(20, 20, 20));
   style.set_border_color(nvgRGB(80, 80, 80));
   style.set_mark_color(nvgRGB(111, 111, 255));
-  style.set_corner_radius(LEFT_TOP, 4.f);
-  style.set_corner_radius(RIGHT_TOP, 4.f);
-  style.set_corner_radius(RIGHT_BOTTOM, 4.f);
-  style.set_corner_radius(LEFT_BOTTOM, 4.f);
-  rm_checkbox* checkbox = new rm_checkbox(pwindow, 50, 300, 100, &style, u8"рашн текст");
-  rm_checkbox* checkbox2 = new rm_checkbox(pwindow, 150, 300, 100, &style, u8"рашн текст");
+  //style.set_corner_radius(LEFT_TOP, 4.f);
+  //style.set_corner_radius(RIGHT_TOP, 4.f);
+  //style.set_corner_radius(RIGHT_BOTTOM, 4.f);
+  //style.set_corner_radius(LEFT_BOTTOM, 4.f);
+  rm_checkbox* checkbox = new rm_checkbox(pwindow, 20, 40 + 30 + 20, 100, &style, "Enable");
+  rm_checkbox* checkbox2 = new rm_checkbox(pwindow, 150, 40 + 30 + 20, 100, &style, u8"Включить");
 
-  rm_combobox* combobox = new rm_combobox(pwindow, 300, 300, 200, 40);
+  rm_animation* anim = new rm_animation(pwindow, 20, 100, 100, 100, image_pat);
+  anim->set_speed(4.f);
+  anim->set_scale(0.5f);
+
+  rm_animation* anim2 = new rm_animation(pwindow, 20 + 100, 100, 100, 100, image_pat);
+  anim2->set_speed(-4.f);
+  anim2->set_scale(0.5f);
+
+  rm_combobox* combobox = new rm_combobox(pwindow, 300, 100+50, 200, 20);
   combobox->add_item("Item 1");
   combobox->add_item("Item 2");
   combobox->add_item("Item 3");
@@ -321,6 +328,8 @@ int main() {
 
   glDisable(GL_DEPTH_TEST);
 
+  float last_time = 0.f;
+  float current_time = 1.f;
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
     int fbWidth, fbHeight;
@@ -329,13 +338,16 @@ int main() {
     glClearColor(0.3f, 0.3f, 0.32f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    float percent = fabsf(sinf(instance.get_time())) * 100.f;
+    last_time = current_time;
+    current_time = instance.get_time();
+    float dt = current_time - last_time;
+    float percent = fabsf(sinf(current_time)) * 100.f;
     progress->set_percent(percent);
     progress2->set_percent(slider->get_value());
 
     gui->resize(fbWidth, fbHeight);
     gui->rebuild_draw_cache();
-    gui->draw();
+    gui->draw(dt);
 
 #if 0
     int w, h;

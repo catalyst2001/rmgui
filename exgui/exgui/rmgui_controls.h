@@ -146,7 +146,6 @@ public:
 
 class rm_combobox;
 using rm_combobox_cb = void(*)(rm_combobox *pcombo, rm_combo_item *pitem, size_t itemid);
-
 class rm_combobox : public rm_widget, public rm_callback<rm_combobox_cb> {
   std::vector<rm_combo_item> m_items;
   int  m_selected;
@@ -168,9 +167,15 @@ public:
   }
 };
 
+/**
+* =============================================
+* Slider
+*
+*
+* =============================================
+*/
 class rm_slider;
 using rm_slider_callback = void(*)(rm_slider *pslider);
-
 class rm_slider : public rm_widget {
   float   m_min;
   float   m_max;
@@ -190,6 +195,13 @@ public:
   float get_value() const { return m_value; }
 };
 
+/**
+* =============================================
+* Progress Base class
+*
+*
+* =============================================
+*/
 class rm_progress_base : public rm_widget
 {
 protected:
@@ -207,8 +219,11 @@ public:
 };
 
 /**
-* progress widget
-* with image pattern
+* =============================================
+* Progress Image
+*
+*
+* =============================================
 */
 class rm_progress_image : public rm_progress_base
 {
@@ -259,4 +274,31 @@ class rm_scroll_base
 protected:
   void orient_detect(const rm_rect &background);
   void draw(NVGcontext* p_ctx, const rm_rect &back, float pos);
+};
+
+/**
+* =============================================
+* Animation
+*
+*
+* =============================================
+*/
+class rm_animation : public rm_widget
+{
+  rm_image m_image;
+  float    m_speed;
+  float    m_angle;
+  float    m_scale;
+  virtual void on_draw(NVGcontext* p_ctx) override;
+public:
+  rm_animation(rm_widget* p_parent, int x, int y, int width, int height, rm_image img, float start_angle=0.f, float scale=1.f, float speed=1.f);
+  ~rm_animation();
+  inline void     set_image(rm_image img) { m_image = img; }
+  inline rm_image get_image() const { return m_image; }
+  inline void     set_angle(float angle) { m_angle = angle; }
+  inline float    get_angle() const { return m_angle; }
+  inline void     set_speed(float speed) { m_speed = speed; }
+  inline float    get_speed() const { return m_speed; }
+  inline void     set_scale(float scl) { m_scale = scl; }
+  inline float    get_scale() const { return m_scale; }
 };

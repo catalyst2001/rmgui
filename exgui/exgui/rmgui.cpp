@@ -140,7 +140,7 @@ void rm_surface::build_draw_cache_recursive(rm_widget* p_elem)
   ///* is visible? */
   if (p_elem->get_elem_flags().has_visible()) {
     /* add element to draw path container */
-    layer_draw_cache* player = get_layer_by_zid(p_elem->get_zindex());
+    layer_draw_cache* player = get_layer_by_zindex(p_elem->get_zindex());
     if(player)
       player->add_widget(p_elem);
 
@@ -160,7 +160,7 @@ void rm_surface::rebuild_draw_cache()
   build_draw_cache_recursive(this);
 }
 
-layer_draw_cache *rm_surface::get_layer_by_zid(int zid)
+layer_draw_cache *rm_surface::get_layer_by_zindex(int zid)
 {
   layer_draw_cache* pcache;
   auto it = std::find_if(m_layers.begin(), m_layers.end(),
@@ -185,8 +185,9 @@ layer_draw_cache *rm_surface::get_layer_by_zid(int zid)
   return pcache;
 }
 
-void rm_surface::draw()
+void rm_surface::draw(float dt)
 {
+  m_delta_time = dt;
   nvgBeginFrame(m_pctx, m_relative.width, m_relative.height, 1.f);
   /* drawing layers */
   for (size_t i = 0; i < m_layers.size(); i++) {
@@ -298,6 +299,7 @@ rm_surface::rm_surface(NVGcontext* p_ctx, int width, int height, irmgui_sysdf* p
   set_root(this);
   m_pctx = p_ctx;
   m_pfocus = nullptr;
+  m_delta_time = 0.f;
   load_font_from_memory(fontawesomewebfont, FONT_SIZE, "fontawesome");
 }
 
@@ -307,7 +309,6 @@ rm_surface::~rm_surface()
 
 void rm_window::on_draw(NVGcontext* p_ctx)
 {
-  //nvgSave(p_ctx);
   rm_window_style* p_style = get_style();
   assert(p_style && "rmgui_window::on_draw(): window style is not set! Use rmgui_window::set_style(rmgui_wi1ndow_style *)");
   int b_is_active = (int)(get_elem_flags().is_focused() || get_elem_flags().is_hovered());
@@ -319,9 +320,6 @@ void rm_window::on_draw(NVGcontext* p_ctx)
     p_style->get_corner_radius(LEFT_TOP), p_style->get_corner_radius(RIGHT_TOP),
     p_style->get_corner_radius(RIGHT_BOTTOM), p_style->get_corner_radius(LEFT_BOTTOM));
   nvgFill(p_ctx);
-
-  //nvgFontFaceId(p_ctx, get_font());
-  //nvgFontSize(p_ctx, p_style->get_font_size());
 }
 
 bool rm_window::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos)
