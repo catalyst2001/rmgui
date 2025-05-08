@@ -245,10 +245,11 @@ void rm_text_input::on_text_input(int sym) {
   }
 }
 
-rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style* pstyle, const std::string& label)
+rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style* pstyle, const std::string& label, rm_checkbox_cb pcallback)
   : rm_widget(x, y, width, pstyle->get_check_size(), p_parent, "ui_checkbox"), m_checked(false), m_label(label)
 {
   set_style(pstyle);
+  set_callback(pcallback);
   m_icon_font = m_proot->find_font("fontawesome");
   assert(m_icon_font.is_valid() && "'fontawesome' not loaded");
 }
@@ -304,13 +305,34 @@ bool rm_checkbox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STAT
   return true;
 }
 
-rm_combobox::rm_combobox(rm_widget* p_parent, int x, int y, int width, int height, const std::vector<std::string>& items)
-  : rm_widget(x, y, width, height, p_parent, "ui_combobox", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL|EXGUI_FLAG_DISABLE_SCISSOR|EXGUI_FLAG_HIGHEST_PRIORITY), m_items(items), m_selected(0), m_expanded(false)
+rm_combobox::rm_combobox(rm_widget* p_parent, int x, int y, int width, int height, rm_combobox_cb pcallback)
+  : rm_widget(x, y, width, height, p_parent, "ui_combobox", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL|EXGUI_FLAG_DISABLE_SCISSOR|EXGUI_FLAG_HIGHEST_PRIORITY), m_selected(0), m_expanded(false)
 {
+  set_callback(pcallback);
   set_zindex(999); //topmost
 }
 
 rm_combobox::~rm_combobox() {}
+
+size_t rm_combobox::add_item(const char* pitem, void* puserdata)
+{
+  m_items.push_back({ pitem, puserdata });
+  return m_items.size() - 1;
+}
+
+size_t rm_combobox::find_item(const char* pitem)
+{
+  auto it = std::find_if(m_items.begin(), m_items.end(),
+    [pitem](rm_combo_item &item) {
+      return !strcmp(pitem, item.get_name());
+    }
+  );
+
+  if (it != m_items.end())
+    return it - m_items.begin();
+
+  return rm_combobox::kinvalid_index;
+}
 
 void rm_combobox::on_draw(NVGcontext* p_ctx) {
   m_bbox.from_rect(m_absolute);
@@ -327,10 +349,11 @@ void rm_combobox::on_draw(NVGcontext* p_ctx) {
   nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
   nvgFillColor(p_ctx, nvgRGBA(0, 0, 0, 255));
   if (!m_items.empty() && m_selected >= 0 && m_selected < (int)m_items.size())
-    nvgText(p_ctx, m_relative.x + 5, m_relative.y + m_relative.height / 2.0f, m_items[m_selected].c_str(), nullptr);
+    nvgText(p_ctx, m_relative.x + 5, m_relative.y + m_relative.height / 2.0f, m_items[m_selected].get_name(), nullptr);
 
   if (m_expanded) {
     for (size_t i = 0; i < m_items.size(); i++) {
+      rm_combo_item& item = m_items[i];
       float itemY = m_relative.y + m_relative.height * (1 + i);
       nvgBeginPath(p_ctx);
       nvgRect(p_ctx, m_relative.x, itemY, m_relative.width, m_relative.height);
@@ -340,7 +363,7 @@ void rm_combobox::on_draw(NVGcontext* p_ctx) {
       nvgStroke(p_ctx);
       nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
       nvgFillColor(p_ctx, nvgRGBA(0, 0, 0, 255));
-      nvgText(p_ctx, m_relative.x + 5, itemY + m_relative.height / 2.0f, m_items[i].c_str(), nullptr);
+      nvgText(p_ctx, m_relative.x + 5, itemY + m_relative.height / 2.0f, item.get_name(), nullptr);
     }
   }
 }
@@ -358,7 +381,9 @@ bool rm_combobox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STAT
       int index = (int)((cursor_pos.y - itemYStart) / itemHeight);
       if (index >= 0 && index < (int)m_items.size()) {
         m_selected = index;
-        std::cout << "Combobox selected: " << m_items[m_selected] << std::endl;
+        if (is_valid_callback()) {
+          get_callback()(this, &m_items[m_selected], (size_t)m_selected);
+        }
       }
       m_expanded = false;
       return false;
@@ -366,10 +391,9 @@ bool rm_combobox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STAT
   }
 
   if (m_expanded) {
-    printf("rm_combobox: restrict events\n");
+    //printf("rm_combobox: absorb events\n");
     return false; //absorb the event
   }
-
   return true;
 }
 

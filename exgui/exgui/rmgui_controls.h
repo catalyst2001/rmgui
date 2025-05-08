@@ -102,26 +102,70 @@ public:
   inline void set_font_size(float fsize) { m_font_size = fsize; }
 };
 
-class rm_checkbox : public rm_widget, public rm_styled<rm_checkbox_style> {
-  bool        m_checked;
-  std::string m_label;
-  rm_font     m_icon_font;
-public:
-  rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style *pstyle, const std::string& label);
-  virtual ~rm_checkbox();
+/**
+* =============================================
+* CheckBox
+* 
+* 
+* =============================================
+*/
+class rm_checkbox;
+using rm_checkbox_cb = bool (*)(rm_checkbox *pcheckbox);
+class rm_checkbox : public rm_widget, public rm_styled<rm_checkbox_style>, public rm_callback<rm_checkbox_cb> {
+  bool           m_checked;
+  std::string    m_label;
+  rm_font        m_icon_font;
+
   virtual void on_draw(NVGcontext* p_ctx) override;
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
+public:
+  rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style *pstyle, const std::string& label, rm_checkbox_cb pcallback=nullptr);
+  virtual ~rm_checkbox();
+  inline bool        is_checked() const { return m_checked; }
+  inline const char* get_label() const { return m_label.c_str(); }
+  inline void        set_label(const char* plabeltext) { m_label.assign(plabeltext); }
 };
 
-class rm_combobox : public rm_widget {
-  std::vector<std::string> m_items;
-  int m_selected;
-  bool m_expanded;
+/**
+* =============================================
+* ComboBox
+*
+*
+* =============================================
+*/
+class rm_combo_item {
+  std::string name;
+  void* pdata;
 public:
-  rm_combobox(rm_widget* p_parent, int x, int y, int width, int height, const std::vector<std::string>& items);
-  virtual ~rm_combobox();
+  rm_combo_item() : pdata(nullptr) {}
+  rm_combo_item(const char* pname, void* userptr = nullptr) : name(pname), pdata(userptr) {}
+
+  inline const char* get_name() const { return name.c_str(); }
+  inline void* get_userdata() const { return pdata; }
+};
+
+class rm_combobox;
+using rm_combobox_cb = void(*)(rm_combobox *pcombo, rm_combo_item *pitem, size_t itemid);
+
+class rm_combobox : public rm_widget, public rm_callback<rm_combobox_cb> {
+  std::vector<rm_combo_item> m_items;
+  int  m_selected;
+  bool m_expanded;
+
   virtual void on_draw(NVGcontext* p_ctx) override;
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
+public:
+  const size_t kinvalid_index = ((size_t)-1);
+  rm_combobox(rm_widget* p_parent, int x, int y, int width, int height, rm_combobox_cb pcallback=nullptr);
+  virtual ~rm_combobox();
+
+  inline size_t get_num_items() const { return m_items.size(); }
+  size_t add_item(const char *pitem, void *puserdata=nullptr);
+  size_t find_item(const char* pitem);
+  inline rm_combo_item* get_item(size_t idx) {
+    assert(idx < m_items.size() && "item index out of bounds");
+    return &m_items[idx];
+  }
 };
 
 class rm_slider;

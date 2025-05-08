@@ -301,8 +301,10 @@ int main() {
   rm_checkbox* checkbox = new rm_checkbox(pwindow, 50, 300, 100, &style, u8"рашн текст");
   rm_checkbox* checkbox2 = new rm_checkbox(pwindow, 150, 300, 100, &style, u8"рашн текст");
 
-  std::vector<std::string> comboItems = { "Item 1", "Item 2", "Item 3" };
-  rm_combobox* combobox = new rm_combobox(pwindow, 300, 300, 200, 40, comboItems);
+  rm_combobox* combobox = new rm_combobox(pwindow, 300, 300, 200, 40);
+  combobox->add_item("Item 1");
+  combobox->add_item("Item 2");
+  combobox->add_item("Item 3");
 
   rm_slider* slider = new rm_slider(pwindow, 50, 400, 400, 40, 0.0f, 100.0f, 50.0f,
     [](rm_slider *psilder) {

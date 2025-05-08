@@ -691,6 +691,23 @@ public:
 };
 
 /**
+* callback for element
+*/
+template<class _callback_type>
+class rm_callback
+{
+protected:
+  _callback_type m_pcallback;
+public:
+  rm_callback() : m_pcallback(nullptr) {}
+  ~rm_callback() {}
+
+  inline bool             is_valid_callback() const { return m_pcallback != nullptr; }
+  inline _callback_type   get_callback() const { return m_pcallback; }
+  inline void             set_callback(_callback_type pcb) { m_pcallback = pcb; }
+};
+
+/**
 * text input handler
 */
 
