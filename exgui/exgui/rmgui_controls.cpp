@@ -102,9 +102,9 @@ void rm_image_button::on_draw(NVGcontext* p_ctx) {
 bool rm_image_button::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) {
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
     std::cout << "Image Button clicked!" << std::endl;
-    return true;
+    return false;
   }
-  return false;
+  return true;
 }
 
 rm_button::rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text)
@@ -137,9 +137,9 @@ void rm_button::on_draw(NVGcontext* p_ctx) {
 bool rm_button::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) {
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
     std::cout << "Button \"" << m_text << "\" clicked!" << std::endl;
-    return true;
+    return false;
   }
-  return false;
+  return true;
 }
 
 rm_label::rm_label(rm_widget* p_parent, int x, int y, const std::string& text)
@@ -224,9 +224,9 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
 bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) {
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN) {
     m_active = m_bbox.inside(cursor_pos);
-    return true;
+    return false;
   }
-  return false;
+  return true;
 }
 
 void rm_text_input::on_text_input(int sym) {
@@ -299,15 +299,15 @@ bool rm_checkbox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STAT
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(cursor_pos)) {
     m_checked = !m_checked;
     std::cout << "Checkbox \"" << m_label << "\" now " << (m_checked ? "checked" : "unchecked") << std::endl;
-    return true;
+    return false;
   }
-  return false;
+  return true;
 }
 
 rm_combobox::rm_combobox(rm_widget* p_parent, int x, int y, int width, int height, const std::vector<std::string>& items)
-  : rm_widget(x, y, width, height, p_parent, "ui_combobox", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL|EXGUI_FLAG_DISABLE_SCISSOR), m_items(items), m_selected(0), m_expanded(false)
+  : rm_widget(x, y, width, height, p_parent, "ui_combobox", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL|EXGUI_FLAG_DISABLE_SCISSOR|EXGUI_FLAG_HIGHEST_PRIORITY), m_items(items), m_selected(0), m_expanded(false)
 {
-  set_zindex(1); //topmost
+  set_zindex(999); //topmost
 }
 
 rm_combobox::~rm_combobox() {}
@@ -346,12 +346,13 @@ void rm_combobox::on_draw(NVGcontext* p_ctx) {
 }
 
 bool rm_combobox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) {
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == UP) {
-    if (!m_expanded && m_bbox.inside(cursor_pos)) {
+  if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN) {
+    if (m_bbox.inside(cursor_pos)) {
       m_expanded = true;
-      return true;
+      return false;
     }
-    else if (m_expanded) {
+
+    if (m_expanded) {
       float itemYStart = m_absolute.y + m_relative.height;
       float itemHeight = m_relative.height;
       int index = (int)((cursor_pos.y - itemYStart) / itemHeight);
@@ -360,10 +361,16 @@ bool rm_combobox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STAT
         std::cout << "Combobox selected: " << m_items[m_selected] << std::endl;
       }
       m_expanded = false;
-      return true;
+      return false;
     }
   }
-  return false;
+
+  if (m_expanded) {
+    printf("rm_combobox: restrict events\n");
+    return false; //absorb the event
+  }
+
+  return true;
 }
 
 void rm_slider::compute_value(rmgui_vector2& cursor_pos)
@@ -421,17 +428,17 @@ bool rm_slider::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE 
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
     m_dragging = true;
     compute_value(cursor_pos);
-    return true;
+    return false;
   }
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == UP) {
     m_dragging = false;
-    return true;
+    return false;
   }
   if (m_dragging && event == EXGUI_MOUSE_EVENT_MOVE) {
     compute_value(cursor_pos);
-    return true;
+    return false;
   }
-  return false;
+  return true;
 }
 
 rm_progress_base::rm_progress_base(rm_widget* p_parent, int x, int y, int width, int height, float inital, float corner_round) :
@@ -474,7 +481,7 @@ void rm_progress_base::on_draw(NVGcontext* p_ctx)
 
 bool rm_progress_base::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos)
 {
-  return false;
+  return true;
 }
 
 rm_progress_image::rm_progress_image(rm_widget* p_parent, int x, int y, int width, int height, 

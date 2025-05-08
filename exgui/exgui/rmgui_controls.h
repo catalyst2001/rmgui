@@ -103,9 +103,9 @@ public:
 };
 
 class rm_checkbox : public rm_widget, public rm_styled<rm_checkbox_style> {
-  bool               m_checked;
-  std::string        m_label;
-  rm_font            m_icon_font;
+  bool        m_checked;
+  std::string m_label;
+  rm_font     m_icon_font;
 public:
   rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style *pstyle, const std::string& label);
   virtual ~rm_checkbox();

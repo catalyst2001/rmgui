@@ -28,7 +28,16 @@ bool rm_widget::add_child(rm_widget* p_child)
 
   /* have parent? */
   p_child->grab_globals_from(this);
-  m_childs.push_back(p_child);
+
+  /* need events handling highest priority? */
+  if (p_child->get_elem_flags().is_set(EXGUI_FLAG_HIGHEST_PRIORITY)) {
+    /* add child first in list */
+    m_childs.insert(m_childs.begin(), p_child);
+  }
+  else {
+    /* add child last */
+    m_childs.push_back(p_child);
+  }
   root_update();
   return true;
 }
@@ -92,39 +101,17 @@ void rmgui_surface::text_input_dispatcher(rmgui_widget* p_elem, int sym)
 }
 #endif
 
-void rm_surface::mouse_dispatcher(rm_widget* p_elem,
+bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
   EXGUI_MOUSE_EVENT event,
   EXGUI_KEY vk,
   EXGUI_KEY_STATE state,
   rmgui_vector2& cursor_pos)
 {
-//  bool b_cursor_inside = p_elem->get_bbox().inside(cursor_pos);
-//  bool b_global_receive_events = p_elem->get_elem_flags().is_set(EXGUI_FLAG_GLOBAL);
-//
-//  if (b_cursor_inside || b_global_receive_events) {
-//    p_elem->on_mouse(event, vk, state, cursor_pos);
-//    if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && p_elem != this) {
-//      if (b_global_receive_events && !b_cursor_inside) 
-//        goto __perform_notify_childs; //HACK: K.D. change logic and remove goto!
-//      
-//      m_pfocus = p_elem;
-//      printf("updated focus to element %s\n", p_elem->get_classname());
-//    }
-//  }
-//
-//__perform_notify_childs:
-//  p_elem->m_elem_flags.toggle_bits(EXGUI_FLAG_HOVERED, b_cursor_inside);
-//  if (p_elem->get_elem_flags().has_childs() && p_elem->get_elem_flags().has_notify_childs()) {
-//    for (int i = 0; i < p_elem->get_num_childs(); i++) {
-//      mouse_dispatcher(p_elem->get_child(i), event, vk, state, cursor_pos);
-//    }
-//  }
+  bool b_call_next = true;
   bool b_cursor_inside = p_elem->get_bbox().inside(cursor_pos);
   bool b_global_receive_events = p_elem->get_elem_flags().is_set(EXGUI_FLAG_GLOBAL);
-
   if (b_cursor_inside || b_global_receive_events) {
-    p_elem->on_mouse(event, vk, state, cursor_pos);
-
+    b_call_next = p_elem->on_mouse(event, vk, state, cursor_pos);
     if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && p_elem != this) {
       if (!(b_global_receive_events && !b_cursor_inside)) {
         m_pfocus = p_elem;
@@ -134,14 +121,18 @@ void rm_surface::mouse_dispatcher(rm_widget* p_elem,
   }
 
   p_elem->m_elem_flags.toggle_bits(EXGUI_FLAG_HOVERED, b_cursor_inside);
+  if (!b_call_next)
+    return false; //this event was break by p_elem
 
   if (p_elem->get_elem_flags().has_childs() &&
-    p_elem->get_elem_flags().has_notify_childs())
-  {
-    for (int i = 0; i < p_elem->get_num_childs(); i++) {
-      mouse_dispatcher(p_elem->get_child(i), event, vk, state, cursor_pos);
+    p_elem->get_elem_flags().has_notify_childs()) {
+    for (size_t i = 0; i < p_elem->get_num_childs(); i++) {
+      if (!mouse_dispatcher(p_elem->get_child(i), event, vk, state, cursor_pos)) {
+        return false;
+      }
     }
   }
+  return true; //continue handling next
 }
 
 void rm_surface::build_draw_cache_recursive(rm_widget* p_elem)

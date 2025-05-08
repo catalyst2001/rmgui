@@ -309,6 +309,7 @@ enum EXGUI_EVENT : uint32_t {
 
 #define EXGUI_FLAG_GLOBAL        (1 << 10)
 #define EXGUI_FLAG_DISABLE_SCISSOR (1 << 11)
+#define EXGUI_FLAG_HIGHEST_PRIORITY      (1 << 12)
 
 /* default flags for each widget */
 #define EXGUI_FLAG_DEFAULT       (EXGUI_FLAG_VISIBLE|EXGUI_FLAG_ACTIVE|EXGUI_FLAG_NOTIFY_CHILDS|EXGUI_FLAG_HAS_SYM|EXGUI_FLAG_HAS_KEYBD|EXGUI_FLAG_HAS_MOUSE|EXGUI_FLAG_HAS_CHILDS)
@@ -400,7 +401,22 @@ public:
   virtual bool on_event(EXGUI_EVENT event, rm_widget *p_from) = 0;
   virtual void on_draw(NVGcontext* p_ctx) = 0;
   virtual void on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state) = 0;
+
+  /**
+  * @brief Text input handler
+  * @param sym - symbol key code
+  * @return Nothing
+  */
   virtual void on_text_input(int sym) = 0;
+
+  /**
+  * @brief Mouse event handler
+  * @param event - received mouse event (EXGUI_MOUSE_EVENT_MOVE or EXGUI_MOUSE_EVENT_CLICK)
+  * @param vk - received virtual key
+  * @param state - received key state (DOWN, UP or REPEAT)
+  * @param cursor_pos - received current cursor pos
+  * @return To block further propagation of the event, return false. If ture is returned, the event is propagated to the following elements.
+  */
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) = 0;
 };
 
@@ -466,7 +482,7 @@ protected:
     RMGUI_UNUSED(vk);
     RMGUI_UNUSED(state);
     RMGUI_UNUSED(cursor_pos);
-    return false;
+    return true;
   }
 
 protected:
@@ -620,7 +636,7 @@ class rm_surface : public rm_widget, rm_object_accrssor
 #if 0
   static void text_input_dispatcher(rmgui_widget *p_elem, int sym);
 #endif
-  void mouse_dispatcher(rm_widget *p_elem,
+  bool mouse_dispatcher(rm_widget *p_elem,
     EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, 
     EXGUI_KEY_STATE state, rmgui_vector2 &cursor_pos);
 
