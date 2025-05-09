@@ -264,16 +264,64 @@ public:
      |   |
      `---`
 */
-class rm_scroll_base
+class rm_scroll_style
 {
   NVGcolor  m_background_clr;
   NVGcolor  m_thumb_clr;
+  NVGcolor  m_background_border_clr;
+  NVGcolor  m_thumb_border_clr;
   float     m_corner_round;
   float     m_thumb_size;
+  float     m_background_stroke_width;
+  float     m_thumb_stroke_width;
+public:
+  void load_defaults() {
+    m_background_clr = nvgRGB(30, 30, 30);
+    m_thumb_clr = nvgRGB(80, 80, 80);
+    m_background_border_clr = nvgRGB(100, 100, 100);
+    m_thumb_border_clr = nvgRGB(100, 100, 100);
+  }
+  rm_scroll_style() {
+    load_defaults();
+  }
+
+  /* selectors */
+  inline const NVGcolor &get_scroll_background_color() const { return m_background_clr; }
+  inline const NVGcolor &get_scroll_thumb_color() const { return m_thumb_clr; }
+  inline const NVGcolor &get_scroll_background_border_color() const { return m_background_border_clr; }
+  inline const NVGcolor &get_scroll_thumb_border_color() const { return m_thumb_border_clr; }
+  inline float           get_scroll_corner_radius() const { return m_corner_round; }
+  inline float           get_thumb_size() const { return m_thumb_size; }
+  inline float           get_background_stroke_width() const { return m_background_stroke_width; }
+  inline float           get_thumb_stroke_width() const { return m_thumb_stroke_width; }
+
+  /* modifiers */
+  inline void set_scroll_background_color(NVGcolor color) { m_background_clr = color; }
+  inline void set_scroll_thumb_color(NVGcolor color) { m_thumb_clr = color; }
+  inline void set_scroll_background_border_color(NVGcolor color) { m_background_border_clr = color; }
+  inline void set_scroll_thumb_border_color(NVGcolor color) { m_thumb_border_clr = color; }
+  inline void set_scroll_corner_radius(float radius) { m_corner_round = radius; }
+  inline void set_thumb_size(float size) { m_thumb_size= size; }
+  inline void set_background_stroke_width(float width) { m_background_stroke_width = width; }
+  inline void set_thumb_stroke_width(float width) { m_thumb_stroke_width = width; }
+};
+
+class rm_scroll_base
+{
   RM_ORIENT m_orientation;
 protected:
   void orient_detect(const rm_rect &background);
-  void draw(NVGcontext* p_ctx, const rm_rect &back, float pos);
+  void draw_scroll(NVGcontext* p_ctx, const rm_rect &back, rm_scroll_style *pstyle, float pos);
+};
+
+class rm_scrollbar;
+using rm_scrollbar_cb = void(*)(rm_scrollbar *pscrollbar, float value);
+class rm_scrollbar : public rm_widget, rm_styled<rm_scroll_style>, rm_callback<rm_scrollbar_cb>, public rm_scroll_base
+{
+public:
+
+
+
 };
 
 /**

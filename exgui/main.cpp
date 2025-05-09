@@ -301,11 +301,11 @@ int main() {
   rm_checkbox* checkbox2 = new rm_checkbox(pwindow, 150, 40 + 30 + 20, 100, &style, u8"Включить");
 
   rm_animation* anim = new rm_animation(pwindow, 20, 100, 100, 100, image_pat);
-  anim->set_speed(4.f);
+  anim->set_speed(8.f);
   anim->set_scale(0.5f);
 
   rm_animation* anim2 = new rm_animation(pwindow, 20 + 100, 100, 100, 100, image_pat);
-  anim2->set_speed(-4.f);
+  anim2->set_speed(-8.f);
   anim2->set_scale(0.5f);
 
   rm_combobox* combobox = new rm_combobox(pwindow, 300, 100+50, 200, 20);

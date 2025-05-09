@@ -553,26 +553,40 @@ void rm_scroll_base::orient_detect(const rm_rect& background)
   m_orientation = (background.width > background.height) ? RM_ORIENT_HORZ : RM_ORIENT_VERT;
 }
 
-void rm_scroll_base::draw(NVGcontext* p_ctx, const rm_rect& back, float pos)
+void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, const rm_rect& back, rm_scroll_style* pstyle, float pos)
 {
   rm_rect thumb_rect;
   assert(m_orientation != RM_ORIENT_AUTO && "[K.D.] m_orientation have undefined value! You called rm_scroll_base::orient_detect() from init/resize?");
   if (m_orientation == RM_ORIENT_HORZ) {
-    thumb_rect.x = 0; //TODO:
-    thumb_rect.y = 0; //TODO:
-    thumb_rect.width = 0;
+    thumb_rect.x = back.width * pos;
+    thumb_rect.y = back.y;
+    thumb_rect.width = pstyle->get_thumb_size();
     thumb_rect.height = back.height;
   }
   else {
-    thumb_rect.x = 0; //TODO:
-    thumb_rect.y = 0; //TODO:
+    thumb_rect.x = back.x;
+    thumb_rect.y = back.height * pos;
     thumb_rect.width = back.width;
-    thumb_rect.height = 0;
+    thumb_rect.height = pstyle->get_thumb_size();
   }
 
-  // paint background
+  /* paint background */
+  nvgBeginPath(p_ctx);
+  nvgFillColor(p_ctx, pstyle->get_scroll_background_color());
+  nvgRoundedRect(p_ctx, back.x, back.y, back.width, back.height, pstyle->get_scroll_corner_radius());
+  nvgFill(p_ctx);
+  nvgStrokeWidth(p_ctx, pstyle->get_background_stroke_width());
+  nvgStrokeColor(p_ctx, pstyle->get_scroll_background_border_color());
+  nvgStroke(p_ctx);
 
-  // paint thumb
+  /* paint thumb */
+  nvgBeginPath(p_ctx);
+  nvgFillColor(p_ctx, pstyle->get_scroll_thumb_color());
+  nvgRoundedRect(p_ctx, thumb_rect.x, thumb_rect.y, thumb_rect.width, thumb_rect.height, pstyle->get_scroll_corner_radius());
+  nvgFill(p_ctx);
+  nvgStrokeWidth(p_ctx, pstyle->get_thumb_stroke_width());
+  nvgStrokeColor(p_ctx, pstyle->get_scroll_thumb_border_color());
+  nvgStroke(p_ctx);
 }
 
 void rm_animation::on_draw(NVGcontext* p_ctx)
