@@ -589,6 +589,67 @@ void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, const rm_rect& back, rm_scro
   nvgStroke(p_ctx);
 }
 
+void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_rect content, const rm_rect& window, float thumb_thickness, float pos)
+{
+  rm_rect thumb_rect;
+  float   thumb_size;
+  assert(m_orientation != RM_ORIENT_AUTO && "[K.D.] m_orientation have undefined value! You called rm_scroll_base::orient_detect() from init/resize?");
+  if (m_orientation == RM_ORIENT_HORZ) {
+    if (content.width <= window.width)
+      content.width = window.width;
+
+    float scroll_area = window.width;
+    thumb_size = (window.width / content.width) * scroll_area;
+    thumb_size = std::max(thumb_thickness, thumb_size); // thumb min width
+
+    float max_offset = scroll_area - thumb_size;
+    float thumb_x = window.x + pos * max_offset;
+
+    thumb_rect.x = thumb_x;
+    thumb_rect.y = window.y + (window.height - thumb_thickness) * 0.5f;
+    thumb_rect.width = thumb_size;
+    thumb_rect.height = thumb_thickness;
+  }
+  else {
+    if (content.height <= window.height)
+      content.height = window.height;
+
+    float scroll_area = window.height;
+    thumb_size = (window.height / content.height) * scroll_area;
+    thumb_size = std::max(thumb_thickness, thumb_size); // thumb min height
+
+    float max_offset = scroll_area - thumb_size;
+    float thumb_y = window.y + pos * max_offset;
+
+    thumb_rect.x = window.x + (window.width - thumb_thickness) * 0.5f;
+    thumb_rect.y = thumb_y;
+    thumb_rect.width = thumb_thickness;
+    thumb_rect.height = thumb_size;
+  }
+
+  // paint background
+  float round_radius = (window.height / 2.f) * pstyle->get_scroll_corner_radius();
+  nvgBeginPath(p_ctx);
+  nvgFillColor(p_ctx, pstyle->get_scroll_background_color());
+  nvgRoundedRect(p_ctx, window.x, window.y, window.width, window.height, round_radius);
+  nvgFill(p_ctx);
+  nvgStrokeWidth(p_ctx, pstyle->get_background_stroke_width());
+  nvgStrokeColor(p_ctx, pstyle->get_scroll_background_border_color());
+  nvgStroke(p_ctx);
+
+  // paint thumb
+  round_radius = (thumb_rect.height / 2.f) * pstyle->get_scroll_corner_radius();
+  nvgBeginPath(p_ctx);
+  nvgFillColor(p_ctx, pstyle->get_scroll_thumb_color());
+  nvgRoundedRect(p_ctx, thumb_rect.x, thumb_rect.y, thumb_rect.width, thumb_rect.height, round_radius);
+  nvgFill(p_ctx);
+  nvgStrokeWidth(p_ctx, pstyle->get_thumb_stroke_width());
+  nvgStrokeColor(p_ctx, pstyle->get_scroll_thumb_border_color());
+  nvgStroke(p_ctx);
+}
+
+
+
 void rm_animation::on_draw(NVGcontext* p_ctx)
 {
   rmgui_vector2 pos(m_relative.width / 2.f, m_relative.height / 2.f);
@@ -611,5 +672,46 @@ rm_animation::rm_animation(rm_widget* p_parent, int x, int y, int width, int hei
 }
 
 rm_animation::~rm_animation()
+{
+}
+
+void rm_scrollbar::on_draw(NVGcontext* p_ctx)
+{
+  rm_rect content_rect(0, 0, 1000, 1000);
+  draw_scroll(p_ctx, m_pstyle, content_rect, m_relative, 20, m_position);
+}
+
+bool rm_scrollbar::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos)
+{
+  return true;
+}
+
+rm_scrollbar::rm_scrollbar(rm_widget* p_parent, RM_ORIENT orient, rm_scroll_style* p_style, float inital_pos) :
+  rm_widget(0, 0, 0, 0, p_parent, "ui_scrollbar", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL), m_position(inital_pos)
+{
+  rm_rect &parent_rel = p_parent->get_relative();
+  rm_rect &parent_abs = p_parent->get_absolute();
+  set_style(p_style);
+  set_orient(orient);
+
+  /* set position of parent */
+  m_relative.x = 0;
+  m_relative.y = 0;
+  if (get_orient() == RM_ORIENT_HORZ) {
+    m_relative.width = parent_rel.width;
+    m_relative.height = p_style->get_thumb_size();
+    m_absolute.x = parent_abs.x;
+    m_absolute.y = parent_abs.y + parent_rel.height - p_style->get_thumb_size();
+  } else {
+    m_relative.width = p_style->get_thumb_size();
+    m_relative.height = parent_rel.height;
+    m_absolute.x = parent_abs.x + parent_rel.width - p_style->get_thumb_size(); 
+    m_absolute.y = parent_abs.y;
+  }
+  m_absolute.width = m_relative.width;
+  m_absolute.height = m_relative.height;
+}
+
+rm_scrollbar::~rm_scrollbar()
 {
 }

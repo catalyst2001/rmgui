@@ -187,11 +187,13 @@ class rm_slider : public rm_widget {
   float   m_thumb_size;
   void    compute_value(rmgui_vector2& cursor_pos);
   void    compute_inner_and_thumb();
+
+  virtual void on_draw(NVGcontext* p_ctx) override;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos);
+
 public:
   rm_slider(rm_widget* p_parent, int x, int y, int width, int height, float min, float max, float initial, rm_slider_callback pcallback=nullptr);
   virtual ~rm_slider();
-  virtual void on_draw(NVGcontext* p_ctx) override;
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos);
   float get_value() const { return m_value; }
 };
 
@@ -280,6 +282,10 @@ public:
     m_thumb_clr = nvgRGB(80, 80, 80);
     m_background_border_clr = nvgRGB(100, 100, 100);
     m_thumb_border_clr = nvgRGB(100, 100, 100);
+    m_corner_round = 0.f;
+    m_thumb_size = 10.f;
+    m_background_stroke_width = 1.f;
+    m_thumb_stroke_width = 1.f;
   }
   rm_scroll_style() {
     load_defaults();
@@ -300,7 +306,7 @@ public:
   inline void set_scroll_thumb_color(NVGcolor color) { m_thumb_clr = color; }
   inline void set_scroll_background_border_color(NVGcolor color) { m_background_border_clr = color; }
   inline void set_scroll_thumb_border_color(NVGcolor color) { m_thumb_border_clr = color; }
-  inline void set_scroll_corner_radius(float radius) { m_corner_round = radius; }
+  inline void set_scroll_corner_round(float radius) { m_corner_round = radius; }
   inline void set_thumb_size(float size) { m_thumb_size= size; }
   inline void set_background_stroke_width(float width) { m_background_stroke_width = width; }
   inline void set_thumb_stroke_width(float width) { m_thumb_stroke_width = width; }
@@ -310,18 +316,29 @@ class rm_scroll_base
 {
   RM_ORIENT m_orientation;
 protected:
+  inline void      set_orient(RM_ORIENT orient) { m_orientation = orient; }
+  inline RM_ORIENT get_orient() const { return m_orientation; }
   void orient_detect(const rm_rect &background);
   void draw_scroll(NVGcontext* p_ctx, const rm_rect &back, rm_scroll_style *pstyle, float pos);
+  void draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_rect content, const rm_rect& window, float thumb_height, float pos);
 };
 
 class rm_scrollbar;
 using rm_scrollbar_cb = void(*)(rm_scrollbar *pscrollbar, float value);
-class rm_scrollbar : public rm_widget, rm_styled<rm_scroll_style>, rm_callback<rm_scrollbar_cb>, public rm_scroll_base
+class rm_scrollbar : public rm_widget,
+  rm_styled<rm_scroll_style>,
+  rm_callback<rm_scrollbar_cb>,
+  public rm_scroll_base
 {
+  float m_position;
+  virtual void on_draw(NVGcontext* p_ctx) override;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos);
 public:
+  rm_scrollbar(rm_widget* p_parent, RM_ORIENT orient, rm_scroll_style *p_style, float inital_pos=0.f);
+  ~rm_scrollbar();
 
-
-
+  inline void  set_position(float pos) { m_position = pos; }
+  inline float get_position() const { return m_position; }
 };
 
 /**

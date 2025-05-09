@@ -313,6 +313,12 @@ int main() {
   combobox->add_item("Item 2");
   combobox->add_item("Item 3");
 
+  static rm_scroll_style scrollbar_style;
+  scrollbar_style.set_scroll_corner_round(1.f);
+  scrollbar_style.set_scroll_thumb_color(nvgRGB(90, 90, 90));
+  scrollbar_style.set_thumb_size(10);
+  rm_scrollbar* pscroll = new rm_scrollbar(pwindow, RM_ORIENT_HORZ, &scrollbar_style);
+
   rm_slider* slider = new rm_slider(pwindow, 50, 400, 400, 40, 0.0f, 100.0f, 50.0f,
     [](rm_slider *psilder) {
       printf("slider value changed: %f\n", psilder->get_value());
@@ -341,9 +347,11 @@ int main() {
     last_time = current_time;
     current_time = instance.get_time();
     float dt = current_time - last_time;
-    float percent = fabsf(sinf(current_time)) * 100.f;
+    float sinabs = fabsf(sinf(current_time));
+    float percent = sinabs * 100.f;
     progress->set_percent(percent);
     progress2->set_percent(slider->get_value());
+    pscroll->set_position(sinabs);
 
     gui->resize(fbWidth, fbHeight);
     gui->rebuild_draw_cache();
