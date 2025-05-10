@@ -23,7 +23,7 @@ public:
   rm_image_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& imageFile);
   virtual ~rm_image_button();
   virtual void on_draw(NVGcontext* p_ctx) override;
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
 };
 
 class rm_button : public rm_widget {
@@ -32,7 +32,7 @@ public:
   rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text);
   virtual ~rm_button();
   virtual void on_draw(NVGcontext* p_ctx) override;
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
 };
 
 class rm_label : public rm_widget {
@@ -60,16 +60,16 @@ public:
   virtual ~rm_text_input();
   virtual void on_draw(NVGcontext* p_ctx) override;
   virtual void on_text_input(int sym) override;
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
 };
 
 /**
 * CHECKBOX
 */
 class rm_checkbox_style : public rm_corners_style {
-  rmgui_vector2 m_text_offset;
+  rm_vec2 m_text_offset;
   NVGcolor      m_text_color;
-  NVGcolor      m_bkg_color;
+  NVGcolor      m_bg_color;
   NVGcolor      m_mark_color;
   NVGcolor      m_border_color;
   int           m_check_size;
@@ -78,25 +78,25 @@ public:
   rm_checkbox_style() :
     m_text_offset(5.f, 0.f),
     m_text_color(nvgRGB(255, 255, 255)),
-    m_bkg_color(nvgRGB(255, 255, 255)),
+    m_bg_color(nvgRGB(255, 255, 255)),
     m_mark_color(nvgRGB(0, 0, 0)),
     m_border_color(nvgRGB(0, 0, 0)),
     m_check_size(20),
     m_font_size(18.f) {}
 
   /* selectors  */
-  inline const rmgui_vector2& get_text_offsets() const { return m_text_offset; }
+  inline const rm_vec2& get_text_offsets() const { return m_text_offset; }
   inline const NVGcolor& get_text_color() const { return m_text_color; }
-  inline const NVGcolor& get_background_color() const { return m_bkg_color; }
+  inline const NVGcolor& get_background_color() const { return m_bg_color; }
   inline const NVGcolor& get_mark_color() const { return m_mark_color; }
   inline const NVGcolor& get_border_color() const { return m_border_color; }
   inline int             get_check_size() const { return m_check_size; }
   inline float           get_font_size() const { return m_font_size; }
 
   /* modifiers */
-  inline void set_text_offsets(rmgui_vector2 offset) { m_text_offset = offset; }
+  inline void set_text_offsets(rm_vec2 offset) { m_text_offset = offset; }
   inline void set_text_color(NVGcolor clr) { m_text_color = clr; }
-  inline void set_background_color(NVGcolor clr) { m_bkg_color = clr; }
+  inline void set_background_color(NVGcolor clr) { m_bg_color = clr; }
   inline void set_mark_color(NVGcolor clr) { m_mark_color = clr; }
   inline void set_border_color(NVGcolor clr) { m_border_color = clr; }
   inline void set_check_size(int newsize) { m_check_size = newsize; }
@@ -118,7 +118,7 @@ class rm_checkbox : public rm_widget, public rm_styled<rm_checkbox_style>, publi
   rm_font        m_icon_font;
 
   virtual void on_draw(NVGcontext* p_ctx) override;
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
 public:
   rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style *pstyle, const std::string& label, rm_checkbox_cb pcallback=nullptr);
   virtual ~rm_checkbox();
@@ -153,7 +153,7 @@ class rm_combobox : public rm_widget, public rm_callback<rm_combobox_cb> {
   bool m_expanded;
 
   virtual void on_draw(NVGcontext* p_ctx) override;
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
 public:
   const size_t kinvalid_index = ((size_t)-1);
   rm_combobox(rm_widget* p_parent, int x, int y, int width, int height, rm_combobox_cb pcallback=nullptr);
@@ -186,11 +186,11 @@ class rm_slider : public rm_widget {
   rm_slider_callback m_pcallback;
   rm_rect m_inner_rect;
   float   m_thumb_size;
-  void    compute_value(rmgui_vector2& cursor_pos);
+  void    compute_value(rm_vec2& cursor_pos);
   void    compute_inner_and_thumb();
 
   virtual void on_draw(NVGcontext* p_ctx) override;
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos);
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos);
 
 public:
   rm_slider(rm_widget* p_parent, int x, int y, int width, int height, float min, float max, float initial, rm_slider_callback pcallback=nullptr);
@@ -218,7 +218,7 @@ public:
   void         set_corner_round(float p) { m_round = p; }
   inline float get_corner_round() const { return m_round; }
   virtual void on_draw(NVGcontext* p_ctx) override;
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos);
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos);
 };
 
 /**
@@ -320,8 +320,8 @@ protected:
   inline void      set_orient(RM_ORIENT orient) { m_orientation = orient; }
   inline RM_ORIENT get_orient() const { return m_orientation; }
   void orient_detect(const rm_rect &background);
-  void draw_scroll(NVGcontext* p_ctx, const rm_rect &back, rm_scroll_style *pstyle, float pos);
-  void draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_rect content, const rm_rect& window, float thumb_height, float pos);
+  void draw_scroll(NVGcontext* p_ctx, const rm_rect &back, rm_scroll_style *pstyle, float pos); //TODO: K.D. for D2
+  void draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_vec2 content_size, const rm_vec2& window_size, float thumb_height, float pos);
 };
 
 class rm_scrollbar;
@@ -336,7 +336,7 @@ class rm_scrollbar : public rm_widget,
   void       adjust_position();
 
   virtual void on_draw(NVGcontext* p_ctx) override;
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos);
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos);
 public:
   rm_scrollbar(rm_widget* p_parent, RM_ORIENT orient, rm_scroll_style *p_style, float inital_pos=0.f);
   ~rm_scrollbar();
@@ -374,6 +374,54 @@ public:
 
 /**
  * =============================================
+ * Tab Control Style
+ * =============================================
+ */
+class rm_tabcontrol_style : public rm_corners_style {
+  rm_vec2 m_text_offset;
+  NVGcolor      m_text_color;
+  NVGcolor      m_bg_color;
+  NVGcolor      m_border_color;
+  NVGcolor      m_brd_stroke_color;
+  NVGcolor      m_selected_color;
+  NVGcolor      m_unselected_color;
+  float         m_font_size;
+  bool          m_is_horizontal;
+public:
+  rm_tabcontrol_style() :
+    m_text_offset(0.f, 0.f),
+    m_text_color(nvgRGB(0, 0, 0)),
+    m_bg_color(nvgRGB(255, 255, 255)),
+    m_border_color(nvgRGB(0, 0, 0)),
+    m_selected_color(nvgRGB(240, 240, 240)),
+    m_unselected_color(nvgRGB(200, 200, 200)),
+    m_font_size(15.f),
+    m_is_horizontal(true) {
+  }
+  inline bool            is_horizontal() const { return m_is_horizontal; }
+  inline void            set_horizontal(bool enabled) { m_is_horizontal = enabled; }
+
+  /* selectors  */
+  inline const rm_vec2& get_text_offsets() const { return m_text_offset; }
+  inline const NVGcolor& get_text_color() const { return m_text_color; }
+  inline const NVGcolor& get_background_color() const { return m_bg_color; }
+  inline const NVGcolor& get_border_color() const { return m_border_color; }
+  inline const NVGcolor& get_selected_color() const { return m_selected_color; }
+  inline const NVGcolor& get_unselected_color() const { return m_unselected_color; }
+  inline float           get_font_size() const { return m_font_size; }
+
+  /* modifiers */
+  inline void set_text_offsets(rm_vec2 offset) { m_text_offset = offset; }
+  inline void set_text_color(NVGcolor clr) { m_text_color = clr; }
+  inline void set_background_color(NVGcolor clr) { m_bg_color = clr; }
+  inline void set_border_color(NVGcolor clr) { m_border_color = clr; }
+  inline void set_selected_color(NVGcolor clr) { m_selected_color = clr; }
+  inline void set_unselected_color(NVGcolor clr) { m_unselected_color = clr; }
+  inline void set_font_size(float fsize) { m_font_size = fsize; }
+};
+
+/**
+ * =============================================
  * Tab Control
  * =============================================
  */
@@ -393,13 +441,13 @@ public:
 class rm_tabcontrol;
 using rm_tabcontrol_cb = void(*)(rm_tabcontrol* ptabs, rm_tab_item* pitem, size_t tabid);
 
-class rm_tabcontrol : public rm_widget, public rm_callback<rm_tabcontrol_cb> {
-  std::vector<rm_tab_item>            m_tabs;
+class rm_tabcontrol : public rm_widget, public rm_styled<rm_tabcontrol_style>, public rm_callback<rm_tabcontrol_cb> {
+  std::vector<rm_tab_item>             m_tabs;
   std::vector<std::vector<rm_widget*>> m_tabChildren;
   int                                  m_selected;
 protected:
   virtual void on_draw(NVGcontext* p_ctx) override;
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
 
   void update_children_visibility() {
     for (size_t t = 0; t < m_tabChildren.size(); ++t) {
@@ -414,25 +462,25 @@ protected:
 public:
   const size_t kinvalid_index = static_cast<size_t>(-1);
 
-  inline void get_content_rect(rm_rect& rect) const {
-    rect.x = m_relative.x;
-    rect.y = m_relative.y + m_relative.height;
-    rect.width = m_relative.width;
-    rect.height = m_absolute.height - m_relative.height;
-  }
-  inline rmgui_vector2 get_content_origin() const {
-    return { m_relative.x, m_relative.y + m_relative.height };
+  //inline void [[maybe_unused]] get_content_rect(rm_rect& rect) const {
+  //  rect.x = 0.f;
+  //  rect.y = m_size.y;
+  //  rect.width = m_size.x;
+  //  rect.height = m_size.y; //TODO: K.D. ok?
+  //}
+
+  inline rm_vec2 get_content_origin() const {
+    return { 0.f, m_size.y / 2.f };
   }
 
-  rm_tabcontrol(int x, int y, int width, int height,
-    rm_widget* p_parent,
+  rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height,
     rm_tabcontrol_cb cb = nullptr)
     : rm_widget(x, y, width, height, p_parent, "ui_tabcontrol",
       EXGUI_FLAG_DEFAULT | EXGUI_FLAG_GLOBAL, 0, nullptr),
     m_selected(0)
   {
     set_callback(cb);
-    set_zindex(1000);
+    set_zindex(998);
   }
   virtual ~rm_tabcontrol() {}
 
@@ -460,14 +508,18 @@ public:
     widget->set_parent(this);
     add_child(widget);
     {
-      rm_rect abs = widget->get_absolute();
+      rm_vec2& abs = widget->get_absolute();
       float newX = m_absolute.x + abs.x;
       float newY = m_absolute.y + abs.y;
       widget->move((int)newX, (int)newY);
     }
 
-    if (static_cast<int>(tabIndex) == m_selected) widget->show(true);
-    else                                      widget->hide();
+    if (static_cast<int>(tabIndex) == m_selected) {
+      widget->show(true);
+    }
+    else {
+      widget->hide();
+    }
   }
   const std::vector<rm_widget*>& get_tab_children(size_t tabIndex) const {
     assert(tabIndex < m_tabChildren.size());
@@ -475,14 +527,18 @@ public:
   }
 
   void set_selected_index(int idx) {
-    if (idx < 0 || idx >= static_cast<int>(m_tabs.size())) return;
+    if (idx < 0 || idx >= static_cast<int>(m_tabs.size())) 
+      return;
     m_selected = idx;
     update_children_visibility();
-    if (is_valid_callback()) get_callback()(this, &m_tabs[m_selected], m_selected);
+    if (is_valid_callback())
+      get_callback()(this, &m_tabs[m_selected], m_selected);
   }
   inline int get_selected_index() const { return m_selected; }
   inline rm_tab_item* get_selected_tab() {
-    if (m_selected < 0 || m_selected >= static_cast<int>(m_tabs.size())) return nullptr;
+    if (m_selected < 0 || m_selected >= static_cast<int>(m_tabs.size()))
+      return nullptr;
+
     return &m_tabs[m_selected];
   }
 };
@@ -527,12 +583,12 @@ class rm_treeview : public rm_widget, public rm_callback<rm_treeview_cb> {
   float                      m_indent;
 protected:
   virtual void on_draw(NVGcontext* p_ctx) override;
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
 
   // recursive draw helper
   float draw_node(NVGcontext* p_ctx, rm_tree_node* node, float x, float y);
   // recursive hit-test helper
-  bool hit_test(rmgui_vector2 const& pos, rm_tree_node* node, float x, float y, rm_tree_node*& out);
+  bool hit_test(const rm_vec2& pos, rm_tree_node* node, float x, float& y, rm_tree_node*& out);
 
 public:
   rm_treeview(int x, int y, int width, int height, rm_widget* p_parent, rm_treeview_cb cb = nullptr)
@@ -540,7 +596,7 @@ public:
     m_selected(nullptr), m_rowHeight(20.0f), m_indent(16.0f)
   {
     set_callback(cb);
-    set_zindex(500);
+    //set_zindex(997);
   }
 
   virtual ~rm_treeview() {

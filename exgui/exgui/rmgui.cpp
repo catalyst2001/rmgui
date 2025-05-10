@@ -73,6 +73,13 @@ void rm_widget::set_parent(rm_widget* p_parent)
   root_update();
 }
 
+void rm_widget::resize(int width, int height)
+{
+  rm_vec2 start(width, height);
+  m_size.init(width, height);
+  m_bbox.init(start, m_size);
+}
+
 void rm_surface::event_dispatcher(rm_widget* p_elem)
 {
   RMGUI_UNUSED(p_elem);
@@ -110,7 +117,7 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
   EXGUI_MOUSE_EVENT event,
   EXGUI_KEY vk,
   EXGUI_KEY_STATE state,
-  rmgui_vector2& cursor_pos)
+  rm_vec2& cursor_pos)
 {
   bool b_call_next = true;
   bool b_cursor_inside = p_elem->get_bbox().inside(cursor_pos);
@@ -193,7 +200,7 @@ layer_draw_cache *rm_surface::get_layer_by_zindex(int zid)
 void rm_surface::draw(float dt)
 {
   m_delta_time = dt;
-  nvgBeginFrame(m_pctx, m_relative.width, m_relative.height, 1.f);
+  nvgBeginFrame(m_pctx, m_size.x, m_size.y, 1.f);
   /* drawing layers */
   for (size_t i = 0; i < m_layers.size(); i++) {
     /* draw elements in layer */
@@ -202,14 +209,15 @@ void rm_surface::draw(float dt)
     for (size_t j = 0; j < pdraw_cache->size(); j++) {
       rm_widget* pwidget = pdraw_cache->get_widget(j);
       assert(pwidget && "pwidget was nullptr");
-      rm_rect& outer_rect = pwidget->get_absolute();
+      rm_vec2& abs_pos = pwidget->get_absolute();
+      rm_vec2& size = pwidget->get_size();
       nvgSave(m_pctx);
 
       /* disabled scissoring? */
       if (!pwidget->get_elem_flags().is_set(EXGUI_FLAG_DISABLE_SCISSOR))
-        nvgScissor(m_pctx, outer_rect.x, outer_rect.y, outer_rect.width, outer_rect.height);
+        nvgScissor(m_pctx, abs_pos.x, abs_pos.y, size.x, size.y);
 
-      nvgTranslate(m_pctx, outer_rect.x, outer_rect.y);
+      nvgTranslate(m_pctx, abs_pos.x, abs_pos.y);
       pwidget->on_draw(m_pctx);
       //nvgResetTransform(m_pctx);
       nvgResetScissor(m_pctx);
@@ -236,14 +244,8 @@ void rm_surface::textinput(int sym)
 
 void rm_surface::mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, int x, int y)
 {
-  rmgui_vector2 mouse_pos(x, y);
+  rm_vec2 mouse_pos(x, y);
   mouse_dispatcher(this, event, vk, state, mouse_pos);
-}
-
-void rm_surface::resize(int width, int height)
-{
-  m_relative.width = m_absolute.width = width;
-  m_relative.height = m_absolute.height = height;
 }
 
 rm_image rm_surface::load_image_from_memory(const void* psrc, size_t srclen, int flags)
@@ -321,13 +323,13 @@ void rm_window::on_draw(NVGcontext* p_ctx)
   nvgBeginPath(p_ctx);
   nvgFillColor(p_ctx, p_style->get_background_color(b_is_active));
   nvgRoundedRectVarying(p_ctx,
-    m_relative.x, m_relative.y, m_relative.width, m_relative.height,
+    0.f, 0.f, m_size.x, m_size.y,
     p_style->get_corner_radius(LEFT_TOP), p_style->get_corner_radius(RIGHT_TOP),
     p_style->get_corner_radius(RIGHT_BOTTOM), p_style->get_corner_radius(LEFT_BOTTOM));
   nvgFill(p_ctx);
 }
 
-bool rm_window::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos)
+bool rm_window::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
 {
   //move(
   //  cursor_pos.x - m_absolute.x,

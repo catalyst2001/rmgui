@@ -63,43 +63,49 @@ protected:
 using rm_font = rm_object_base<-1>; //font handle
 using rm_image = rm_object_base<0>; //image handle
 
-class rmgui_vector2
+class rm_vec2
 {
 public:
   union {
     struct { float x, y; };
     float v[2];
   };
-  rmgui_vector2() : x(0.f), y(0.f) {}
-  rmgui_vector2(float xx, float yy) : x(xx), y(yy) {}
-  rmgui_vector2(int xx, int yy) : x((float)xx), y((float)yy) {}
-  ~rmgui_vector2() {}
+  rm_vec2() : x(0.f), y(0.f) {}
+  rm_vec2(float xx, float yy) : x(xx), y(yy) {}
+  rm_vec2(int xx, int yy) : x((float)xx), y((float)yy) {}
+  ~rm_vec2() {}
 
-  inline rmgui_vector2 operator=(rmgui_vector2& vec) { return *this = vec; }
-  inline rmgui_vector2 operator+(rmgui_vector2& vec) { return rmgui_vector2(x + vec.x, y + vec.y); }
-  inline rmgui_vector2 operator-(rmgui_vector2& vec) { return rmgui_vector2(x - vec.x, y - vec.y); }
-  inline rmgui_vector2 operator*(rmgui_vector2& vec) { return rmgui_vector2(x * vec.x, y * vec.y); }
-  inline rmgui_vector2 operator/(rmgui_vector2& vec) { return rmgui_vector2(x / vec.x, y / vec.y); }
-  inline rmgui_vector2 operator+(float s) { return rmgui_vector2(x + s, y + s); }
-  inline rmgui_vector2 operator-(float s) { return rmgui_vector2(x - s, y - s); }
-  inline rmgui_vector2 operator*(float s) { return rmgui_vector2(x * s, y * s); }
-  inline rmgui_vector2 operator/(float s) { return rmgui_vector2(x / s, y / s); }
-  inline rmgui_vector2 operator+=(rmgui_vector2& vec) { x += vec.x; y += vec.y; return *this; }
-  inline rmgui_vector2 operator-=(rmgui_vector2& vec) { x -= vec.x; y -= vec.y; return *this; }
-  inline rmgui_vector2 operator*=(rmgui_vector2& vec) { x *= vec.x; y *= vec.y; return *this; }
-  inline rmgui_vector2 operator/=(rmgui_vector2& vec) { x /= vec.x; y /= vec.y; return *this; }
-  inline rmgui_vector2 operator*=(float s) { x *= s; y *= s; return *this; }
-  inline rmgui_vector2 operator/=(float s) { x /= s; y /= s; return *this; }
-  inline rmgui_vector2 operator+=(float s) { x += s; y += s; return *this; }
-  inline rmgui_vector2 operator-=(float s) { x -= s; y -= s; return *this; }
+  inline void init(float xx, float yy) {
+    x = xx;
+    y = yy;
+  }
 
-  inline bool compare_strong(rmgui_vector2& vec) { return x == vec.x && y == vec.y; }
-  inline bool operator==(rmgui_vector2& vec) { return fabsf(x - vec.x) < FLT_EPSILON && fabsf(y - vec.y) < FLT_EPSILON; }
-  inline bool operator!=(rmgui_vector2& vec) { return fabsf(x - vec.x) >= FLT_EPSILON && fabsf(y - vec.y) >= FLT_EPSILON; }
-  inline bool operator<(rmgui_vector2& vec) { return x < vec.x && y < vec.y; }
-  inline bool operator<=(rmgui_vector2& vec) { return x <= vec.x && y <= vec.y; }
-  inline bool operator>(rmgui_vector2& vec) { return x > vec.x && y > vec.y; }
-  inline bool operator>=(rmgui_vector2& vec) { return x >= vec.x && y >= vec.y; }
+  inline rm_vec2 operator=(const rm_vec2& src) { return *this = src; }
+  inline rm_vec2 operator=(rm_vec2& vec) { return *this = vec; }
+  inline rm_vec2 operator+(rm_vec2& vec) { return rm_vec2(x + vec.x, y + vec.y); }
+  inline rm_vec2 operator-(rm_vec2& vec) { return rm_vec2(x - vec.x, y - vec.y); }
+  inline rm_vec2 operator*(rm_vec2& vec) { return rm_vec2(x * vec.x, y * vec.y); }
+  inline rm_vec2 operator/(rm_vec2& vec) { return rm_vec2(x / vec.x, y / vec.y); }
+  inline rm_vec2 operator+(float s) { return rm_vec2(x + s, y + s); }
+  inline rm_vec2 operator-(float s) { return rm_vec2(x - s, y - s); }
+  inline rm_vec2 operator*(float s) { return rm_vec2(x * s, y * s); }
+  inline rm_vec2 operator/(float s) { return rm_vec2(x / s, y / s); }
+  inline rm_vec2 operator+=(rm_vec2& vec) { x += vec.x; y += vec.y; return *this; }
+  inline rm_vec2 operator-=(rm_vec2& vec) { x -= vec.x; y -= vec.y; return *this; }
+  inline rm_vec2 operator*=(rm_vec2& vec) { x *= vec.x; y *= vec.y; return *this; }
+  inline rm_vec2 operator/=(rm_vec2& vec) { x /= vec.x; y /= vec.y; return *this; }
+  inline rm_vec2 operator*=(float s) { x *= s; y *= s; return *this; }
+  inline rm_vec2 operator/=(float s) { x /= s; y /= s; return *this; }
+  inline rm_vec2 operator+=(float s) { x += s; y += s; return *this; }
+  inline rm_vec2 operator-=(float s) { x -= s; y -= s; return *this; }
+
+  inline bool compare_strong(rm_vec2& vec) { return x == vec.x && y == vec.y; }
+  inline bool operator==(rm_vec2& vec) { return fabsf(x - vec.x) < FLT_EPSILON && fabsf(y - vec.y) < FLT_EPSILON; }
+  inline bool operator!=(rm_vec2& vec) { return fabsf(x - vec.x) >= FLT_EPSILON && fabsf(y - vec.y) >= FLT_EPSILON; }
+  inline bool operator<(rm_vec2& vec) { return x < vec.x && y < vec.y; }
+  inline bool operator<=(rm_vec2& vec) { return x <= vec.x && y <= vec.y; }
+  inline bool operator>(rm_vec2& vec) { return x > vec.x && y > vec.y; }
+  inline bool operator>=(rm_vec2& vec) { return x >= vec.x && y >= vec.y; }
   inline float operator[](int idx) { assert(idx < EXGUI_COUNTOF(v) && "index out of bounds"); return v[idx]; }
 };
 
@@ -110,9 +116,11 @@ public:
     struct { float x, y, width, height; };
     struct { float v[4]; };
   };
-  rm_rect() {}
+  rm_rect() : x(0.f), y(0.f), width(0.f), height(0.f) {}
   rm_rect(const rm_rect& rect) { *this = rect; }
   rm_rect(float x, float y, float w, float h) : x(x), y(y), width(w), height(h) {}
+  rm_rect(float x, float y, const rm_vec2 &size) : x(x), y(y), width(size.x), height(size.y) {}
+  rm_rect(const rm_vec2& pos, float w, float h) : x(pos.x), y(pos.y), width(w), height(h) {}
   rm_rect(int x, int y, int w, int h) : x((float)x), y((float)y), width((float)w), height((float)h) {}
   ~rm_rect() {}
 
@@ -152,12 +160,19 @@ _type rmgui_clamp(_type v, _type minval, _type maxval)
 class rm_bbox
 {
 public:
-  rmgui_vector2 min, max;
+  rm_vec2 min, max;
   rm_bbox() {}
   ~rm_bbox() {}
 
-  inline bool inside(rmgui_vector2& pt) {
+  inline bool inside(rm_vec2& pt) {
     return min <= pt && pt <= max;
+  }
+
+  inline void init(rm_vec2& pos, rm_vec2& size) {
+    min.x = pos.x;
+    min.y = pos.y;
+    max.x = min.x + size.x;
+    max.y = min.y + size.y;
   }
 
   inline void from_rect(rm_rect& rect) {
@@ -417,7 +432,7 @@ public:
   * @param cursor_pos - received current cursor pos
   * @return To block further propagation of the event, return false. If ture is returned, the event is propagated to the following elements.
   */
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) = 0;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) = 0;
 };
 
 /**
@@ -477,7 +492,7 @@ protected:
   virtual void on_text_input(int sym) {
     RMGUI_UNUSED(sym);
   }
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) {
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
     RMGUI_UNUSED(event);
     RMGUI_UNUSED(vk);
     RMGUI_UNUSED(state);
@@ -497,8 +512,8 @@ protected:
   rm_font          m_font;
   char             m_szclass[32];
   rm_bbox          m_bbox;
-  rm_rect          m_relative;
-  rm_rect          m_absolute;
+  rm_vec2    m_size; //width;height
+  rm_vec2    m_absolute;
   int              m_zindex;
 
   inline rm_surface* get_root() { return m_proot; }
@@ -536,9 +551,9 @@ public:
     m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_zindex(0) {
     m_elem_flags = flags;
     m_user_flags = uflags;
-    m_absolute = rm_rect(x, y, width, height);
-    m_relative = rm_rect(0, 0, width, height);
-    m_bbox.from_rect(m_absolute);
+    m_absolute.init(x, y);
+    m_size.init(width, height);
+    m_bbox.init(m_absolute, m_size);
 
     if (m_pparent) {
       m_pparent->add_child(this);
@@ -553,19 +568,19 @@ public:
   }
   ~rm_widget() {}
 
-  inline const char    *get_classname() { return m_szclass; }
-  inline void          *get_userptr() { return m_puserptr; }
-  inline void           set_userptr(void* p) { m_puserptr = p; }
+  inline const char *get_classname() { return m_szclass; }
+  inline void       *get_userptr() { return m_puserptr; }
+  inline void        set_userptr(void* p) { m_puserptr = p; }
 
   /* rect && bbox */
-  inline rm_bbox       &get_bbox() { return m_bbox; }
-  inline rm_rect       &get_relative() { return m_relative; }
-  inline rm_rect       &get_absolute() { return m_absolute; }
+  inline rm_bbox    &get_bbox() { return m_bbox; }
+  inline rm_vec2    &get_absolute() { return m_absolute; }
+  inline rm_vec2    &get_size() { return m_size; }
 
   /* visual */
-  inline bool           is_visible() { return m_elem_flags.has_visible(); }
-  inline void           show(bool b_show = true) { m_elem_flags.toggle_bits(EXGUI_FLAG_VISIBLE, b_show); }
-  inline void           hide() { show(false); }
+  inline bool        is_visible() { return m_elem_flags.has_visible(); }
+  inline void        show(bool b_show = true) { m_elem_flags.toggle_bits(EXGUI_FLAG_VISIBLE, b_show); }
+  inline void        hide() { show(false); }
 
   /* childs */
   inline size_t      get_num_childs() const { return m_childs.size(); }
@@ -593,6 +608,8 @@ public:
   /* layers */
   inline void           set_zindex(int zidx) { m_zindex = zidx; }
   inline int            get_zindex() const { return m_zindex; }
+
+  void resize(int width, int height);
 
   void move(int newx, int newy)  {
     move_recursive(this, newx, newy);
@@ -641,7 +658,7 @@ class rm_surface : public rm_widget, rm_object_accrssor
 #endif
   bool mouse_dispatcher(rm_widget *p_elem,
     EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, 
-    EXGUI_KEY_STATE state, rmgui_vector2 &cursor_pos);
+    EXGUI_KEY_STATE state, rm_vec2 &cursor_pos);
 
   /* access is open for inheritance (rmgui_root::rebuild_draw_cache accessor class ) */
 //protected:
@@ -658,7 +675,7 @@ public:
   void keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state);
   void textinput(int sym);
   void mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, int x, int y);
-  void resize(int width, int height);
+
 
   NVGcontext* get_context() { return m_pctx; }
 
@@ -850,7 +867,7 @@ class rm_window : public rm_widget, public rm_styled<rm_window_style>
 
   /* paint window background */
   virtual void on_draw(NVGcontext* p_ctx);
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos);
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos);
 
 public:
   rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags = EXGUI_FLAG_DEFAULT, uint32_t uflags = 0, void* p_userptr = nullptr);

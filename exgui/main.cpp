@@ -300,31 +300,40 @@ int main() {
   rm_checkbox* checkbox = new rm_checkbox(pwindow, 20, 40 + 30 + 20, 100, &style, "Enable");
   rm_checkbox* checkbox2 = new rm_checkbox(pwindow, 150, 40 + 30 + 20, 100, &style, u8"Включить");
 
-  rm_tabcontrol* tabs = new rm_tabcontrol(10, 190, 500, 30, pwindow,
+  static rm_tabcontrol_style tabcontrol_style;
+  tabcontrol_style.set_corner_radius(LEFT_TOP, 4.f);
+  tabcontrol_style.set_corner_radius(RIGHT_TOP, 4.f);
+  tabcontrol_style.set_corner_radius(RIGHT_BOTTOM, 4.f);
+  tabcontrol_style.set_corner_radius(LEFT_BOTTOM, 4.f);
+  tabcontrol_style.set_horizontal(true); //fuck it
+  rm_tabcontrol* tabs = new rm_tabcontrol(pwindow, 10, 190, 300, 150,
     [](rm_tabcontrol* ctrl, rm_tab_item* item, size_t idx) {
       printf("Tab %zu active: %s\n", idx, item->get_name());
     }
   );
+  tabs->set_style(&tabcontrol_style);
+
   //pwindow->add_child(tabs);
 
   size_t t0 = tabs->add_tab("Home");
   size_t t1 = tabs->add_tab("Settings");
+  size_t t2 = tabs->add_tab("Test1");
 
   auto origin = tabs->get_content_origin();
-  rm_label* homeLabel = new rm_label(tabs, origin.x, origin.y-10, "Welcome to the Home tab");
+  rm_label* homeLabel = new rm_label(tabs, origin.x, origin.y + 5, "Welcome to the Home tab");
   tabs->add_widget_to_tab(t0, homeLabel);
 
-  rm_button* homeBtn = new rm_button(tabs, origin.x, origin.y, 120, 30, "Home Action");
+  rm_button* homeBtn = new rm_button(tabs, origin.x, origin.y + 18, 120, 30, "Home Action");
   tabs->add_widget_to_tab(t0, homeBtn);
 
-  rm_checkbox* settingChk = new rm_checkbox(tabs, origin.x, origin.y-13, 150, &style, "Enable Feature");
+  rm_checkbox* settingChk = new rm_checkbox(tabs, origin.x, origin.y+5, 150, &style, "Enable Feature");
   tabs->add_widget_to_tab(t1, settingChk);
 
-  rm_text_input* settingInput = new rm_text_input(tabs, origin.x, origin.y, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
+  rm_text_input* settingInput = new rm_text_input(tabs, origin.x, origin.y+18, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
   tabs->add_widget_to_tab(t1, settingInput);
 
 
-  rm_treeview* tree = new rm_treeview(280, 250, 200, 200, pwindow,
+  rm_treeview* tree = new rm_treeview(290, 230, 200, 200, pwindow,
     [](rm_treeview* tv, rm_tree_node* node) {
       printf("Selected node: %s\n", node->name.c_str());
     }
@@ -337,6 +346,8 @@ int main() {
   root1->add_child("Child 1.1");
   rm_tree_node* sub = root1->add_child("Child 1.2");
   sub->add_child("Child 1.2.1");
+
+  root2->add_child("Child 1.2");
 
   root1->expanded = true;
 
