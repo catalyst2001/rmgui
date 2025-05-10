@@ -732,3 +732,155 @@ rm_scrollbar::rm_scrollbar(rm_widget* p_parent, RM_ORIENT orient, rm_scroll_styl
 rm_scrollbar::~rm_scrollbar()
 {
 }
+
+void rm_tabcontrol::on_draw(NVGcontext* p_ctx) {
+  m_bbox.from_rect(m_absolute);
+  nvgFontFaceId(p_ctx, get_font());
+
+  // Background
+  nvgBeginPath(p_ctx);
+  nvgRoundedRect(p_ctx, m_relative.x, m_relative.y, m_relative.width, m_relative.height, 4.0f);
+  nvgFillColor(p_ctx, nvgRGBA(180, 180, 180, 255));
+  nvgFill(p_ctx);
+  nvgStrokeColor(p_ctx, nvgRGBA(0, 0, 0, 255));
+  nvgStroke(p_ctx);
+
+  size_t n = m_tabs.size(); if (!n) return;
+  float tabW = m_relative.width / float(n);
+  nvgFontSize(p_ctx, 16.0f);
+  nvgTextAlign(p_ctx, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+
+  for (size_t i = 0; i < n; ++i) {
+    float x = m_relative.x + i * tabW;
+    float y = m_relative.y;
+    float h = m_relative.height;
+    nvgBeginPath(p_ctx);
+    nvgFillColor(p_ctx,
+      (int(i) == m_selected) ? nvgRGBA(240, 240, 240, 255) : nvgRGBA(200, 200, 200, 255)
+    );
+    nvgRect(p_ctx, x, y, tabW, h);
+    nvgFill(p_ctx);
+    nvgStrokeColor(p_ctx, nvgRGBA(0, 0, 0, 255)); nvgStroke(p_ctx);
+    nvgFillColor(p_ctx, nvgRGBA(0, 0, 0, 255));
+    nvgText(p_ctx, x + tabW * 0.5f, y + h * 0.5f, m_tabs[i].get_name(), NULL);
+  }
+}
+
+bool rm_tabcontrol::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) {
+  if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
+    size_t n = m_tabs.size(); float tabW = m_absolute.width / float(n);
+    int idx = int((cursor_pos.x - m_absolute.x) / tabW);
+    if (idx >= 0 && idx < static_cast<int>(n)) { set_selected_index(idx); return false; }
+  }
+  return true;
+}
+
+void rm_treeview::on_draw(NVGcontext* p_ctx) {
+  m_bbox.from_rect(m_absolute);
+  nvgFontFaceId(p_ctx, get_font());
+  nvgFontSize(p_ctx, m_rowHeight * 0.8f);
+  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+
+  // background
+  nvgBeginPath(p_ctx);
+  nvgRect(p_ctx, m_relative.x, m_relative.y, m_relative.width, m_relative.height);
+  nvgFillColor(p_ctx, nvgRGBA(245, 245, 245, 255));
+  nvgFill(p_ctx);
+
+  float y = m_relative.y;
+  for (auto root : m_roots) {
+    y = draw_node(p_ctx, root, m_relative.x, y);
+    if (y > m_relative.y + m_relative.height) break; // clip
+  }
+}
+
+float rm_treeview::draw_node(NVGcontext* p_ctx, rm_tree_node* node, float x, float y) {
+  // background if selected
+  if (node == m_selected) {
+    nvgBeginPath(p_ctx);
+    nvgRect(p_ctx, x, y, m_relative.width - (x - m_relative.x), m_rowHeight);
+    nvgFillColor(p_ctx, nvgRGBA(200, 230, 255, 255));
+    nvgFill(p_ctx);
+  }
+  // expand/collapse icon
+  if (!node->children.empty()) {
+    const float sz = m_rowHeight * 0.5f;
+    float cx = x + (m_indent - sz) * 0.5f;
+    float cy = y + (m_rowHeight - sz) * 0.5f;
+    nvgBeginPath(p_ctx);
+    if (node->expanded) {
+      // draw '-'
+      nvgMoveTo(p_ctx, cx, cy + sz / 2);
+      nvgLineTo(p_ctx, cx + sz, cy + sz / 2);
+    }
+    else {
+      // draw '+'
+      nvgMoveTo(p_ctx, cx, cy + sz / 2);
+      nvgLineTo(p_ctx, cx + sz, cy + sz / 2);
+      nvgMoveTo(p_ctx, cx + sz / 2, cy);
+      nvgLineTo(p_ctx, cx + sz / 2, cy + sz);
+    }
+    nvgStrokeColor(p_ctx, nvgRGBA(100, 100, 100, 255));
+    nvgStroke(p_ctx);
+  }
+  // draw text
+  float tx = x + m_indent;
+  float ty = y + m_rowHeight * 0.5f;
+  nvgFillColor(p_ctx, nvgRGBA(0, 0, 0, 255));
+  nvgText(p_ctx, tx, ty, node->name.c_str(), nullptr);
+
+  y += m_rowHeight;
+  // draw children
+  if (node->expanded) {
+    for (auto child : node->children) {
+      y = draw_node(p_ctx, child, x + m_indent, y);
+      if (y > m_relative.y + m_relative.height) break;
+    }
+  }
+  return y;
+}
+
+bool rm_treeview::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) {
+  if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN) {
+    rm_tree_node* hitNode = nullptr;
+    if (hit_test(cursor_pos, nullptr, m_relative.x, m_relative.y, hitNode) && hitNode) {
+      if (!hitNode->children.empty()) {
+        hitNode->expanded = !hitNode->expanded;
+        root_update();
+      }
+      m_selected = hitNode;
+      if (is_valid_callback())
+        get_callback()(this, m_selected);
+      return false;
+    }
+  }
+  return true;
+}
+
+bool rm_treeview::hit_test(rmgui_vector2 const& pos, rm_tree_node* node, float x, float y, rm_tree_node*& out) {
+  if (!node) {
+    // root level
+    for (auto root : m_roots) {
+      if (hit_test(pos, root, x, y, out)) return true;
+      y += m_rowHeight;
+      if (out) return true;
+    }
+    return false;
+  }
+  // check this node area
+  if (pos.x >= x && pos.x <= m_absolute.x + m_absolute.width
+    && pos.y >= y && pos.y < y + m_rowHeight) {
+    out = node;
+    return true;
+  }
+  y += m_rowHeight;
+  // check children
+  if (node->expanded) {
+    for (auto child : node->children) {
+      if (hit_test(pos, child, x + m_indent, y, out)) return true;
+      y += m_rowHeight;
+      if (out) return true;
+    }
+  }
+  return false;
+}

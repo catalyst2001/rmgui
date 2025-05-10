@@ -2,6 +2,7 @@
 #include "rmgui.h"
 #include <string>
 #include <vector>
+#include <functional>
 
 class rmgui_image {
 public:
@@ -369,4 +370,197 @@ public:
   inline float    get_speed() const { return m_speed; }
   inline void     set_scale(float scl) { m_scale = scl; }
   inline float    get_scale() const { return m_scale; }
+};
+
+/**
+ * =============================================
+ * Tab Control
+ * =============================================
+ */
+class rm_tab_item {
+  std::string name;
+  void* pdata;
+public:
+  rm_tab_item() : pdata(nullptr) {}
+  rm_tab_item(const char* pname, void* userptr = nullptr)
+    : name(pname), pdata(userptr) {
+  }
+
+  inline const char* get_name() const { return name.c_str(); }
+  inline void* get_userdata() const { return pdata; }
+};
+
+class rm_tabcontrol;
+using rm_tabcontrol_cb = void(*)(rm_tabcontrol* ptabs, rm_tab_item* pitem, size_t tabid);
+
+class rm_tabcontrol : public rm_widget, public rm_callback<rm_tabcontrol_cb> {
+  std::vector<rm_tab_item>            m_tabs;
+  std::vector<std::vector<rm_widget*>> m_tabChildren;
+  int                                  m_selected;
+protected:
+  virtual void on_draw(NVGcontext* p_ctx) override;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
+
+  void update_children_visibility() {
+    for (size_t t = 0; t < m_tabChildren.size(); ++t) {
+      bool show = (static_cast<int>(t) == m_selected);
+      for (rm_widget* w : m_tabChildren[t]) {
+        if (show) w->show(true);
+        else       w->hide();
+      }
+    }
+  }
+
+public:
+  const size_t kinvalid_index = static_cast<size_t>(-1);
+
+  inline void get_content_rect(rm_rect& rect) const {
+    rect.x = m_relative.x;
+    rect.y = m_relative.y + m_relative.height;
+    rect.width = m_relative.width;
+    rect.height = m_absolute.height - m_relative.height;
+  }
+  inline rmgui_vector2 get_content_origin() const {
+    return { m_relative.x, m_relative.y + m_relative.height };
+  }
+
+  rm_tabcontrol(int x, int y, int width, int height,
+    rm_widget* p_parent,
+    rm_tabcontrol_cb cb = nullptr)
+    : rm_widget(x, y, width, height, p_parent, "ui_tabcontrol",
+      EXGUI_FLAG_DEFAULT | EXGUI_FLAG_GLOBAL, 0, nullptr),
+    m_selected(0)
+  {
+    set_callback(cb);
+    set_zindex(1000);
+  }
+  virtual ~rm_tabcontrol() {}
+
+  inline size_t get_num_tabs() const { return m_tabs.size(); }
+  size_t add_tab(const char* pname, void* puserdata = nullptr) {
+    m_tabs.emplace_back(pname, puserdata);
+    m_tabChildren.emplace_back();
+    update_children_visibility();
+    return m_tabs.size() - 1;
+  }
+  size_t find_tab(const char* pname) {
+    auto it = std::find_if(m_tabs.begin(), m_tabs.end(),
+      [pname](rm_tab_item& item) { return strcmp(item.get_name(), pname) == 0; }
+    );
+    return (it != m_tabs.end()) ? (it - m_tabs.begin()) : kinvalid_index;
+  }
+  inline rm_tab_item* get_tab(size_t idx) {
+    assert(idx < m_tabs.size());
+    return &m_tabs[idx];
+  }
+
+  void add_widget_to_tab(size_t tabIndex, rm_widget* widget) {
+    assert(tabIndex < m_tabChildren.size());
+    m_tabChildren[tabIndex].push_back(widget);
+    widget->set_parent(this);
+    add_child(widget);
+    {
+      rm_rect abs = widget->get_absolute();
+      float newX = m_absolute.x + abs.x;
+      float newY = m_absolute.y + abs.y;
+      widget->move((int)newX, (int)newY);
+    }
+
+    if (static_cast<int>(tabIndex) == m_selected) widget->show(true);
+    else                                      widget->hide();
+  }
+  const std::vector<rm_widget*>& get_tab_children(size_t tabIndex) const {
+    assert(tabIndex < m_tabChildren.size());
+    return m_tabChildren[tabIndex];
+  }
+
+  void set_selected_index(int idx) {
+    if (idx < 0 || idx >= static_cast<int>(m_tabs.size())) return;
+    m_selected = idx;
+    update_children_visibility();
+    if (is_valid_callback()) get_callback()(this, &m_tabs[m_selected], m_selected);
+  }
+  inline int get_selected_index() const { return m_selected; }
+  inline rm_tab_item* get_selected_tab() {
+    if (m_selected < 0 || m_selected >= static_cast<int>(m_tabs.size())) return nullptr;
+    return &m_tabs[m_selected];
+  }
+};
+
+/**
+ * =============================================
+ * Tree View Control
+ * =============================================
+ */
+class rm_tree_node {
+public:
+  std::string            name;
+  void* userdata;
+  bool                   expanded;
+  std::vector<rm_tree_node*> children;
+  rm_tree_node* parent;
+
+  rm_tree_node(const char* pname, void* puserdata = nullptr)
+    : name(pname), userdata(puserdata), expanded(false), parent(nullptr) {
+  }
+
+  ~rm_tree_node() {
+    for (auto child : children) delete child;
+  }
+
+  // add child node
+  rm_tree_node* add_child(const char* pname, void* puserdata = nullptr) {
+    rm_tree_node* node = new rm_tree_node(pname, puserdata);
+    node->parent = this;
+    children.push_back(node);
+    return node;
+  }
+};
+
+class rm_treeview;
+using rm_treeview_cb = std::function<void(rm_treeview*, rm_tree_node*)>;
+
+class rm_treeview : public rm_widget, public rm_callback<rm_treeview_cb> {
+  std::vector<rm_tree_node*> m_roots;
+  rm_tree_node* m_selected;
+  float                      m_rowHeight;
+  float                      m_indent;
+protected:
+  virtual void on_draw(NVGcontext* p_ctx) override;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos) override;
+
+  // recursive draw helper
+  float draw_node(NVGcontext* p_ctx, rm_tree_node* node, float x, float y);
+  // recursive hit-test helper
+  bool hit_test(rmgui_vector2 const& pos, rm_tree_node* node, float x, float y, rm_tree_node*& out);
+
+public:
+  rm_treeview(int x, int y, int width, int height, rm_widget* p_parent, rm_treeview_cb cb = nullptr)
+    : rm_widget(x, y, width, height, p_parent, "ui_treeview", EXGUI_FLAG_DEFAULT | EXGUI_FLAG_GLOBAL, 0, nullptr),
+    m_selected(nullptr), m_rowHeight(20.0f), m_indent(16.0f)
+  {
+    set_callback(cb);
+    set_zindex(500);
+  }
+
+  virtual ~rm_treeview() {
+    for (auto root : m_roots) delete root;
+  }
+
+  // add a root-level node
+  rm_tree_node* add_root(const char* pname, void* puserdata = nullptr) {
+    rm_tree_node* node = new rm_tree_node(pname, puserdata);
+    m_roots.push_back(node);
+    return node;
+  }
+  // clear all nodes
+  void clear() {
+    for (auto root : m_roots) delete root;
+    m_roots.clear();
+    m_selected = nullptr;
+  }
+
+  inline rm_tree_node* get_selected() const { return m_selected; }
+  inline void set_row_height(float h) { m_rowHeight = h; }
+  inline void set_indent(float i) { m_indent = i; }
 };

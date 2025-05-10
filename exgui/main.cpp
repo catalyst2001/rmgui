@@ -300,6 +300,47 @@ int main() {
   rm_checkbox* checkbox = new rm_checkbox(pwindow, 20, 40 + 30 + 20, 100, &style, "Enable");
   rm_checkbox* checkbox2 = new rm_checkbox(pwindow, 150, 40 + 30 + 20, 100, &style, u8"Включить");
 
+  rm_tabcontrol* tabs = new rm_tabcontrol(10, 190, 500, 30, pwindow,
+    [](rm_tabcontrol* ctrl, rm_tab_item* item, size_t idx) {
+      printf("Tab %zu active: %s\n", idx, item->get_name());
+    }
+  );
+  //pwindow->add_child(tabs);
+
+  size_t t0 = tabs->add_tab("Home");
+  size_t t1 = tabs->add_tab("Settings");
+
+  auto origin = tabs->get_content_origin();
+  rm_label* homeLabel = new rm_label(tabs, origin.x, origin.y-10, "Welcome to the Home tab");
+  tabs->add_widget_to_tab(t0, homeLabel);
+
+  rm_button* homeBtn = new rm_button(tabs, origin.x, origin.y, 120, 30, "Home Action");
+  tabs->add_widget_to_tab(t0, homeBtn);
+
+  rm_checkbox* settingChk = new rm_checkbox(tabs, origin.x, origin.y-13, 150, &style, "Enable Feature");
+  tabs->add_widget_to_tab(t1, settingChk);
+
+  rm_text_input* settingInput = new rm_text_input(tabs, origin.x, origin.y, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
+  tabs->add_widget_to_tab(t1, settingInput);
+
+
+  rm_treeview* tree = new rm_treeview(280, 250, 200, 200, pwindow,
+    [](rm_treeview* tv, rm_tree_node* node) {
+      printf("Selected node: %s\n", node->name.c_str());
+    }
+  );
+  //pwindow->add_child(tree);
+
+  rm_tree_node* root1 = tree->add_root("Root 1");
+  rm_tree_node* root2 = tree->add_root("Root 2");
+
+  root1->add_child("Child 1.1");
+  rm_tree_node* sub = root1->add_child("Child 1.2");
+  sub->add_child("Child 1.2.1");
+
+  root1->expanded = true;
+
+
   rm_animation* anim = new rm_animation(pwindow, 20, 100, 100, 100, image_pat);
   anim->set_speed(8.f);
   anim->set_scale(0.5f);

@@ -111,7 +111,7 @@ public:
     struct { float v[4]; };
   };
   rm_rect() {}
-  rm_rect(rm_rect& rect) { *this = rect; }
+  rm_rect(const rm_rect& rect) { *this = rect; }
   rm_rect(float x, float y, float w, float h) : x(x), y(y), width(w), height(h) {}
   rm_rect(int x, int y, int w, int h) : x((float)x), y((float)y), width((float)w), height((float)h) {}
   ~rm_rect() {}
