@@ -331,6 +331,9 @@ class rm_scrollbar : public rm_widget,
   public rm_scroll_base
 {
   float m_position;
+  rm_widget* find_other_scrollbars();
+  void       adjust_position();
+
   virtual void on_draw(NVGcontext* p_ctx) override;
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rmgui_vector2& cursor_pos);
 public:

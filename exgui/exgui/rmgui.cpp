@@ -62,6 +62,11 @@ bool rm_widget::remove_child(rm_widget* p_child)
   return true;
 }
 
+rm_widget* rm_widget::find_child_by_classname(const char* pclassname) const
+{
+  return nullptr;
+}
+
 void rm_widget::set_parent(rm_widget* p_parent)
 {
   m_pparent = p_parent;

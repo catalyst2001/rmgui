@@ -568,11 +568,12 @@ public:
   inline void           hide() { show(false); }
 
   /* childs */
-  inline size_t         get_num_childs() { return m_childs.size(); }
+  inline size_t      get_num_childs() const { return m_childs.size(); }
   inline rm_widget*  get_child(size_t idx) { return m_childs[idx]; }
   inline rm_widget** get_all_childs() { return m_childs.data(); }
-  bool                  add_child(rm_widget* p_child);
-  bool                  remove_child(rm_widget* p_child);
+  bool               add_child(rm_widget* p_child);
+  bool               remove_child(rm_widget* p_child);
+  rm_widget         *find_child_by_classname(const char* pclassname) const;
 
   /* parent */
   inline rm_widget  *get_parent() { return m_pparent; }

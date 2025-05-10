@@ -675,6 +675,41 @@ rm_animation::~rm_animation()
 {
 }
 
+rm_widget* rm_scrollbar::find_other_scrollbars()
+{
+  for (size_t i = 0; i < m_pparent->get_num_childs(); i++) {
+    rm_widget* pchild = m_pparent->get_child(i);
+    if (pchild != this && !strcmp(pchild->get_classname(), "ui_scrollbar")) {
+      return pchild;
+    }
+  }
+  return nullptr;
+}
+
+void rm_scrollbar::adjust_position()
+{
+  /* set position of parent */
+  rm_widget* pother_scroll = find_other_scrollbars();
+  rm_rect& parent_rel = m_pparent->get_relative();
+  rm_rect& parent_abs = m_pparent->get_absolute();
+  m_relative.x = 0;
+  m_relative.y = 0;
+  if (get_orient() == RM_ORIENT_HORZ) {
+    m_relative.width = parent_rel.width;
+    m_relative.height = m_pstyle->get_thumb_size();
+    m_absolute.x = parent_abs.x;
+    m_absolute.y = parent_abs.y + parent_rel.height - m_pstyle->get_thumb_size();
+  }
+  else {
+    m_relative.width = m_pstyle->get_thumb_size();
+    m_relative.height = parent_rel.height;
+    m_absolute.x = parent_abs.x + parent_rel.width - m_pstyle->get_thumb_size();
+    m_absolute.y = parent_abs.y;
+  }
+  m_absolute.width = m_relative.width;
+  m_absolute.height = m_relative.height;
+}
+
 void rm_scrollbar::on_draw(NVGcontext* p_ctx)
 {
   rm_rect content_rect(0, 0, 1000, 1000);
@@ -689,27 +724,9 @@ bool rm_scrollbar::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STA
 rm_scrollbar::rm_scrollbar(rm_widget* p_parent, RM_ORIENT orient, rm_scroll_style* p_style, float inital_pos) :
   rm_widget(0, 0, 0, 0, p_parent, "ui_scrollbar", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL), m_position(inital_pos)
 {
-  rm_rect &parent_rel = p_parent->get_relative();
-  rm_rect &parent_abs = p_parent->get_absolute();
   set_style(p_style);
   set_orient(orient);
-
-  /* set position of parent */
-  m_relative.x = 0;
-  m_relative.y = 0;
-  if (get_orient() == RM_ORIENT_HORZ) {
-    m_relative.width = parent_rel.width;
-    m_relative.height = p_style->get_thumb_size();
-    m_absolute.x = parent_abs.x;
-    m_absolute.y = parent_abs.y + parent_rel.height - p_style->get_thumb_size();
-  } else {
-    m_relative.width = p_style->get_thumb_size();
-    m_relative.height = parent_rel.height;
-    m_absolute.x = parent_abs.x + parent_rel.width - p_style->get_thumb_size(); 
-    m_absolute.y = parent_abs.y;
-  }
-  m_absolute.width = m_relative.width;
-  m_absolute.height = m_relative.height;
+  adjust_position();
 }
 
 rm_scrollbar::~rm_scrollbar()
