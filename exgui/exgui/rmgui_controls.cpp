@@ -551,27 +551,27 @@ void rm_scroll_base::orient_detect(const rm_rect& background)
   m_orientation = (background.width > background.height) ? RM_ORIENT_HORZ : RM_ORIENT_VERT;
 }
 
-void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, const rm_rect& back, rm_scroll_style* pstyle, float pos)
+void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, const rm_vec2& back, rm_scroll_style* pstyle, float pos)
 {
   rm_rect thumb_rect;
   assert(m_orientation != RM_ORIENT_AUTO && "[K.D.] m_orientation have undefined value! You called rm_scroll_base::orient_detect() from init/resize?");
   if (m_orientation == RM_ORIENT_HORZ) {
-    thumb_rect.x = back.width * pos;
+    thumb_rect.x = back.x * pos;
     thumb_rect.y = back.y;
     thumb_rect.width = pstyle->get_thumb_size();
-    thumb_rect.height = back.height;
+    thumb_rect.height = back.y;
   }
   else {
     thumb_rect.x = back.x;
-    thumb_rect.y = back.height * pos;
-    thumb_rect.width = back.width;
+    thumb_rect.y = back.y * pos;
+    thumb_rect.width = back.x;
     thumb_rect.height = pstyle->get_thumb_size();
   }
 
   /* paint background */
   nvgBeginPath(p_ctx);
   nvgFillColor(p_ctx, pstyle->get_scroll_background_color());
-  nvgRoundedRect(p_ctx, back.x, back.y, back.width, back.height, pstyle->get_scroll_corner_radius());
+  nvgRoundedRect(p_ctx, back.x, back.y, back.x, back.y, pstyle->get_scroll_corner_radius());
   nvgFill(p_ctx);
   nvgStrokeWidth(p_ctx, pstyle->get_background_stroke_width());
   nvgStrokeColor(p_ctx, pstyle->get_scroll_background_border_color());
@@ -724,6 +724,79 @@ rm_scrollbar::~rm_scrollbar()
 {
 }
 
+rm_tabcontrol::rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height,
+  rm_tabcontrol_cb cb)
+  : rm_widget(x, y, width, height, p_parent, "ui_tabcontrol",
+    EXGUI_FLAG_DEFAULT | EXGUI_FLAG_GLOBAL, 0, nullptr),
+  m_selected(0)
+{
+  set_callback(cb);
+  set_zindex(998);
+}
+
+rm_widget* rm_tabcontrol::add_tab(const char* pname, void* puserdata)
+{
+  m_tabs.emplace_back(pname, puserdata);
+
+  bool horz = m_pstyle->is_horizontal();
+  float th = m_pstyle->get_tab_thickness();
+  float cx = horz ? 0.f : th;
+  float cy = horz ? th : 0.f;
+  float cw = horz ? m_size.x : m_size.x - th;
+  float ch = horz ? m_size.y - th : m_size.y;
+
+  rm_widget* page = new rm_widget(
+    int(cx), int(cy), int(cw), int(ch),
+    this,
+    "ui_tabpage",
+    EXGUI_FLAG_DEFAULT | EXGUI_FLAG_GLOBAL,
+    0, nullptr
+  );
+
+  m_tabPages.push_back(page);
+  update_children_visibility();
+  return page;
+}
+
+size_t rm_tabcontrol::find_tab(const char* pname)
+{
+  auto it = std::find_if(m_tabs.begin(), m_tabs.end(),
+    [pname](rm_tab_item& item) { return strcmp(item.get_name(), pname) == 0; }
+  );
+  return (it != m_tabs.end()) ? (it - m_tabs.begin()) : kinvalid_index;
+}
+
+//void rm_tabcontrol::add_widget_to_tab(size_t tabIndex, rm_widget* widget)
+//{
+//  assert(tabIndex < m_tabChildren.size());
+//  m_tabChildren[tabIndex].push_back(widget);
+//  widget->set_parent(this);
+//  add_child(widget);
+//  {
+//    rm_vec2& abs = widget->get_absolute();
+//    float newX = m_absolute.x + abs.x;
+//    float newY = m_absolute.y + abs.y;
+//    widget->move((int)newX, (int)newY);
+//  }
+//
+//  if (static_cast<int>(tabIndex) == m_selected) {
+//    widget->show(true);
+//  }
+//  else {
+//    widget->hide();
+//  }
+//}
+
+void rm_tabcontrol::set_selected_index(int idx)
+{
+  if (idx < 0 || idx >= static_cast<int>(m_tabs.size()))
+    return;
+  m_selected = idx;
+  update_children_visibility();
+  if (is_valid_callback())
+    get_callback()(this, &m_tabs[m_selected], m_selected);
+}
+
 void rm_tabcontrol::on_draw(NVGcontext* p_ctx) {
   //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
   nvgFontFaceId(p_ctx, get_font());
@@ -775,6 +848,13 @@ bool rm_tabcontrol::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
     }
   }
   return true;
+}
+
+void rm_tabcontrol::update_children_visibility()
+{
+  for (size_t t = 0; t < m_tabPages.size(); ++t) {
+    m_tabPages[t]->show(int(t) == m_selected);
+  }
 }
 
 void rm_treeview::on_draw(NVGcontext* p_ctx) {
@@ -856,9 +936,9 @@ bool rm_treeview::on_mouse(EXGUI_MOUSE_EVENT event,
     rm_tree_node* hitNode = nullptr;
     float y = m_absolute.y;
     if (hit_test(cursor_pos,
-      /*node=*/nullptr,
-      /*abs x=*/m_absolute.x,
-      /*abs y=*/y,
+      nullptr,
+      m_absolute.x,
+      y,
       hitNode)
       && hitNode)
     {

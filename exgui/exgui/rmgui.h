@@ -80,7 +80,13 @@ public:
     y = yy;
   }
 
-  inline rm_vec2 operator=(const rm_vec2& src) { return *this = src; }
+  inline rm_vec2 operator=(const rm_vec2& src) {
+    if (this != &src) {
+      x = src.x;
+      y = src.y;
+    }
+    return *this;
+  }
   inline rm_vec2 operator=(rm_vec2& vec) { return *this = vec; }
   inline rm_vec2 operator+(rm_vec2& vec) { return rm_vec2(x + vec.x, y + vec.y); }
   inline rm_vec2 operator-(rm_vec2& vec) { return rm_vec2(x - vec.x, y - vec.y); }

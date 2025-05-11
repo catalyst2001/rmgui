@@ -320,7 +320,7 @@ protected:
   inline void      set_orient(RM_ORIENT orient) { m_orientation = orient; }
   inline RM_ORIENT get_orient() const { return m_orientation; }
   void orient_detect(const rm_rect &background);
-  void draw_scroll(NVGcontext* p_ctx, const rm_rect &back, rm_scroll_style *pstyle, float pos); //TODO: K.D. for D2
+  void draw_scroll(NVGcontext* p_ctx, const rm_vec2&back, rm_scroll_style *pstyle, float pos); //TODO: K.D. for D2
   void draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_vec2 content_size, const rm_vec2& window_size, float thumb_height, float pos);
 };
 
@@ -387,6 +387,7 @@ class rm_tabcontrol_style : public rm_corners_style {
   NVGcolor      m_unselected_color;
   float         m_font_size;
   bool          m_is_horizontal;
+  float         m_tab_thickness;
 public:
   rm_tabcontrol_style() :
     m_text_offset(0.f, 0.f),
@@ -396,13 +397,14 @@ public:
     m_selected_color(nvgRGB(240, 240, 240)),
     m_unselected_color(nvgRGB(200, 200, 200)),
     m_font_size(15.f),
-    m_is_horizontal(true) {
+    m_is_horizontal(true), m_tab_thickness(5.f){
   }
   inline bool            is_horizontal() const { return m_is_horizontal; }
   inline void            set_horizontal(bool enabled) { m_is_horizontal = enabled; }
 
   /* selectors  */
   inline const rm_vec2& get_text_offsets() const { return m_text_offset; }
+  inline const float    get_tab_thickness() const { return m_tab_thickness; }
   inline const NVGcolor& get_text_color() const { return m_text_color; }
   inline const NVGcolor& get_background_color() const { return m_bg_color; }
   inline const NVGcolor& get_border_color() const { return m_border_color; }
@@ -412,6 +414,7 @@ public:
 
   /* modifiers */
   inline void set_text_offsets(rm_vec2 offset) { m_text_offset = offset; }
+  inline void set_tab_thickness(float t) { m_tab_thickness = t; }
   inline void set_text_color(NVGcolor clr) { m_text_color = clr; }
   inline void set_background_color(NVGcolor clr) { m_bg_color = clr; }
   inline void set_border_color(NVGcolor clr) { m_border_color = clr; }
@@ -440,24 +443,16 @@ public:
 
 class rm_tabcontrol;
 using rm_tabcontrol_cb = void(*)(rm_tabcontrol* ptabs, rm_tab_item* pitem, size_t tabid);
-
 class rm_tabcontrol : public rm_widget, public rm_styled<rm_tabcontrol_style>, public rm_callback<rm_tabcontrol_cb> {
   std::vector<rm_tab_item>             m_tabs;
   std::vector<std::vector<rm_widget*>> m_tabChildren;
+  std::vector<rm_widget*>              m_tabPages;
   int                                  m_selected;
 protected:
   virtual void on_draw(NVGcontext* p_ctx) override;
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
 
-  void update_children_visibility() {
-    for (size_t t = 0; t < m_tabChildren.size(); ++t) {
-      bool show = (static_cast<int>(t) == m_selected);
-      for (rm_widget* w : m_tabChildren[t]) {
-        if (show) w->show(true);
-        else       w->hide();
-      }
-    }
-  }
+  void update_children_visibility();
 
 public:
   const size_t kinvalid_index = static_cast<size_t>(-1);
@@ -468,77 +463,31 @@ public:
   //  rect.width = m_size.x;
   //  rect.height = m_size.y; //TODO: K.D. ok?
   //}
+  inline rm_vec2 get_content_origin() const { return { 0.f, m_size.y + m_absolute.y }; }
 
-  inline rm_vec2 get_content_origin() const {
-    return { 0.f, m_size.y / 2.f };
-  }
-
-  rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height,
-    rm_tabcontrol_cb cb = nullptr)
-    : rm_widget(x, y, width, height, p_parent, "ui_tabcontrol",
-      EXGUI_FLAG_DEFAULT | EXGUI_FLAG_GLOBAL, 0, nullptr),
-    m_selected(0)
-  {
-    set_callback(cb);
-    set_zindex(998);
-  }
+  rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height, rm_tabcontrol_cb cb = nullptr);
   virtual ~rm_tabcontrol() {}
 
   inline size_t get_num_tabs() const { return m_tabs.size(); }
-  size_t add_tab(const char* pname, void* puserdata = nullptr) {
-    m_tabs.emplace_back(pname, puserdata);
-    m_tabChildren.emplace_back();
-    update_children_visibility();
-    return m_tabs.size() - 1;
-  }
-  size_t find_tab(const char* pname) {
-    auto it = std::find_if(m_tabs.begin(), m_tabs.end(),
-      [pname](rm_tab_item& item) { return strcmp(item.get_name(), pname) == 0; }
-    );
-    return (it != m_tabs.end()) ? (it - m_tabs.begin()) : kinvalid_index;
-  }
+
+  rm_widget* add_tab(const char* pname, void* puserdata = nullptr);
+  size_t find_tab(const char* pname);
   inline rm_tab_item* get_tab(size_t idx) {
     assert(idx < m_tabs.size());
     return &m_tabs[idx];
   }
 
-  void add_widget_to_tab(size_t tabIndex, rm_widget* widget) {
-    assert(tabIndex < m_tabChildren.size());
-    m_tabChildren[tabIndex].push_back(widget);
-    widget->set_parent(this);
-    add_child(widget);
-    {
-      rm_vec2& abs = widget->get_absolute();
-      float newX = m_absolute.x + abs.x;
-      float newY = m_absolute.y + abs.y;
-      widget->move((int)newX, (int)newY);
-    }
+  //void [[maybe_unused]] add_widget_to_tab(size_t tabIndex, rm_widget* widget);
+  //inline const std::vector<rm_widget*>& get_tab_children(size_t tabIndex) const {
+  //  assert(tabIndex < m_tabChildren.size());
+  //  return m_tabChildren[tabIndex];
+  //}
 
-    if (static_cast<int>(tabIndex) == m_selected) {
-      widget->show(true);
-    }
-    else {
-      widget->hide();
-    }
-  }
-  const std::vector<rm_widget*>& get_tab_children(size_t tabIndex) const {
-    assert(tabIndex < m_tabChildren.size());
-    return m_tabChildren[tabIndex];
-  }
-
-  void set_selected_index(int idx) {
-    if (idx < 0 || idx >= static_cast<int>(m_tabs.size())) 
-      return;
-    m_selected = idx;
-    update_children_visibility();
-    if (is_valid_callback())
-      get_callback()(this, &m_tabs[m_selected], m_selected);
-  }
+  void set_selected_index(int idx);
   inline int get_selected_index() const { return m_selected; }
   inline rm_tab_item* get_selected_tab() {
     if (m_selected < 0 || m_selected >= static_cast<int>(m_tabs.size()))
       return nullptr;
-
     return &m_tabs[m_selected];
   }
 };
