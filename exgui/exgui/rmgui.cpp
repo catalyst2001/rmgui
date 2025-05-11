@@ -89,7 +89,9 @@ void rm_surface::keybd_dispatcher(rm_widget* p_elem, int sc, EXGUI_KEY vk, EXGUI
 {
   p_elem->on_keybd(sc, vk, state);
   /* element has childs? */
-  if (p_elem->get_elem_flags().has_childs() && p_elem->get_elem_flags().has_notify_childs()) {
+  if (p_elem->get_elem_flags().has_active() && 
+    p_elem->get_elem_flags().has_childs() && 
+    p_elem->get_elem_flags().has_notify_childs()) {
     /* recursive enum childs */
     for (size_t i = 0; i < p_elem->get_num_childs(); i++) {
       /* enter recursively */
@@ -136,7 +138,8 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
   if (!b_call_next)
     return false; //this event was break by p_elem
 
-  if (p_elem->get_elem_flags().has_childs() &&
+  if (p_elem->get_elem_flags().has_active() && 
+    p_elem->get_elem_flags().has_childs() &&
     p_elem->get_elem_flags().has_notify_childs()) {
     for (size_t i = 0; i < p_elem->get_num_childs(); i++) {
       if (!mouse_dispatcher(p_elem->get_child(i), event, vk, state, cursor_pos)) {

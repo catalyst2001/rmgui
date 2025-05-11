@@ -293,6 +293,8 @@ int main() {
   style.set_background_color(nvgRGB(20, 20, 20));
   style.set_border_color(nvgRGB(80, 80, 80));
   style.set_mark_color(nvgRGB(111, 111, 255));
+  style.set_border_width(0.5f);
+  
   //style.set_corner_radius(LEFT_TOP, 4.f);
   //style.set_corner_radius(RIGHT_TOP, 4.f);
   //style.set_corner_radius(RIGHT_BOTTOM, 4.f);
@@ -305,7 +307,7 @@ int main() {
   tabcontrol_style.set_corner_radius(RIGHT_TOP, 4.f);
   tabcontrol_style.set_corner_radius(RIGHT_BOTTOM, 4.f);
   tabcontrol_style.set_corner_radius(LEFT_BOTTOM, 4.f);
-  tabcontrol_style.set_horizontal(false); //fuck it
+  tabcontrol_style.set_horizontal(!true);
   tabcontrol_style.set_tab_height(30);
   rm_tabcontrol* tabs = new rm_tabcontrol(pwindow, 10, 190, 300, 300,
     [](rm_tabcontrol* ctrl, rm_tab_item* item, size_t idx) {
@@ -318,11 +320,10 @@ int main() {
   rm_widget *t1 = tabs->add_tab("Settings");
   rm_widget *t2 = tabs->add_tab("Test1");
 
-  auto origin = tabs->get_content_origin();
-  rm_label* homeLabel = new rm_label(t0, 0, 0, "Welcome to the Home tab");
-  rm_button* homeBtn = new rm_button(t0, 10, 25, 120, 30, "Home Action");
-  rm_checkbox* settingChk = new rm_checkbox(t1, 10, 0, 150, &style, "Enable Feature");
-  rm_text_input* settingInput = new rm_text_input(t1, 10, 25, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
+  rm_label* home_label = new rm_label(t0, 0, 0, "Welcome to the Home tab");
+  rm_button* home_btn = new rm_button(t0, 10, 25, 120, 30, "Home Action");
+  rm_checkbox* setting_chk = new rm_checkbox(t1, 10, 0, 150, &style, "Enable Feature");
+  rm_text_input* setting_input = new rm_text_input(t1, 10, 25, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
 
 
   rm_treeview* tree = new rm_treeview(290, 230, 200, 200, pwindow,
@@ -330,7 +331,6 @@ int main() {
       printf("Selected node: %s\n", node->name.c_str());
     }
   );
-  //pwindow->add_child(tree);
 
   rm_tree_node* root1 = tree->add_root("Root 1");
   rm_tree_node* root2 = tree->add_root("Root 2");

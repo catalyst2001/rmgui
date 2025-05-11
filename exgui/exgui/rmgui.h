@@ -492,7 +492,7 @@ protected:
     return true;
   }
   virtual void on_draw(NVGcontext* p_ctx) {
-#ifdef RMGUI_DEBUG_DRAW
+#ifndef RMGUI_DEBUG_DRAW
     static NVGcolor colors[] = {
       nvgRGB(255, 0, 0), nvgRGB(0, 255, 0)
     };
@@ -617,6 +617,10 @@ public:
   /* flags */
   inline rmgui_flags_elem get_elem_flags() { return m_elem_flags; }
   inline uint32_t       get_user_flags() { return m_user_flags; }
+
+  /* state active */
+  inline void       set_enabled(bool enabled) {m_elem_flags.toggle_bits(EXGUI_FLAG_ACTIVE, enabled);}
+  inline const bool is_enabled() {return m_elem_flags.has_active();}
 
   /* system dependend functions interface */
   inline irmgui_sysdf  *get_sysdf() { return m_psysdf; }

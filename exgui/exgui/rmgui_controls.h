@@ -74,6 +74,7 @@ class rm_checkbox_style : public rm_corners_style {
   NVGcolor      m_border_color;
   int           m_check_size;
   float         m_font_size;
+  float         m_border_width;
 public:
   rm_checkbox_style() :
     m_text_offset(5.f, 0.f),
@@ -82,7 +83,7 @@ public:
     m_mark_color(nvgRGB(0, 0, 0)),
     m_border_color(nvgRGB(0, 0, 0)),
     m_check_size(20),
-    m_font_size(18.f) {}
+    m_font_size(18.f), m_border_width(1.f){}
 
   /* selectors  */
   inline const rm_vec2& get_text_offsets() const { return m_text_offset; }
@@ -92,6 +93,7 @@ public:
   inline const NVGcolor& get_border_color() const { return m_border_color; }
   inline int             get_check_size() const { return m_check_size; }
   inline float           get_font_size() const { return m_font_size; }
+  inline float           get_border_width() const { return m_border_width; }
 
   /* modifiers */
   inline void set_text_offsets(rm_vec2 offset) { m_text_offset = offset; }
@@ -101,6 +103,7 @@ public:
   inline void set_border_color(NVGcolor clr) { m_border_color = clr; }
   inline void set_check_size(int newsize) { m_check_size = newsize; }
   inline void set_font_size(float fsize) { m_font_size = fsize; }
+  inline void set_border_width(float bsize) { m_border_width = bsize; }
 };
 
 /**
@@ -320,7 +323,7 @@ protected:
   inline void      set_orient(RM_ORIENT orient) { m_orientation = orient; }
   inline RM_ORIENT get_orient() const { return m_orientation; }
   void orient_detect(const rm_rect &background);
-  void draw_scroll(NVGcontext* p_ctx, const rm_vec2&back, rm_scroll_style *pstyle, float pos); //TODO: K.D. for D2
+  void draw_scroll(NVGcontext* p_ctx, const rm_vec2&back, rm_scroll_style *pstyle, float pos);
   void draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_vec2 content_size, const rm_vec2& window_size, float thumb_height, float pos);
 };
 
@@ -430,15 +433,17 @@ public:
  */
 class rm_tab_item {
   std::string name;
-  void* pdata;
+  void       *pdata;
+  rm_widget  *pwidget;
 public:
-  rm_tab_item() : pdata(nullptr) {}
-  rm_tab_item(const char* pname, void* userptr = nullptr)
-    : name(pname), pdata(userptr) {
+  rm_tab_item() : pdata(nullptr), pwidget(nullptr) {}
+  rm_tab_item(const char* pname, rm_widget* pw, void* userptr = nullptr)
+    : name(pname), pdata(userptr), pwidget(pw) {
   }
 
   inline const char* get_name() const { return name.c_str(); }
   inline void* get_userdata() const { return pdata; }
+  inline rm_widget* get_page() const { return pwidget; }
 };
 
 class rm_tabcontrol;
@@ -450,20 +455,11 @@ protected:
   virtual void on_draw(NVGcontext* p_ctx) override;
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
 
-  void update_children_visibility();
+  void update_children_active();
 
   void get_widget_size(rm_vec2 &dst_pos, rm_vec2 &dst_size);
   void get_one_tab_size(rm_vec2 &dst_size);
 public:
-  const size_t kinvalid_index = static_cast<size_t>(-1);
-
-  //inline void [[maybe_unused]] get_content_rect(rm_rect& rect) const {
-  //  rect.x = 0.f;
-  //  rect.y = m_size.y;
-  //  rect.width = m_size.x;
-  //  rect.height = m_size.y; //TODO: K.D. ok?
-  //}
-  inline rm_vec2 get_content_origin() const { return { 0.f, m_size.y + m_absolute.y }; }
 
   rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height, rm_tabcontrol_cb cb = nullptr);
   virtual ~rm_tabcontrol() {}
@@ -471,7 +467,7 @@ public:
   inline size_t get_num_tabs() const { return m_tabs.size(); }
 
   rm_widget* add_tab(const char* pname, void* puserdata = nullptr);
-  size_t find_tab(const char* pname);
+  rm_widget* find_tab(const char* pname);
   inline rm_tab_item* get_tab(size_t idx) {
     assert(idx < m_tabs.size());
     return &m_tabs[idx];

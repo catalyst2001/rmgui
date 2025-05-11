@@ -268,7 +268,7 @@ void rm_checkbox::on_draw(NVGcontext* p_ctx) {
   /* paint background */
   nvgBeginPath(p_ctx);
   nvgRoundedRectVarying(p_ctx,
-    0.f, 0.f, m_size.y, m_size.y,
+    0.5f, 0.5f, m_size.y-1.f, m_size.y-1.f,
     m_pstyle->get_corner_radius(LEFT_TOP),
     m_pstyle->get_corner_radius(RIGHT_TOP),
     m_pstyle->get_corner_radius(RIGHT_BOTTOM),
@@ -276,7 +276,7 @@ void rm_checkbox::on_draw(NVGcontext* p_ctx) {
   );
   nvgFillColor(p_ctx, m_pstyle->get_background_color());
   nvgFill(p_ctx);
-  nvgStrokeWidth(p_ctx, 1.f);
+  nvgStrokeWidth(p_ctx, m_pstyle->get_border_width());
   nvgStrokeColor(p_ctx, m_pstyle->get_border_color());
   nvgStroke(p_ctx);
 
@@ -377,6 +377,10 @@ void rm_combobox::on_draw(NVGcontext* p_ctx) {
 bool rm_combobox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN) {
     if (m_bbox.inside(cursor_pos)) {
+      if (m_expanded) {
+        m_expanded = false;
+        return false;
+      }
       m_expanded = true;
       return false;
     }
@@ -738,7 +742,7 @@ rm_scrollbar::~rm_scrollbar()
 rm_tabcontrol::rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height,
   rm_tabcontrol_cb cb)
   : rm_widget(x, y, width, height, p_parent, "ui_tabcontrol",
-    EXGUI_FLAG_DEFAULT/* | EXGUI_FLAG_GLOBAL*/, 0, nullptr),
+    EXGUI_FLAG_DEFAULT, 0, nullptr),
   m_selected(0)
 {
   set_callback(cb);
@@ -750,57 +754,37 @@ rm_widget* rm_tabcontrol::add_tab(const char* pname, void* puserdata)
   rm_vec2 widget_pos;
   rm_vec2 widget_size;
   get_widget_size(widget_pos, widget_size);
-  m_tabs.emplace_back(pname, puserdata);
-
-
   rm_widget* page = new rm_widget(
     int(widget_pos.x), int(widget_pos.y), int(widget_size.x), int(widget_size.y),
     this,
     "ui_tabpage",
-    EXGUI_FLAG_DEFAULT/* | EXGUI_FLAG_GLOBAL*/,
+    EXGUI_FLAG_DEFAULT,
     0, nullptr
   );
 
-  //m_tabPages.push_back(page);
-  update_children_visibility();
+  m_tabs.emplace_back(pname, page, puserdata);
+  update_children_active();
   return page;
 }
 
-size_t rm_tabcontrol::find_tab(const char* pname)
+rm_widget* rm_tabcontrol::find_tab(const char* pname)
 {
   auto it = std::find_if(m_tabs.begin(), m_tabs.end(),
     [pname](rm_tab_item& item) { return strcmp(item.get_name(), pname) == 0; }
   );
-  return (it != m_tabs.end()) ? (it - m_tabs.begin()) : kinvalid_index;
-}
 
-//void rm_tabcontrol::add_widget_to_tab(size_t tabIndex, rm_widget* widget)
-//{
-//  assert(tabIndex < m_tabChildren.size());
-//  m_tabChildren[tabIndex].push_back(widget);
-//  widget->set_parent(this);
-//  add_child(widget);
-//  {
-//    rm_vec2& abs = widget->get_absolute();
-//    float newX = m_absolute.x + abs.x;
-//    float newY = m_absolute.y + abs.y;
-//    widget->move((int)newX, (int)newY);
-//  }
-//
-//  if (static_cast<int>(tabIndex) == m_selected) {
-//    widget->show(true);
-//  }
-//  else {
-//    widget->hide();
-//  }
-//}
+  if (it != m_tabs.end())
+    return it->get_page();
+
+  return nullptr;
+}
 
 void rm_tabcontrol::set_selected_index(int idx)
 {
   if (idx < 0 || idx >= static_cast<int>(m_tabs.size()))
     return;
   m_selected = idx;
-  update_children_visibility();
+  update_children_active();
   if (is_valid_callback())
     get_callback()(this, &m_tabs[m_selected], m_selected);
 }
@@ -818,7 +802,7 @@ void rm_tabcontrol::on_draw(NVGcontext* p_ctx) {
   //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
   nvgFontFaceId(p_ctx, get_font());
 
-  // Background
+  // background
   //nvgBeginPath(p_ctx);
   //nvgRoundedRect(p_ctx, 0.f, 0.f, m_relative.width, m_relative.height, 4.0f);
   //nvgFillColor(p_ctx, m_pstyle->get_background_color());
@@ -826,32 +810,24 @@ void rm_tabcontrol::on_draw(NVGcontext* p_ctx) {
   //nvgStrokeColor(p_ctx, m_pstyle->get_border_color());
   //nvgStroke(p_ctx);
   bool is_horizontal = m_pstyle->is_horizontal();
-  size_t n = m_tabs.size();
-  if (!n)
+  size_t num_tabs = m_tabs.size();
+  if (!num_tabs)
     return;
 
   rm_vec2 tab_size;
-  if (is_horizontal) {
-    tab_size.x = m_size.x / float(n);
-    tab_size.y = m_pstyle->get_tab_height();
-  } else {
-    tab_size.x = m_pstyle->get_tab_height();
-    tab_size.y = m_size.y / float(n);
-  }
+  get_one_tab_size(tab_size);
 
   nvgFontSize(p_ctx, m_pstyle->get_font_size());
   nvgTextAlign(p_ctx, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
 
-  for (size_t i = 0; i < n; ++i) {
+  for (size_t i = 0; i < num_tabs; ++i) {
     bool is_first = i == 0;
-    bool is_last = i == n - 1;
+    bool is_last = i == num_tabs - 1;
     float x = (is_horizontal ? i * tab_size.x : 0.f);
     float y = (is_horizontal ? 0.f : i * tab_size.y);
-    //float h = is_horizontal ? m_pstyle->get_tab_height() : m_size.y / float(n);
+
     nvgBeginPath(p_ctx);
-    nvgFillColor(p_ctx,
-      (int(i) == m_selected) ? m_pstyle->get_selected_color() : m_pstyle->get_unselected_color()
-    );
+    nvgFillColor(p_ctx, (int(i) == m_selected) ? m_pstyle->get_selected_color() : m_pstyle->get_unselected_color());
     nvgRoundedRectVarying(p_ctx, x, y, tab_size.x, tab_size.y,
       is_first ? m_pstyle->get_corner_radius(LEFT_TOP) : 0.f,
       (is_horizontal ? is_last : is_first) ? m_pstyle->get_corner_radius(RIGHT_TOP) : 0.f,
@@ -870,23 +846,15 @@ void rm_tabcontrol::on_draw(NVGcontext* p_ctx) {
 }
 
 bool rm_tabcontrol::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
-  //FIXME: K.D. m_bbox.inside(cursor_pos) has no effect. This handler is not be called if this control no have flag 'GLOBAL'
   int     idx;
   rm_vec2 tabcontrol_size;
   get_tabcontrol_size(tabcontrol_size);
-  rm_vec2 null_coord(0.f, 0.f);
-  m_bbox.init(null_coord, tabcontrol_size);
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
-    rm_vec2 local_mouse_pos = cursor_to_local(cursor_pos);
-    printf("rm_tabcontrol::on_mouse(): %f %f\n", local_mouse_pos.x, local_mouse_pos.y);
-    if (m_pstyle->is_horizontal()) {
-      idx = local_mouse_pos.x / m_pstyle->get_tab_height();
-    }
-    else {
-      idx = local_mouse_pos.y / m_pstyle->get_tab_height();
-    }
-
-    if (idx >= 0 && idx < (int)m_tabs.size()) {
+  m_bbox.init(m_absolute, tabcontrol_size);
+  rm_vec2 local_mouse_pos = cursor_to_local(cursor_pos);
+  size_t num_tabs = m_tabs.size();
+  if (num_tabs && event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
+    idx = int((m_pstyle->is_horizontal() ? local_mouse_pos.x : local_mouse_pos.y) / m_pstyle->get_tab_height() / num_tabs);
+    if (idx >= 0 && idx < int(num_tabs)) {
       set_selected_index(idx);
       return false;
     }
@@ -894,12 +862,14 @@ bool rm_tabcontrol::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
   return true;
 }
 
-void rm_tabcontrol::update_children_visibility()
+void rm_tabcontrol::update_children_active()
 {
   rm_widget* pwidget;
   for (size_t t = 0; t < get_num_childs(); ++t) {
+    bool is_active = int(t) == m_selected;
     pwidget = get_child(t);
-    pwidget->show(int(t) == m_selected);
+    pwidget->show(is_active);
+    pwidget->set_enabled(is_active);
   }
 }
 
