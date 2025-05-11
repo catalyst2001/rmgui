@@ -387,7 +387,7 @@ class rm_tabcontrol_style : public rm_corners_style {
   NVGcolor      m_unselected_color;
   float         m_font_size;
   bool          m_is_horizontal;
-  float         m_tab_thickness;
+  float         m_tab_height;
 public:
   rm_tabcontrol_style() :
     m_text_offset(0.f, 0.f),
@@ -397,14 +397,14 @@ public:
     m_selected_color(nvgRGB(240, 240, 240)),
     m_unselected_color(nvgRGB(200, 200, 200)),
     m_font_size(15.f),
-    m_is_horizontal(true), m_tab_thickness(5.f){
+    m_is_horizontal(true), m_tab_height(30.f){
   }
   inline bool            is_horizontal() const { return m_is_horizontal; }
   inline void            set_horizontal(bool enabled) { m_is_horizontal = enabled; }
 
   /* selectors  */
   inline const rm_vec2& get_text_offsets() const { return m_text_offset; }
-  inline const float    get_tab_thickness() const { return m_tab_thickness; }
+  inline const float    get_tab_height() const { return m_tab_height; }
   inline const NVGcolor& get_text_color() const { return m_text_color; }
   inline const NVGcolor& get_background_color() const { return m_bg_color; }
   inline const NVGcolor& get_border_color() const { return m_border_color; }
@@ -414,7 +414,7 @@ public:
 
   /* modifiers */
   inline void set_text_offsets(rm_vec2 offset) { m_text_offset = offset; }
-  inline void set_tab_thickness(float t) { m_tab_thickness = t; }
+  inline void set_tab_height(float t) { m_tab_height = t; }
   inline void set_text_color(NVGcolor clr) { m_text_color = clr; }
   inline void set_background_color(NVGcolor clr) { m_bg_color = clr; }
   inline void set_border_color(NVGcolor clr) { m_border_color = clr; }
@@ -445,8 +445,6 @@ class rm_tabcontrol;
 using rm_tabcontrol_cb = void(*)(rm_tabcontrol* ptabs, rm_tab_item* pitem, size_t tabid);
 class rm_tabcontrol : public rm_widget, public rm_styled<rm_tabcontrol_style>, public rm_callback<rm_tabcontrol_cb> {
   std::vector<rm_tab_item>             m_tabs;
-  std::vector<std::vector<rm_widget*>> m_tabChildren;
-  std::vector<rm_widget*>              m_tabPages;
   int                                  m_selected;
 protected:
   virtual void on_draw(NVGcontext* p_ctx) override;
@@ -454,6 +452,8 @@ protected:
 
   void update_children_visibility();
 
+  void get_widget_size(rm_vec2 &dst_pos, rm_vec2 &dst_size);
+  void get_one_tab_size(rm_vec2 &dst_size);
 public:
   const size_t kinvalid_index = static_cast<size_t>(-1);
 
@@ -477,12 +477,6 @@ public:
     return &m_tabs[idx];
   }
 
-  //void [[maybe_unused]] add_widget_to_tab(size_t tabIndex, rm_widget* widget);
-  //inline const std::vector<rm_widget*>& get_tab_children(size_t tabIndex) const {
-  //  assert(tabIndex < m_tabChildren.size());
-  //  return m_tabChildren[tabIndex];
-  //}
-
   void set_selected_index(int idx);
   inline int get_selected_index() const { return m_selected; }
   inline rm_tab_item* get_selected_tab() {
@@ -490,6 +484,8 @@ public:
       return nullptr;
     return &m_tabs[m_selected];
   }
+
+  void get_tabcontrol_size(rm_vec2& dst);
 };
 
 /**

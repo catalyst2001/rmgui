@@ -87,7 +87,11 @@ public:
     }
     return *this;
   }
-  inline rm_vec2 operator=(rm_vec2& vec) { return *this = vec; }
+  inline rm_vec2 operator=(rm_vec2& vec) { 
+    x = vec.x;
+    y = vec.y;
+    return *this;
+  }
   inline rm_vec2 operator+(rm_vec2& vec) { return rm_vec2(x + vec.x, y + vec.y); }
   inline rm_vec2 operator-(rm_vec2& vec) { return rm_vec2(x - vec.x, y - vec.y); }
   inline rm_vec2 operator*(rm_vec2& vec) { return rm_vec2(x * vec.x, y * vec.y); }
@@ -488,7 +492,16 @@ protected:
     return true;
   }
   virtual void on_draw(NVGcontext* p_ctx) {
-    RMGUI_UNUSED(p_ctx);
+#ifdef RMGUI_DEBUG_DRAW
+    static NVGcolor colors[] = {
+      nvgRGB(255, 0, 0), nvgRGB(0, 255, 0)
+    };
+    nvgBeginPath(p_ctx);
+    nvgRect(p_ctx, 0.f, 0.f, m_size.x, m_size.y);
+    nvgStrokeColor(p_ctx, colors[get_elem_flags().is_hovered()]);
+    nvgStrokeWidth(p_ctx, 2.f);
+    nvgStroke(p_ctx);
+#endif
   }
   virtual void on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state) {
     RMGUI_UNUSED(sc);
@@ -518,8 +531,8 @@ protected:
   rm_font          m_font;
   char             m_szclass[32];
   rm_bbox          m_bbox;
-  rm_vec2    m_size; //width;height
-  rm_vec2    m_absolute;
+  rm_vec2          m_size; //width;height
+  rm_vec2          m_absolute;
   int              m_zindex;
 
   inline rm_surface* get_root() { return m_proot; }
@@ -555,16 +568,17 @@ public:
     uint32_t flags = EXGUI_FLAG_DEFAULT, 
     uint32_t uflags = 0, void *p_userptr = nullptr) : m_proot(nullptr),
     m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_zindex(0) {
-    m_elem_flags = flags;
-    m_user_flags = uflags;
-    m_absolute.init(x, y);
-    m_size.init(width, height);
-    m_bbox.init(m_absolute, m_size);
-
+    rm_vec2 parent_coord;
     if (m_pparent) {
+      parent_coord = m_pparent->get_absolute();
       m_pparent->add_child(this);
       grab_globals_from(m_pparent);
     }
+    m_elem_flags = flags;
+    m_user_flags = uflags;
+    m_absolute.init(parent_coord.x + x, parent_coord.y + y);
+    m_size.init(width, height);
+    m_bbox.init(m_absolute, m_size);
 
     /* set font from root */
     if (m_proot)
@@ -619,6 +633,10 @@ public:
 
   void move(int newx, int newy)  {
     move_recursive(this, newx, newy);
+  }
+
+  rm_vec2 cursor_to_local(const rm_vec2& cursor_pos) {
+    return rm_vec2(cursor_pos.x - m_absolute.x, cursor_pos.y - m_absolute.y);
   }
 };
 

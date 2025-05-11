@@ -74,7 +74,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NANOVG_GL3;_CRT_SECURE_NO_WARNINGS; GLFW_EXPOSE_NATIVE_WIN32;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NANOVG_GL3;_CRT_SECURE_NO_WARNINGS;GLFW_EXPOSE_NATIVE_WIN32;RMGUI_DEBUG_DRAW;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>exgui\;vendor\nanovg\;vendor\stb\;vendor\glad\include\glad\;vendor\GLFW\;vendor\glad\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -90,7 +90,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NANOVG_GL3;_CRT_SECURE_NO_WARNINGS; GLFW_EXPOSE_NATIVE_WIN32;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NANOVG_GL3;_CRT_SECURE_NO_WARNINGS;GLFW_EXPOSE_NATIVE_WIN32;RMGUI_DEBUG_DRAW;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>exgui\;vendor\nanovg\;vendor\stb\;vendor\glad\include\glad\;vendor\GLFW\;vendor\glad\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -106,7 +106,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NANOVG_GL3;_CRT_SECURE_NO_WARNINGS; GLFW_EXPOSE_NATIVE_WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NANOVG_GL3;_CRT_SECURE_NO_WARNINGS;GLFW_EXPOSE_NATIVE_WIN32;RMGUI_DEBUG_DRAW;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>exgui\;vendor\nanovg\;vendor\stb\;vendor\glad\include\glad\;vendor\GLFW\;vendor\glad\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -122,7 +122,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NANOVG_GL3;_CRT_SECURE_NO_WARNINGS; GLFW_EXPOSE_NATIVE_WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NANOVG_GL3;_CRT_SECURE_NO_WARNINGS;GLFW_EXPOSE_NATIVE_WIN32;RMGUI_DEBUG_DRAW;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>exgui\;vendor\nanovg\;vendor\stb\;vendor\glad\include\glad\;vendor\GLFW\;vendor\glad\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>

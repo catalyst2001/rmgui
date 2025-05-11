@@ -305,8 +305,9 @@ int main() {
   tabcontrol_style.set_corner_radius(RIGHT_TOP, 4.f);
   tabcontrol_style.set_corner_radius(RIGHT_BOTTOM, 4.f);
   tabcontrol_style.set_corner_radius(LEFT_BOTTOM, 4.f);
-  tabcontrol_style.set_horizontal(true); //fuck it
-  rm_tabcontrol* tabs = new rm_tabcontrol(pwindow, 10, 190, 300, 50,
+  tabcontrol_style.set_horizontal(false); //fuck it
+  tabcontrol_style.set_tab_height(30);
+  rm_tabcontrol* tabs = new rm_tabcontrol(pwindow, 10, 190, 300, 300,
     [](rm_tabcontrol* ctrl, rm_tab_item* item, size_t idx) {
       printf("Tab %zu active: %s\n", idx, item->get_name());
     }
@@ -318,10 +319,10 @@ int main() {
   rm_widget *t2 = tabs->add_tab("Test1");
 
   auto origin = tabs->get_content_origin();
-  rm_label* homeLabel = new rm_label(t0, 10, origin.y, "Welcome to the Home tab");
-  rm_button* homeBtn = new rm_button(t0, 10, origin.y+25, 120, 30, "Home Action");
-  rm_checkbox* settingChk = new rm_checkbox(t1, 10, origin.y, 150, &style, "Enable Feature");
-  rm_text_input* settingInput = new rm_text_input(t1, 10, origin.y+25, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
+  rm_label* homeLabel = new rm_label(t0, 0, 0, "Welcome to the Home tab");
+  rm_button* homeBtn = new rm_button(t0, 10, 25, 120, 30, "Home Action");
+  rm_checkbox* settingChk = new rm_checkbox(t1, 10, 0, 150, &style, "Enable Feature");
+  rm_text_input* settingInput = new rm_text_input(t1, 10, 25, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
 
 
   rm_treeview* tree = new rm_treeview(290, 230, 200, 200, pwindow,

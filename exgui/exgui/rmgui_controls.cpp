@@ -97,6 +97,7 @@ void rm_image_button::on_draw(NVGcontext* p_ctx) {
     nvgFillPaint(p_ctx, imgPaint);
     nvgFill(p_ctx);
   }
+  rm_widget::on_draw(p_ctx);
 }
 
 bool rm_image_button::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
@@ -132,6 +133,7 @@ void rm_button::on_draw(NVGcontext* p_ctx) {
   float cx = m_size.x / 2.0f;
   float cy = m_size.y / 2.0f;
   nvgText(p_ctx, cx, cy, m_text.c_str(), nullptr);
+  rm_widget::on_draw(p_ctx);
 }
 
 bool rm_button::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
@@ -152,9 +154,10 @@ rm_label::~rm_label() {}
 void rm_label::on_draw(NVGcontext* p_ctx) {
   nvgFontFaceId(p_ctx, get_font());
   nvgFontSize(p_ctx, 18.0f);
-  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
   nvgFillColor(p_ctx, nvgRGBA(255, 255, 255, 255));
-  nvgText(p_ctx, 0.f, 0.f, m_text.c_str(), nullptr);
+  nvgText(p_ctx, 0.f, m_size.y * 0.5f, m_text.c_str(), nullptr);
+  rm_widget::on_draw(p_ctx);
 }
 
 rm_text_input::rm_text_input(rm_widget* p_parent, int x, int y, int width, int height,
@@ -218,6 +221,7 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
     nvgStroke(p_ctx);
   }
   //nvgResetScissor(p_ctx);
+  rm_widget::on_draw(p_ctx);
 }
 
 
@@ -294,6 +298,7 @@ void rm_checkbox::on_draw(NVGcontext* p_ctx) {
 
   const rm_vec2& text_offsets = m_pstyle->get_text_offsets();
   nvgText(p_ctx, m_size.y + text_offsets.x, (m_size.y / 2.0f) + text_offsets.y, m_label.c_str(), nullptr);
+  rm_widget::on_draw(p_ctx);
 }
 
 bool rm_checkbox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
@@ -366,6 +371,7 @@ void rm_combobox::on_draw(NVGcontext* p_ctx) {
       nvgText(p_ctx, 5.f, itemY + m_size.y / 2.0f, item.get_name(), nullptr);
     }
   }
+  rm_widget::on_draw(p_ctx);
 }
 
 bool rm_combobox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
@@ -446,6 +452,7 @@ void rm_slider::on_draw(NVGcontext* p_ctx) {
   nvgCircle(p_ctx, thumbX, trackY, m_inner_rect.height / 2.5f);
   nvgFillColor(p_ctx, nvgRGBA(100, 100, 250, 255));
   nvgFill(p_ctx);
+  rm_widget::on_draw(p_ctx);
 }
 
 bool rm_slider::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
@@ -500,6 +507,7 @@ void rm_progress_base::on_draw(NVGcontext* p_ctx)
     percent_rect.width, percent_rect.height, m_round);
   nvgFillPaint(p_ctx, paint);
   nvgFill(p_ctx);
+  rm_widget::on_draw(p_ctx);
 }
 
 bool rm_progress_base::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
@@ -544,6 +552,7 @@ void rm_progress_image::on_draw(NVGcontext* p_ctx)
   nvgFill(p_ctx);
 
   drawSprite(p_ctx, m_image, m_alpha, 0.f, 0.f, 13.f, 15.f, percent_rect.x, percent_rect.y, percent_rect.width, percent_rect.height, m_round, m_round, m_round, m_round);
+  rm_widget::on_draw(p_ctx);
 }
 
 void rm_scroll_base::orient_detect(const rm_rect& background)
@@ -652,6 +661,7 @@ void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_
 void rm_animation::on_draw(NVGcontext* p_ctx)
 {
   rm_vec2 pos(m_size.x / 2.f, m_size.y / 2.f);
+  rm_widget::on_draw(p_ctx);
   nvgTranslate(p_ctx, pos.x, pos.y);
   nvgRotate(p_ctx, m_angle);
   nvgScale(p_ctx, m_scale, m_scale);
@@ -705,6 +715,7 @@ void rm_scrollbar::on_draw(NVGcontext* p_ctx)
 {
   rm_vec2 content_rect(1000, 1000);
   draw_scroll(p_ctx, m_pstyle, content_rect, m_size, 20, m_position);
+  rm_widget::on_draw(p_ctx);
 }
 
 bool rm_scrollbar::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
@@ -727,7 +738,7 @@ rm_scrollbar::~rm_scrollbar()
 rm_tabcontrol::rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height,
   rm_tabcontrol_cb cb)
   : rm_widget(x, y, width, height, p_parent, "ui_tabcontrol",
-    EXGUI_FLAG_DEFAULT | EXGUI_FLAG_GLOBAL, 0, nullptr),
+    EXGUI_FLAG_DEFAULT/* | EXGUI_FLAG_GLOBAL*/, 0, nullptr),
   m_selected(0)
 {
   set_callback(cb);
@@ -736,24 +747,21 @@ rm_tabcontrol::rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int h
 
 rm_widget* rm_tabcontrol::add_tab(const char* pname, void* puserdata)
 {
+  rm_vec2 widget_pos;
+  rm_vec2 widget_size;
+  get_widget_size(widget_pos, widget_size);
   m_tabs.emplace_back(pname, puserdata);
 
-  bool horz = m_pstyle->is_horizontal();
-  float th = m_pstyle->get_tab_thickness();
-  float cx = horz ? 0.f : th;
-  float cy = horz ? th : 0.f;
-  float cw = horz ? m_size.x : m_size.x - th;
-  float ch = horz ? m_size.y - th : m_size.y;
 
   rm_widget* page = new rm_widget(
-    int(cx), int(cy), int(cw), int(ch),
+    int(widget_pos.x), int(widget_pos.y), int(widget_size.x), int(widget_size.y),
     this,
     "ui_tabpage",
-    EXGUI_FLAG_DEFAULT | EXGUI_FLAG_GLOBAL,
+    EXGUI_FLAG_DEFAULT/* | EXGUI_FLAG_GLOBAL*/,
     0, nullptr
   );
 
-  m_tabPages.push_back(page);
+  //m_tabPages.push_back(page);
   update_children_visibility();
   return page;
 }
@@ -797,6 +805,15 @@ void rm_tabcontrol::set_selected_index(int idx)
     get_callback()(this, &m_tabs[m_selected], m_selected);
 }
 
+void rm_tabcontrol::get_tabcontrol_size(rm_vec2& dst)
+{
+  if (m_pstyle->is_horizontal()) {
+    dst.init(m_size.x, m_pstyle->get_tab_height());
+    return;
+  }
+  dst.init(m_pstyle->get_tab_height(), m_size.y);
+}
+
 void rm_tabcontrol::on_draw(NVGcontext* p_ctx) {
   //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
   nvgFontFaceId(p_ctx, get_font());
@@ -809,22 +826,33 @@ void rm_tabcontrol::on_draw(NVGcontext* p_ctx) {
   //nvgStrokeColor(p_ctx, m_pstyle->get_border_color());
   //nvgStroke(p_ctx);
   bool is_horizontal = m_pstyle->is_horizontal();
-  size_t n = m_tabs.size(); if (!n) return;
-  float tab_size = (is_horizontal ? m_size.x : m_size.y) / float(n);
+  size_t n = m_tabs.size();
+  if (!n)
+    return;
+
+  rm_vec2 tab_size;
+  if (is_horizontal) {
+    tab_size.x = m_size.x / float(n);
+    tab_size.y = m_pstyle->get_tab_height();
+  } else {
+    tab_size.x = m_pstyle->get_tab_height();
+    tab_size.y = m_size.y / float(n);
+  }
+
   nvgFontSize(p_ctx, m_pstyle->get_font_size());
   nvgTextAlign(p_ctx, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
 
   for (size_t i = 0; i < n; ++i) {
     bool is_first = i == 0;
     bool is_last = i == n - 1;
-    float x = (is_horizontal ? i * tab_size : 0.f);
-    float y = (is_horizontal ? 0.f : i * tab_size);
-    float h = is_horizontal ? m_size.y : m_size.y / float(n);
+    float x = (is_horizontal ? i * tab_size.x : 0.f);
+    float y = (is_horizontal ? 0.f : i * tab_size.y);
+    //float h = is_horizontal ? m_pstyle->get_tab_height() : m_size.y / float(n);
     nvgBeginPath(p_ctx);
     nvgFillColor(p_ctx,
       (int(i) == m_selected) ? m_pstyle->get_selected_color() : m_pstyle->get_unselected_color()
     );
-    nvgRoundedRectVarying(p_ctx, x, y, tab_size, h,
+    nvgRoundedRectVarying(p_ctx, x, y, tab_size.x, tab_size.y,
       is_first ? m_pstyle->get_corner_radius(LEFT_TOP) : 0.f,
       (is_horizontal ? is_last : is_first) ? m_pstyle->get_corner_radius(RIGHT_TOP) : 0.f,
       is_last ? m_pstyle->get_corner_radius(RIGHT_BOTTOM) : 0.f,
@@ -833,16 +861,32 @@ void rm_tabcontrol::on_draw(NVGcontext* p_ctx) {
     nvgStrokeColor(p_ctx, m_pstyle->get_border_color());
     nvgStroke(p_ctx);
     nvgFillColor(p_ctx, m_pstyle->get_text_color());
-    nvgText(p_ctx, (x + tab_size * 0.5f) + m_pstyle->get_text_offsets().x, (y + h * 0.5f) + m_pstyle->get_text_offsets().y, m_tabs[i].get_name(), NULL);
+    nvgText(p_ctx, (x + tab_size.x * 0.5f) + m_pstyle->get_text_offsets().x,
+      (y + tab_size.y * 0.5f) + m_pstyle->get_text_offsets().y,
+      m_tabs[i].get_name(),
+      NULL);
+    rm_widget::on_draw(p_ctx);
   }
 }
 
 bool rm_tabcontrol::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
+  //FIXME: K.D. m_bbox.inside(cursor_pos) has no effect. This handler is not be called if this control no have flag 'GLOBAL'
+  int     idx;
+  rm_vec2 tabcontrol_size;
+  get_tabcontrol_size(tabcontrol_size);
+  rm_vec2 null_coord(0.f, 0.f);
+  m_bbox.init(null_coord, tabcontrol_size);
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
-    size_t num_tabs = m_tabs.size(); 
-    float tab_size = (m_pstyle->is_horizontal() ? m_size.x : m_size.y) / float(num_tabs);
-    int idx = (m_pstyle->is_horizontal() ? int(cursor_pos.x - m_absolute.x) : int(cursor_pos.y - m_absolute.y)) / tab_size;
-    if (idx >= 0 && idx < static_cast<int>(num_tabs)) {
+    rm_vec2 local_mouse_pos = cursor_to_local(cursor_pos);
+    printf("rm_tabcontrol::on_mouse(): %f %f\n", local_mouse_pos.x, local_mouse_pos.y);
+    if (m_pstyle->is_horizontal()) {
+      idx = local_mouse_pos.x / m_pstyle->get_tab_height();
+    }
+    else {
+      idx = local_mouse_pos.y / m_pstyle->get_tab_height();
+    }
+
+    if (idx >= 0 && idx < (int)m_tabs.size()) {
       set_selected_index(idx);
       return false;
     }
@@ -852,8 +896,42 @@ bool rm_tabcontrol::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
 
 void rm_tabcontrol::update_children_visibility()
 {
-  for (size_t t = 0; t < m_tabPages.size(); ++t) {
-    m_tabPages[t]->show(int(t) == m_selected);
+  rm_widget* pwidget;
+  for (size_t t = 0; t < get_num_childs(); ++t) {
+    pwidget = get_child(t);
+    pwidget->show(int(t) == m_selected);
+  }
+}
+
+void rm_tabcontrol::get_widget_size(rm_vec2& dst_pos, rm_vec2& dst_size)
+{
+  assert(m_pstyle && "m_pstyle was nullptr");
+  rm_vec2 tab_size;
+  get_tabcontrol_size(tab_size);
+  if (m_pstyle->is_horizontal()) {
+    dst_pos.init(0.f, tab_size.y);
+    dst_size.init(tab_size.x, m_size.y - tab_size.y);
+  }
+  else {
+    dst_pos.init(tab_size.x, 0.f);
+    dst_size.init(m_size.x - tab_size.x, m_size.y);
+  }
+}
+
+void rm_tabcontrol::get_one_tab_size(rm_vec2& dst_size)
+{
+  assert(m_pstyle && "m_pstyle was nullptr");
+  size_t num_tabs = m_tabs.size();
+  if (num_tabs) {
+    bool is_horizontal = m_pstyle->is_horizontal();
+    if (is_horizontal) {
+      dst_size.x = m_size.x / float(num_tabs);
+      dst_size.y = m_pstyle->get_tab_height();
+    }
+    else {
+      dst_size.x = m_pstyle->get_tab_height();
+      dst_size.y = m_size.y / float(num_tabs);
+    }
   }
 }
 
@@ -875,6 +953,7 @@ void rm_treeview::on_draw(NVGcontext* p_ctx) {
     if (y > m_size.y)
       break; // clip
   }
+  rm_widget::on_draw(p_ctx);
 }
 
 float rm_treeview::draw_node(NVGcontext* p_ctx, rm_tree_node* node, float x, float y) {
