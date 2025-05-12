@@ -307,7 +307,7 @@ int main() {
   tabcontrol_style.set_corner_radius(RIGHT_TOP, 4.f);
   tabcontrol_style.set_corner_radius(RIGHT_BOTTOM, 4.f);
   tabcontrol_style.set_corner_radius(LEFT_BOTTOM, 4.f);
-  tabcontrol_style.set_horizontal(!true);
+  tabcontrol_style.set_horizontal(!!true);
   tabcontrol_style.set_tab_height(30);
   rm_tabcontrol* tabs = new rm_tabcontrol(pwindow, 10, 190, 300, 300,
     [](rm_tabcontrol* ctrl, rm_tab_item* item, size_t idx) {
@@ -317,10 +317,16 @@ int main() {
   tabs->set_style(&tabcontrol_style);
 
   rm_widget *t0 = tabs->add_tab("Home");
+  t0->get_content_area().y = 10;
+
   rm_widget *t1 = tabs->add_tab("Settings");
+  t1->get_content_area().y = 100;
+
   rm_widget *t2 = tabs->add_tab("Test1");
+  t2->get_content_area().y = 100;
 
   rm_label* home_label = new rm_label(t0, 0, 0, "Welcome to the Home tab");
+
   rm_button* home_btn = new rm_button(t0, 10, 25, 120, 30, "Home Action");
   rm_checkbox* setting_chk = new rm_checkbox(t1, 10, 0, 150, &style, "Enable Feature");
   rm_text_input* setting_input = new rm_text_input(t1, 10, 25, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
@@ -398,7 +404,6 @@ int main() {
     pscroll->set_position(sinabs);
 
     gui->resize(fbWidth, fbHeight);
-    gui->rebuild_draw_cache();
     gui->draw(dt);
 
 #if 0

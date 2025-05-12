@@ -304,7 +304,9 @@ void rm_checkbox::on_draw(NVGcontext* p_ctx) {
 bool rm_checkbox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(cursor_pos)) {
     m_checked = !m_checked;
-    std::cout << "Checkbox \"" << m_label << "\" now " << (m_checked ? "checked" : "unchecked") << std::endl;
+    if (is_valid_callback())
+      get_callback()(this);
+
     return false;
   }
   return true;
@@ -343,6 +345,7 @@ void rm_combobox::on_draw(NVGcontext* p_ctx) {
   //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
   nvgFontFaceId(p_ctx, get_font());
 
+  //bgr
   nvgBeginPath(p_ctx);
   nvgRoundedRect(p_ctx, 0.f, 0.f, m_size.x, m_size.y, 4.0f);
   nvgFillColor(p_ctx, nvgRGBA(180, 180, 180, 255));
@@ -360,12 +363,13 @@ void rm_combobox::on_draw(NVGcontext* p_ctx) {
     for (size_t i = 0; i < m_items.size(); i++) {
       rm_combo_item& item = m_items[i];
       float itemY = m_size.y * (1.f + i);
+      rm_bbox bbox;
+      rm_vec2 item_pos(m_absolute.x, m_absolute.y + itemY);
+      bbox.init(item_pos, m_size);
       nvgBeginPath(p_ctx);
       nvgRect(p_ctx, 0.f, itemY, m_size.x, m_size.y);
-      nvgFillColor(p_ctx, nvgRGBA(200, 200, 200, 255));
+      nvgFillColor(p_ctx, bbox.inside(m_cursor) ? nvgRGBA(80, 80, 80, 255) : nvgRGBA(200, 200, 200, 255));
       nvgFill(p_ctx);
-      nvgStrokeColor(p_ctx, nvgRGBA(0, 0, 0, 255));
-      nvgStroke(p_ctx);
       nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
       nvgFillColor(p_ctx, nvgRGBA(0, 0, 0, 255));
       nvgText(p_ctx, 5.f, itemY + m_size.y / 2.0f, item.get_name(), nullptr);
@@ -375,6 +379,7 @@ void rm_combobox::on_draw(NVGcontext* p_ctx) {
 }
 
 bool rm_combobox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
+  m_cursor = cursor_pos;
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN) {
     if (m_bbox.inside(cursor_pos)) {
       if (m_expanded) {
@@ -401,7 +406,6 @@ bool rm_combobox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STAT
   }
 
   if (m_expanded) {
-    //printf("rm_combobox: absorb events\n");
     return false; //absorb the event
   }
   return true;
@@ -584,7 +588,7 @@ void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, const rm_vec2& back, rm_scro
   /* paint background */
   nvgBeginPath(p_ctx);
   nvgFillColor(p_ctx, pstyle->get_scroll_background_color());
-  nvgRoundedRect(p_ctx, back.x, back.y, back.x, back.y, pstyle->get_scroll_corner_radius());
+  nvgRoundedRect(p_ctx, 0, 0, back.x, back.y, pstyle->get_scroll_corner_radius());
   nvgFill(p_ctx);
   nvgStrokeWidth(p_ctx, pstyle->get_background_stroke_width());
   nvgStrokeColor(p_ctx, pstyle->get_scroll_background_border_color());
@@ -615,10 +619,10 @@ void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_
     thumb_size = std::max(thumb_thickness, thumb_size); // thumb min width
 
     float max_offset = scroll_area - thumb_size;
-    float thumb_x = window.x + pos * max_offset;
+    float thumb_x = pos * max_offset;
 
     thumb_rect.x = thumb_x;
-    thumb_rect.y = window.y + (window.y - thumb_thickness) * 0.5f;
+    thumb_rect.y = (window.y - thumb_thickness) * 0.5f;
     thumb_rect.width = thumb_size;
     thumb_rect.height = thumb_thickness;
   }
@@ -631,9 +635,9 @@ void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_
     thumb_size = std::max(thumb_thickness, thumb_size); // thumb min height
 
     float max_offset = scroll_area - thumb_size;
-    float thumb_y = window.y + pos * max_offset;
+    float thumb_y = pos * max_offset;
 
-    thumb_rect.x = window.x + (window.x - thumb_thickness) * 0.5f;
+    thumb_rect.x = (window.x - thumb_thickness) * 0.5f;
     thumb_rect.y = thumb_y;
     thumb_rect.width = thumb_thickness;
     thumb_rect.height = thumb_size;
@@ -643,7 +647,7 @@ void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_
   float round_radius = (window.y / 2.f) * pstyle->get_scroll_corner_radius();
   nvgBeginPath(p_ctx);
   nvgFillColor(p_ctx, pstyle->get_scroll_background_color());
-  nvgRoundedRect(p_ctx, window.x, window.y, window.x, window.y, round_radius);
+  nvgRoundedRect(p_ctx, 0, 0, window.x, window.y, round_radius);
   nvgFill(p_ctx);
   nvgStrokeWidth(p_ctx, pstyle->get_background_stroke_width());
   nvgStrokeColor(p_ctx, pstyle->get_scroll_background_border_color());
@@ -659,8 +663,6 @@ void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_
   nvgStrokeColor(p_ctx, pstyle->get_scroll_thumb_border_color());
   nvgStroke(p_ctx);
 }
-
-
 
 void rm_animation::on_draw(NVGcontext* p_ctx)
 {
@@ -702,23 +704,23 @@ rm_widget* rm_scrollbar::find_other_scrollbars()
 void rm_scrollbar::adjust_position()
 {
   /* set position of parent */
-  rm_widget* pother_scroll = find_other_scrollbars();
-  rm_vec2& parent_abs = m_pparent->get_absolute();
+  //rm_widget* pother_scroll = find_other_scrollbars();
+  //rm_vec2& parent_abs = m_pparent->get_absolute();
   rm_vec2& parent_size = m_pparent->get_size();
   if (get_orient() == RM_ORIENT_HORZ) {
     m_size.init(parent_size.x, m_pstyle->get_thumb_size());
-    m_absolute.init(parent_abs.x, parent_abs.y + parent_size.y - m_pstyle->get_thumb_size());
+    m_absolute.init(m_absolute.x, m_absolute.y + parent_size.y - m_pstyle->get_thumb_size());
   }
   else {
     m_size.init(m_pstyle->get_thumb_size(), parent_size.y);
-    m_absolute.init(parent_abs.x + parent_size.x - m_pstyle->get_thumb_size(), parent_abs.y);
+    m_absolute.init(m_absolute.x + parent_size.x - m_pstyle->get_thumb_size(), m_absolute.y);
   }
 }
 
 void rm_scrollbar::on_draw(NVGcontext* p_ctx)
 {
   rm_vec2 content_rect(1000, 1000);
-  draw_scroll(p_ctx, m_pstyle, content_rect, m_size, 20, m_position);
+  draw_scroll(p_ctx, m_pstyle, content_rect, m_size, m_pstyle->get_thumb_size(), m_position);
   rm_widget::on_draw(p_ctx);
 }
 
@@ -751,8 +753,7 @@ rm_tabcontrol::rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int h
 
 rm_widget* rm_tabcontrol::add_tab(const char* pname, void* puserdata)
 {
-  rm_vec2 widget_pos;
-  rm_vec2 widget_size;
+  rm_vec2 widget_pos, widget_size;
   get_widget_size(widget_pos, widget_size);
   rm_widget* page = new rm_widget(
     int(widget_pos.x), int(widget_pos.y), int(widget_size.x), int(widget_size.y),
@@ -852,8 +853,11 @@ bool rm_tabcontrol::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
   m_bbox.init(m_absolute, tabcontrol_size);
   rm_vec2 local_mouse_pos = cursor_to_local(cursor_pos);
   size_t num_tabs = m_tabs.size();
+  rm_vec2 sz;
+  get_one_tab_size(sz);
+  float axis = m_pstyle->is_horizontal() ? local_mouse_pos.x : local_mouse_pos.y;
   if (num_tabs && event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
-    idx = int((m_pstyle->is_horizontal() ? local_mouse_pos.x : local_mouse_pos.y) / m_pstyle->get_tab_height() / num_tabs);
+    idx = int(axis / (m_pstyle->is_horizontal() ? sz.x : sz.y));
     if (idx >= 0 && idx < int(num_tabs)) {
       set_selected_index(idx);
       return false;

@@ -125,6 +125,7 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
   bool b_cursor_inside = p_elem->get_bbox().inside(cursor_pos);
   bool b_global_receive_events = p_elem->get_elem_flags().is_set(EXGUI_FLAG_GLOBAL);
   if (b_cursor_inside || b_global_receive_events) {
+    
     b_call_next = p_elem->on_mouse(event, vk, state, cursor_pos);
     if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && p_elem != this) {
       if (!(b_global_receive_events && !b_cursor_inside)) {
@@ -137,12 +138,17 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
   p_elem->m_elem_flags.toggle_bits(EXGUI_FLAG_HOVERED, b_cursor_inside);
   if (!b_call_next)
     return false; //this event was break by p_elem
-
+  rm_vec2 local = p_elem->cursor_to_local(cursor_pos);
+  const rm_rect& content = p_elem->get_content_area();
+  rm_vec2 child_cursor{
+      local.x - content.x,
+      local.y - content.y
+  };
   if (p_elem->get_elem_flags().has_active() && 
     p_elem->get_elem_flags().has_childs() &&
     p_elem->get_elem_flags().has_notify_childs()) {
     for (size_t i = 0; i < p_elem->get_num_childs(); i++) {
-      if (!mouse_dispatcher(p_elem->get_child(i), event, vk, state, cursor_pos)) {
+      if (!mouse_dispatcher(p_elem->get_child(i), event, vk, state, child_cursor)) {
         return false;
       }
     }
@@ -150,84 +156,76 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
   return true; //continue handling next
 }
 
-void rm_surface::build_draw_cache_recursive(rm_widget* p_elem)
+void rm_surface::draw_recursive(rm_widget* pwidget, float dt)
 {
-  ///* is visible? */
-  if (p_elem->get_elem_flags().has_visible()) {
-    /* add element to draw path container */
-    layer_draw_cache* player = get_layer_by_zindex(p_elem->get_zindex());
-    if(player)
-      player->add_widget(p_elem);
+  assert(pwidget && "pwidget was nullptr");
+  if (!pwidget->get_elem_flags().has_visible())
+    return; //invisible
 
-    /* element has childs? */
-    if (p_elem->get_elem_flags().has_childs()) {
-      /* recursive enum childs */
-      for (size_t i = 0; i < p_elem->get_num_childs(); i++) {
-        /* enter recursively */
-        build_draw_cache_recursive(p_elem->get_child(i));
-      }
+  rm_vec2& abs_pos = pwidget->get_absolute();
+  rm_vec2& size = pwidget->get_size();
+  rm_rect& content = pwidget->get_content_area();
+
+  nvgSave(m_pctx);
+
+  /* disabled scissoring? */
+  if (!pwidget->get_elem_flags().is_set(EXGUI_FLAG_DISABLE_SCISSOR))
+    nvgScissor(m_pctx, abs_pos.x, abs_pos.y, size.x, size.y);
+
+  nvgTranslate(m_pctx, abs_pos.x + content.x, abs_pos.y + content.y);
+  pwidget->on_draw(m_pctx);
+
+  /* element has childs? */
+  if (pwidget->get_elem_flags().has_childs()) {
+    /* recursive enum childs */
+    for (size_t i = 0; i < pwidget->get_num_childs(); i++) {
+      /* enter recursively */
+      draw_recursive(pwidget->get_child(i), dt);
     }
   }
+  //nvgResetTransform(m_pctx);
+  nvgResetScissor(m_pctx);
+  nvgRestore(m_pctx);
+
+#ifdef RMGUI_DEBUG_DRAW
+  /* draw absolute position for debug */
+  nvgBeginPath(m_pctx);
+  nvgFillColor(m_pctx, nvgRGB(0, 0, 255));
+  nvgCircle(m_pctx, abs_pos.x, abs_pos.y, 2.f);
+  nvgFill(m_pctx);
+#endif
 }
 
-void rm_surface::rebuild_draw_cache()
-{
-  build_draw_cache_recursive(this);
-}
-
-layer_draw_cache *rm_surface::get_layer_by_zindex(int zid)
-{
-  layer_draw_cache* pcache;
-  auto it = std::find_if(m_layers.begin(), m_layers.end(),
-    [zid](layer_draw_cache *player) {
-      return player->get_zindex() == zid;
-    }
-  );
-
-  if (it != m_layers.end())
-    return *it;
-  
-  pcache = new (std::nothrow)layer_draw_cache(zid);
-  if (!pcache)
-    return nullptr;
-
-  m_layers.push_back(pcache);
-  std::sort(m_layers.begin(), m_layers.end(), 
-    [](layer_draw_cache *pa, layer_draw_cache* pb) {
-      return pa->get_zindex() < pb->get_zindex();
-    }
-  );
-  return pcache;
-}
+//layer_draw_cache *rm_surface::get_layer_by_zindex(int zid)
+//{
+//  layer_draw_cache* pcache;
+//  auto it = std::find_if(m_layers.begin(), m_layers.end(),
+//    [zid](layer_draw_cache *player) {
+//      return player->get_zindex() == zid;
+//    }
+//  );
+//
+//  if (it != m_layers.end())
+//    return *it;
+//  
+//  pcache = new (std::nothrow)layer_draw_cache(zid);
+//  if (!pcache)
+//    return nullptr;
+//
+//  m_layers.push_back(pcache);
+//  std::sort(m_layers.begin(), m_layers.end(), 
+//    [](layer_draw_cache *pa, layer_draw_cache* pb) {
+//      return pa->get_zindex() < pb->get_zindex();
+//    }
+//  );
+//  return pcache;
+//}
 
 void rm_surface::draw(float dt)
 {
   m_delta_time = dt;
   nvgBeginFrame(m_pctx, m_size.x, m_size.y, 1.f);
-  /* drawing layers */
-  for (size_t i = 0; i < m_layers.size(); i++) {
-    /* draw elements in layer */
-    layer_draw_cache *pdraw_cache = m_layers[i];
-    assert(pdraw_cache && "pdraw_cache was nullptr");
-    for (size_t j = 0; j < pdraw_cache->size(); j++) {
-      rm_widget* pwidget = pdraw_cache->get_widget(j);
-      assert(pwidget && "pwidget was nullptr");
-      rm_vec2& abs_pos = pwidget->get_absolute();
-      rm_vec2& size = pwidget->get_size();
-      nvgSave(m_pctx);
-
-      /* disabled scissoring? */
-      if (!pwidget->get_elem_flags().is_set(EXGUI_FLAG_DISABLE_SCISSOR))
-        nvgScissor(m_pctx, abs_pos.x, abs_pos.y, size.x, size.y);
-
-      nvgTranslate(m_pctx, abs_pos.x, abs_pos.y);
-      pwidget->on_draw(m_pctx);
-      //nvgResetTransform(m_pctx);
-      nvgResetScissor(m_pctx);
-      nvgRestore(m_pctx);
-    }
-    pdraw_cache->clear();
-  }
+  draw_recursive(this, dt);
   nvgEndFrame(m_pctx);
 }
 

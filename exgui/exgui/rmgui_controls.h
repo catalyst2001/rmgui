@@ -154,6 +154,7 @@ class rm_combobox : public rm_widget, public rm_callback<rm_combobox_cb> {
   std::vector<rm_combo_item> m_items;
   int  m_selected;
   bool m_expanded;
+  rm_vec2 m_cursor;
 
   virtual void on_draw(NVGcontext* p_ctx) override;
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;

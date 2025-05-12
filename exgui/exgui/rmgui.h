@@ -134,6 +134,20 @@ public:
   rm_rect(int x, int y, int w, int h) : x((float)x), y((float)y), width((float)w), height((float)h) {}
   ~rm_rect() {}
 
+  inline void init(float xx, float yy, float wwidth, float hheight) {
+    x= xx;
+    y= yy;
+    width = wwidth;
+    height = hheight;
+  }
+
+  inline void init(int xx, int yy, int wwidth, int hheight) {
+    x = float(xx);
+    y = float(yy);
+    width = float(wwidth);
+    height = float(hheight);
+  }
+
   inline float operator[](int idx) { assert(idx < EXGUI_COUNTOF(v) && "index out of bounds"); return v[idx]; }
 };
 
@@ -172,6 +186,7 @@ class rm_bbox
 public:
   rm_vec2 min, max;
   rm_bbox() {}
+  rm_bbox(rm_vec2 &_max) : max(_max) {}
   ~rm_bbox() {}
 
   inline bool inside(rm_vec2& pt) {
@@ -492,7 +507,7 @@ protected:
     return true;
   }
   virtual void on_draw(NVGcontext* p_ctx) {
-#ifndef RMGUI_DEBUG_DRAW
+#ifdef RMGUI_DEBUG_DRAW
     static NVGcolor colors[] = {
       nvgRGB(255, 0, 0), nvgRGB(0, 255, 0)
     };
@@ -533,6 +548,7 @@ protected:
   rm_bbox          m_bbox;
   rm_vec2          m_size; //width;height
   rm_vec2          m_absolute;
+  rm_rect          m_content_area;
   int              m_zindex;
 
   inline rm_surface* get_root() { return m_proot; }
@@ -576,9 +592,10 @@ public:
     }
     m_elem_flags = flags;
     m_user_flags = uflags;
-    m_absolute.init(parent_coord.x + x, parent_coord.y + y);
+    m_absolute.init(x, y);
     m_size.init(width, height);
     m_bbox.init(m_absolute, m_size);
+    m_content_area.init(0.f, 0.f, m_size.x, m_size.y);
 
     /* set font from root */
     if (m_proot)
@@ -596,6 +613,7 @@ public:
   inline rm_bbox    &get_bbox() { return m_bbox; }
   inline rm_vec2    &get_absolute() { return m_absolute; }
   inline rm_vec2    &get_size() { return m_size; }
+  inline rm_rect    &get_content_area() { return m_content_area; }
 
   /* visual */
   inline bool        is_visible() { return m_elem_flags.has_visible(); }
@@ -644,38 +662,11 @@ public:
   }
 };
 
-struct layer_draw_cache {
-  int zindex;
-  std::vector<rm_widget*> m_cache;
-  layer_draw_cache(int zidx) : zindex(zidx) {}
-
-  operator int() const { return zindex; }
-  inline int get_zindex() const { return zindex; }
-
-  void add_widget(rm_widget* pwidget) {
-    m_cache.push_back(pwidget);
-  }
-
-  void clear() {
-    m_cache.clear();
-  }
-
-  inline size_t size() const { return m_cache.size(); }
-  inline rm_widget *get_widget(size_t idx) {
-    assert(idx < m_cache.size() && "idx out of bounds");
-    return m_cache[idx];
-  }
-};
-
 class rm_surface : public rm_widget, rm_object_accrssor
 {
-  using _vec_layers = std::vector<layer_draw_cache*>;
-  _vec_layers m_layers;
   NVGcontext *m_pctx;
   rm_widget  *m_pfocus;
   float       m_delta_time;
-
-  void build_draw_cache_recursive(rm_widget *p_elem);
 
   /* event notifier functions */
   static void event_dispatcher(rm_widget *p_elem);
@@ -687,12 +678,7 @@ class rm_surface : public rm_widget, rm_object_accrssor
   bool mouse_dispatcher(rm_widget *p_elem,
     EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, 
     EXGUI_KEY_STATE state, rm_vec2 &cursor_pos);
-
-  /* access is open for inheritance (rmgui_root::rebuild_draw_cache accessor class ) */
-//protected:
-public:
-  void rebuild_draw_cache();
-  layer_draw_cache* get_layer_by_zindex(int zid);
+  void draw_recursive(rm_widget* p_elem, float dt);
 
 public:
   rm_surface(NVGcontext *p_ctx, int width, int height, irmgui_sysdf *p_sysdf);
