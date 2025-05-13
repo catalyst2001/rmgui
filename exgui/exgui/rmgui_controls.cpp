@@ -1,4 +1,4 @@
-#include "rmgui_controls.h"
+﻿#include "rmgui_controls.h"
 #include <iostream>
 #include <algorithm>
 #include <cstdlib>
@@ -161,51 +161,76 @@ void rm_label::on_draw(NVGcontext* p_ctx) {
 }
 
 rm_text_input::rm_text_input(rm_widget* p_parent, int x, int y, int width, int height,
-  uint32_t flags, float blink_cursor_interval)
-  : rm_widget(x, y, width, height, p_parent, "ui_text_input"), m_active(false)
+  rm_text_input_style* pstyle, uint32_t flags, float blink_cursor_interval)
+  : rm_widget(x, y, width, height, p_parent, "ui_text_input"), m_active(false), m_ctrl_pressed(false), m_dragging(false)
 {
+  set_style(pstyle);
   m_blink_state = false;
   m_timer.set_interval(blink_cursor_interval);
-  m_text_offset = 0.f;
   m_flags = flags;
 }
 
 rm_text_input::~rm_text_input() {}
 
 void rm_text_input::on_draw(NVGcontext* p_ctx) {
+  const std::string& txt = m_buffer.str();
   //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented this
   nvgFontFaceId(p_ctx, get_font());
-
   //nvgScissor(p_ctx, 0.f, 0.f, m_relative.width, m_relative.height); //NOTE: K.D. added 12.03.2025
 
   nvgBeginPath(p_ctx);
-  nvgRoundedRect(p_ctx, 0.f, 0.f, m_size.x, m_size.y, 4.0f);
-  NVGcolor bgColor = m_active ? nvgRGBA(255, 255, 255, 255) : nvgRGBA(230, 230, 230, 255);
+  nvgRoundedRectVarying(p_ctx, 0.f, 0.f, m_size.x, m_size.y, m_pstyle->get_corner_radius(LEFT_TOP),
+    m_pstyle->get_corner_radius(RIGHT_TOP),
+    m_pstyle->get_corner_radius(RIGHT_BOTTOM),
+    m_pstyle->get_corner_radius(LEFT_BOTTOM));
+  NVGcolor bgColor = m_active ? m_pstyle->get_active_bgr_color() : m_pstyle->get_unactive_bgr_color();
   nvgFillColor(p_ctx, bgColor);
   nvgFill(p_ctx);
 
-  nvgStrokeColor(p_ctx, nvgRGBA(0, 0, 0, 255));
+  nvgStrokeColor(p_ctx, m_pstyle->get_border_color());
+  nvgStrokeWidth(p_ctx, m_pstyle->get_border_width());
   nvgStroke(p_ctx);
 
-  nvgFontSize(p_ctx, 18.0f);
-  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-  nvgFillColor(p_ctx, nvgRGBA(0, 0, 0, 255));
-
-  float textY = m_size.y / 2.0f;
-
+  nvgFontSize(p_ctx, m_pstyle->get_font_size());
+  float asc, desc, lineh;
+  nvgTextMetrics(p_ctx, &asc, &desc, &lineh);
+  float baseline_y = m_size.y * 0.5f + (asc + desc) * 0.5f;
+  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
+  nvgFillColor(p_ctx, m_pstyle->get_text_color());
+  float offset = 0.f;
   if (!(m_flags & RMGUI_TEXT_INPUT_MULTILINE)) {
-    float availableWidth = m_size.x - 10;
-    float textWidth = nvgTextBounds(p_ctx, 0, 0, m_text.c_str(), nullptr, nullptr);
-    if (textWidth > availableWidth)
-      m_text_offset = textWidth - availableWidth;
-    else
-      m_text_offset = 0;
-
-    nvgText(p_ctx, 5.f - m_text_offset, textY, m_text.c_str(), nullptr);
+    float available_width = m_size.x - 10.f;
+    float text_width = nvgTextBounds(p_ctx, 0, 0, txt.c_str(), nullptr, nullptr);
+    offset = text_width > available_width ? text_width - available_width : 0;
+    nvgText(p_ctx, 5.f - offset + m_pstyle->get_text_offset(), baseline_y, txt.c_str(), nullptr);
   }
   else {
-    float availableWidth = m_size.x - 10;
-    nvgTextBox(p_ctx, 5.f, 5.f, availableWidth, m_text.c_str(), nullptr);
+    float available_width = m_size.x - 10;
+    nvgTextBox(p_ctx, 5.f + m_pstyle->get_text_offset(), 5.f, available_width, txt.c_str(), nullptr);
+  }
+
+  m_glyph_positions.clear();
+  m_glyph_positions.push_back(0.f);
+  for (size_t i = 1; i <= txt.size(); ++i) {
+    float w = nvgTextBounds(p_ctx, 0, 0, txt.substr(0, i).c_str(), nullptr, nullptr);
+    m_glyph_positions.push_back(w);
+  }
+
+  if (m_buffer.has_selection()) {
+    size_t a = std::min(m_buffer.sel_start, m_buffer.sel_end);
+    size_t b = std::max(m_buffer.sel_start, m_buffer.sel_end);
+    float x0 = (5.f - offset + m_glyph_positions[a]) + m_pstyle->get_text_offset();
+    float x1 = (5.f - offset + m_glyph_positions[b]) + m_pstyle->get_text_offset();
+    nvgBeginPath(p_ctx);
+    if(m_pstyle->has_rounded_selection())
+      nvgRoundedRectVarying(p_ctx, x0, baseline_y - asc, x1 - x0, asc - desc, m_pstyle->get_corner_radius(LEFT_TOP),
+        m_pstyle->get_corner_radius(RIGHT_TOP),
+        m_pstyle->get_corner_radius(RIGHT_BOTTOM),
+        m_pstyle->get_corner_radius(LEFT_BOTTOM));
+    else
+      nvgRect(p_ctx, x0, baseline_y - asc, x1 - x0, asc - desc);
+    nvgFillColor(p_ctx, m_pstyle->get_selection_color());
+    nvgFill(p_ctx);
   }
 
   if (m_timer.has_elapsed(get_sysdf())) {
@@ -213,40 +238,155 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
   }
 
   if (m_active && m_blink_state) {
-    float tw = nvgTextBounds(p_ctx, 0, 0, m_text.c_str(), nullptr, nullptr);
+    size_t ci = m_buffer.has_selection() ? m_buffer.sel_end : m_buffer.pos();
+    float cw = m_glyph_positions[ci];
+    float x = (5.f - offset + cw) + m_pstyle->get_text_offset();
     nvgBeginPath(p_ctx);
-    nvgMoveTo(p_ctx, 5.f - m_text_offset + tw + 2, 4.f);
-    nvgLineTo(p_ctx, 5.f - m_text_offset + tw + 2, m_size.y - 4.f);
-    nvgStrokeColor(p_ctx, nvgRGBA(0, 0, 0, 255));
+    nvgMoveTo(p_ctx, x + 1, baseline_y - asc);
+    nvgLineTo(p_ctx, x + 1, baseline_y - desc);
+    nvgStrokeWidth(p_ctx, m_pstyle->get_blink_width());
+    nvgStrokeColor(p_ctx, m_pstyle->get_blink_color());
+    nvgLineJoin(p_ctx, NVG_SQUARE);
+    nvgLineCap(p_ctx, NVG_SQUARE);
     nvgStroke(p_ctx);
   }
   //nvgResetScissor(p_ctx);
   rm_widget::on_draw(p_ctx);
 }
 
+void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
+{
+  if (!m_active) {
+    rm_widget::on_keybd(sc, vk, state);
+    return;
+  }
+
+  if (vk == EXGUI_KEY_LCTRL || vk == EXGUI_KEY_RCTRL) {
+    m_ctrl_pressed = (state != EXGUI_KEY_STATE::UP);
+    return;
+  }
+
+  if (!m_ctrl_pressed && (state == EXGUI_KEY_STATE::DOWN || state == EXGUI_KEY_STATE::REPEAT)) {
+    bool handled = true;
+    switch (vk) {
+    case EXGUI_KEY_BACKSPACE:
+      m_buffer.backspace();
+      break;
+    case EXGUI_KEY_DELETE:
+      m_buffer.delete_forward();
+      break;
+    case EXGUI_KEY_LEFT:
+      m_buffer.move_cursor_left();
+      break;
+    case EXGUI_KEY_RIGHT:
+      m_buffer.move_cursor_right();
+      break;
+    case EXGUI_KEY_UP:
+      m_buffer.move_cursor_up();
+      break;
+    case EXGUI_KEY_DOWN:
+      m_buffer.move_cursor_down();
+      break;
+    default:
+      handled = false;
+    }
+    if (handled) {
+      m_timer.reset(get_sysdf());
+      m_blink_state = true;
+      return;
+    }
+  }
+
+  if (state != EXGUI_KEY_STATE::DOWN)
+    return;
+
+  if (m_ctrl_pressed && vk == EXGUI_KEY_A) {
+    m_buffer.select_all();
+    m_timer.reset(get_sysdf());
+    m_blink_state = false;
+    return;
+  }
+
+  if (m_ctrl_pressed) {
+    switch (vk) {
+    case EXGUI_KEY_C: m_buffer.copy_all();  break;
+    case EXGUI_KEY_V: m_buffer.paste();     break;
+    case EXGUI_KEY_X: m_buffer.cut_all();   break;
+    case EXGUI_KEY_Z: m_buffer.undo();      break;
+    case EXGUI_KEY_Y: m_buffer.redo();      break;
+    default:
+      rm_widget::on_keybd(sc, vk, state);
+      return;
+    }
+
+    m_timer.reset(get_sysdf());
+    m_blink_state = false;
+    return;
+  }
+
+  if (vk == EXGUI_KEY_ENTER && (m_flags & RMGUI_TEXT_INPUT_MULTILINE)) {
+    m_buffer.insert_cp('\n');
+    m_timer.reset(get_sysdf());
+    m_blink_state = false;
+    return;
+  }
+
+  rm_widget::on_keybd(sc, vk, state);
+}
 
 bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN) {
-    m_active = m_bbox.inside(cursor_pos);
-    return false;
+  bool inside = m_bbox.inside(cursor_pos);
+  float offset = m_pstyle->get_text_offset();
+  float text_draw_x = m_absolute.x + 5.f + offset;
+  float local_x = cursor_pos.x - text_draw_x;
+
+  if (event == EXGUI_MOUSE_EVENT_CLICK && state == EXGUI_KEY_STATE::DOWN) {
+    if (inside) {
+      m_active = true;
+      m_dragging = true;
+      size_t idx = hit_test_index(local_x);
+      m_buffer.set_cursor(idx);
+      m_buffer.sel_start = idx;
+      m_buffer.sel_end = idx;
+      m_blink_state = true;
+      m_timer.reset(get_sysdf());
+    }
+    else {
+      m_active = false;
+      m_dragging = false;
+    }
+    return true;
   }
-  return true;
+
+  if (event == EXGUI_MOUSE_EVENT_MOVE &&
+    state == EXGUI_KEY_STATE::DOWN &&
+    m_dragging)
+  {
+    m_buffer.sel_end = hit_test_index(local_x);
+    return true;
+  }
+
+  if (event == EXGUI_MOUSE_EVENT_CLICK &&
+    state == EXGUI_KEY_STATE::UP &&
+    m_dragging)
+  {
+    if (m_buffer.sel_start == m_buffer.sel_end)
+      m_buffer.clear_selection();
+    m_dragging = false;
+    return true;
+  }
+  return false;
 }
 
 void rm_text_input::on_text_input(int sym) {
   if (m_active) {
-
-    //TODO: K.D. CREATE CLASS rmgui_textbuffer
-
     printf("keycode: %d\n", sym);
-    if (sym == 8) { // backspace
-      if (!m_text.empty())
-        m_text.pop_back();
-    }
-    else {
-      m_text.push_back(static_cast<char>(sym));
+    if (sym >= 32) {
+      m_buffer.insert_cp(sym);
     }
   }
+  m_timer.reset(get_sysdf());
+  m_blink_state = false;
 }
 
 rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style* pstyle, const std::string& label, rm_checkbox_cb pcallback)

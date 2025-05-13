@@ -8,48 +8,111 @@
 #include <vector>
 #include "blendish_test.h"
 
-// Глобальный указатель на корневую поверхность GUI для использования в колбэках
 static rm_surface* g_gui = nullptr;
 
-// GLFW‑колбэк для движения курсора (координаты принимаются как есть – (0,0) в левом верхнем углу)
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
   g_gui->mouse(EXGUI_MOUSE_EVENT_MOVE, EXGUI_KEY_NONE, DOWN, (int)xpos, (int)ypos);
 }
 
-// GLFW‑колбэк для обработки нажатий мыши
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
   if (button == GLFW_MOUSE_BUTTON_LEFT) {
     double xpos, ypos;
     glfwGetCursorPos(window, &xpos, &ypos);
-    // Передаем состояние в зависимости от action
     EXGUI_KEY_STATE state = (action == GLFW_PRESS ? DOWN : UP);
     g_gui->mouse(EXGUI_MOUSE_EVENT_CLICK, EXGUI_KEY_NONE, state, (int)xpos, (int)ypos);
   }
 }
+// FIXME: d2 move to utils 
+EXGUI_KEY translate_glfw_key(int k) {
+  switch (k) {
+  case GLFW_KEY_A: return EXGUI_KEY_A;
+  case GLFW_KEY_B: return EXGUI_KEY_B;
+  case GLFW_KEY_C: return EXGUI_KEY_C;
+  case GLFW_KEY_D: return EXGUI_KEY_D;
+  case GLFW_KEY_E: return EXGUI_KEY_E;
+  case GLFW_KEY_F: return EXGUI_KEY_F;
+  case GLFW_KEY_G: return EXGUI_KEY_G;
+  case GLFW_KEY_H: return EXGUI_KEY_H;
+  case GLFW_KEY_I: return EXGUI_KEY_I;
+  case GLFW_KEY_J: return EXGUI_KEY_J;
+  case GLFW_KEY_K: return EXGUI_KEY_K;
+  case GLFW_KEY_L: return EXGUI_KEY_L;
+  case GLFW_KEY_M: return EXGUI_KEY_M;
+  case GLFW_KEY_N: return EXGUI_KEY_N;
+  case GLFW_KEY_O: return EXGUI_KEY_O;
+  case GLFW_KEY_P: return EXGUI_KEY_P;
+  case GLFW_KEY_Q: return EXGUI_KEY_Q;
+  case GLFW_KEY_R: return EXGUI_KEY_R;
+  case GLFW_KEY_S: return EXGUI_KEY_S;
+  case GLFW_KEY_T: return EXGUI_KEY_T;
+  case GLFW_KEY_U: return EXGUI_KEY_U;
+  case GLFW_KEY_V: return EXGUI_KEY_V;
+  case GLFW_KEY_W: return EXGUI_KEY_W;
+  case GLFW_KEY_X: return EXGUI_KEY_X;
+  case GLFW_KEY_Y: return EXGUI_KEY_Y;
+  case GLFW_KEY_Z: return EXGUI_KEY_Z;
 
-// GLFW‑колбэк для ввода символов (текстовый ввод)
+  case GLFW_KEY_0: return EXGUI_KEY_0;
+  case GLFW_KEY_1: return EXGUI_KEY_1;
+  case GLFW_KEY_2: return EXGUI_KEY_2;
+  case GLFW_KEY_3: return EXGUI_KEY_3;
+  case GLFW_KEY_4: return EXGUI_KEY_4;
+  case GLFW_KEY_5: return EXGUI_KEY_5;
+  case GLFW_KEY_6: return EXGUI_KEY_6;
+  case GLFW_KEY_7: return EXGUI_KEY_7;
+  case GLFW_KEY_8: return EXGUI_KEY_8;
+  case GLFW_KEY_9: return EXGUI_KEY_9;
+
+  case GLFW_KEY_ESCAPE:       return EXGUI_KEY_ESCAPE;
+  case GLFW_KEY_ENTER:        return EXGUI_KEY_ENTER;
+  case GLFW_KEY_TAB:          return EXGUI_KEY_TAB;
+  case GLFW_KEY_BACKSPACE:    return EXGUI_KEY_BACKSPACE;
+  case GLFW_KEY_INSERT:       return EXGUI_KEY_INSERT;
+  case GLFW_KEY_DELETE:       return EXGUI_KEY_DELETE;
+  case GLFW_KEY_RIGHT:        return EXGUI_KEY_RIGHT;
+  case GLFW_KEY_LEFT:         return EXGUI_KEY_LEFT;
+  case GLFW_KEY_DOWN:         return EXGUI_KEY_DOWN;
+  case GLFW_KEY_UP:           return EXGUI_KEY_UP;
+  case GLFW_KEY_PAGE_UP:      return EXGUI_KEY_PAGE_UP;
+  case GLFW_KEY_PAGE_DOWN:    return EXGUI_KEY_PAGE_DOWN;
+  case GLFW_KEY_HOME:         return EXGUI_KEY_HOME;
+  case GLFW_KEY_END:          return EXGUI_KEY_END;
+
+  case GLFW_KEY_CAPS_LOCK:    return EXGUI_KEY_CAPS_LOCK;
+  case GLFW_KEY_SCROLL_LOCK:  return EXGUI_KEY_SCROLL_LOCK;
+  case GLFW_KEY_NUM_LOCK:     return EXGUI_KEY_NUM_LOCK;
+  case GLFW_KEY_PRINT_SCREEN: return EXGUI_KEY_PRINT_SCREEN;
+  case GLFW_KEY_PAUSE:        return EXGUI_KEY_PAUSE;
+
+  case GLFW_KEY_F1:  return EXGUI_KEY_F1;
+  case GLFW_KEY_F2:  return EXGUI_KEY_F2;
+  case GLFW_KEY_F3:  return EXGUI_KEY_F3;
+  case GLFW_KEY_F4:  return EXGUI_KEY_F4;
+  case GLFW_KEY_F5:  return EXGUI_KEY_F5;
+  case GLFW_KEY_F6:  return EXGUI_KEY_F6;
+  case GLFW_KEY_F7:  return EXGUI_KEY_F7;
+  case GLFW_KEY_F8:  return EXGUI_KEY_F8;
+  case GLFW_KEY_F9:  return EXGUI_KEY_F9;
+  case GLFW_KEY_F10: return EXGUI_KEY_F10;
+  case GLFW_KEY_F11: return EXGUI_KEY_F11;
+  case GLFW_KEY_F12: return EXGUI_KEY_F12;
+
+
+  case GLFW_KEY_LEFT_CONTROL:  return EXGUI_KEY_LCTRL;
+  case GLFW_KEY_RIGHT_CONTROL: return EXGUI_KEY_RCTRL;
+
+  default:
+    return EXGUI_KEY_NONE;
+  }
+}
 void char_callback(GLFWwindow* window, unsigned int codepoint) {
-  g_gui->textinput((int)codepoint);
+  g_gui->textinput(codepoint);
 }
 
-// GLFW‑колбэк для обработки нажатий клавиш
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-  if (action == GLFW_PRESS || action == GLFW_REPEAT) {
-    switch (key)
-    {
-    case GLFW_KEY_BACKSPACE:
-      g_gui->textinput(8); //send backspace
-      break;
-    case GLFW_KEY_ENTER:
-      g_gui->textinput('\n'); //return
-      break;
-
-    default:
-      break;
-    }   
-    
-    g_gui->keybd(scancode, EXGUI_KEY_NONE, DOWN);
-  }
+  EXGUI_KEY vk = translate_glfw_key(key);
+  EXGUI_KEY_STATE state = (action == GLFW_PRESS ? DOWN : action == GLFW_RELEASE ? UP : REPEAT);
+  g_gui->keybd(scancode, vk, state);
 }
 
 GLFWwindow* initWindow(int width, int height, const char* title) {
@@ -57,7 +120,7 @@ GLFWwindow* initWindow(int width, int height, const char* title) {
     std::cerr << "Failed to initialize GLFW\n";
     return nullptr;
   }
-  // Используем OpenGL 3.3 Core Profile
+
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -286,14 +349,32 @@ int main() {
   rm_image_button* imgButton = new rm_image_button(pwindow, 20, 20, 200, 40, "idle-button-login.png");
   rm_button* textButton = new rm_button(pwindow, 200 + 20 + 10, 20, 200, 40, "Test Button");
   rm_label* label = new rm_label(pwindow, 20, 40 + 30, "this is rm_label");
-  rm_text_input* textInput = new rm_text_input(pwindow, 300, 100, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
+
+  static rm_text_input_style style_inp;
+  //style_inp.set_text_offsets(10.0f);
+
+
+  style_inp.set_corner_radius(LEFT_TOP, 4.f);
+  style_inp.set_corner_radius(RIGHT_TOP, 4.f);
+  style_inp.set_corner_radius(RIGHT_BOTTOM, 4.f);
+  style_inp.set_corner_radius(LEFT_BOTTOM, 4.f);
+
+  //style_inp.set_border_color(nvgRGB(0,0,255));
+  //style_inp.set_border_width(2.f);
+  style_inp.set_rounded_selection(0);
+  
+  //style_inp.set_active_bgr_color({ 0,0,0 });
+  //style_inp.set_blink_width(1.f);
+
+
+  rm_text_input* textInput = new rm_text_input(pwindow, 300, 100, 200, 20, &style_inp, RMGUI_TEXT_INPUT_SINGLELINE);
 
   static rm_checkbox_style style;
   style.set_font_size(14.f);
   style.set_background_color(nvgRGB(20, 20, 20));
   style.set_border_color(nvgRGB(80, 80, 80));
   style.set_mark_color(nvgRGB(111, 111, 255));
-  style.set_border_width(0.5f);
+  style.set_border_width(1.f);
   
   //style.set_corner_radius(LEFT_TOP, 4.f);
   //style.set_corner_radius(RIGHT_TOP, 4.f);
@@ -329,7 +410,7 @@ int main() {
 
   rm_button* home_btn = new rm_button(t0, 10, 25, 120, 30, "Home Action");
   rm_checkbox* setting_chk = new rm_checkbox(t1, 10, 0, 150, &style, "Enable Feature");
-  rm_text_input* setting_input = new rm_text_input(t1, 10, 25, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
+  //rm_text_input* setting_input = new rm_text_input(t1, 10, 25, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
 
 
   rm_treeview* tree = new rm_treeview(290, 230, 200, 200, pwindow,

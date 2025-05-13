@@ -297,6 +297,9 @@ enum EXGUI_KEY : uint32_t {
   EXGUI_KEY_NUM_LOCK,
   EXGUI_KEY_PRINT_SCREEN,
   EXGUI_KEY_PAUSE,
+  EXGUI_KEY_CONTROL,
+  EXGUI_KEY_LCTRL,
+  EXGUI_KEY_RCTRL,
   EXGUI_KEY_F1,
   EXGUI_KEY_F2,
   EXGUI_KEY_F3,
@@ -725,6 +728,8 @@ public:
   float get_interval() { return m_interval; }
 
   bool has_elapsed(irmgui_sysdf* p_sysdf);
+
+  void reset(irmgui_sysdf* p_sysdf) { m_curr_time = p_sysdf->get_time(); m_next_time = m_curr_time + m_interval; }
 };
 
 /**
@@ -886,4 +891,52 @@ class rm_window : public rm_widget, public rm_styled<rm_window_style>
 public:
   rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags = EXGUI_FLAG_DEFAULT, uint32_t uflags = 0, void* p_userptr = nullptr);
   ~rm_window();
+};
+
+class rmgui_textbuffer {
+private:
+  struct state { 
+    std::string text; 
+    size_t cur, sel_start, sel_end; 
+  };
+
+  std::string         text;
+  std::string         clipboard;
+  size_t              cursor;
+  std::vector<state>  undos;
+  std::vector<state>  redos;
+public:
+    rmgui_textbuffer() : cursor(0), sel_start(0), sel_end(0) {}
+
+    void set_cursor(size_t pos) {cursor = pos; clear_selection();}
+
+    void insert_cp(uint32_t cp);
+    void backspace();
+
+    void cut_all();
+    void copy_all() { clipboard = text; }
+    void paste();
+    void select_all() { sel_start = 0; sel_end = text.size(); cursor = sel_end; }
+
+    void undo();
+    void redo();
+
+    void move_cursor_left();
+    void move_cursor_right();
+    void move_cursor_up();
+    void move_cursor_down();
+
+    void delete_forward();
+
+    void clear_selection() { sel_start = sel_end = cursor; }
+    bool has_selection() const { return sel_start != sel_end; }
+
+    const std::string& str() const { return text; }
+    size_t pos() const { return cursor; }
+    size_t sel_start, sel_end;
+
+private:
+  void save_undo();
+  void clear_redo() { redos.clear(); }
+  void delete_selection();
 };

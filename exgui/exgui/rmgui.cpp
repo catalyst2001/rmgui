@@ -377,3 +377,214 @@ void rmgui_utl::draw_border_frame(NVGcontext* ctx, rm_rect& rect, uint32_t mode,
   //nvgStrokeColor(ctx, mTheme->mBorderDark);
   //nvgStroke(ctx);
 }
+
+void rmgui_textbuffer::insert_cp(uint32_t cp)
+{
+  if (has_selection()) 
+    delete_selection();
+
+  save_undo();
+  std::string u8;
+
+  if (cp < 0x80) 
+    u8.push_back(char(cp));
+  else if (cp < 0x800) {
+    u8.push_back(char(0xC0 | (cp >> 6)));
+    u8.push_back(char(0x80 | (cp & 0x3F)));
+  }
+  else if (cp < 0x10000) {
+    u8.push_back(char(0xE0 | (cp >> 12)));
+    u8.push_back(char(0x80 | ((cp >> 6) & 0x3F)));
+    u8.push_back(char(0x80 | (cp & 0x3F)));
+  }
+  else {
+    u8.push_back(char(0xF0 | (cp >> 18)));
+    u8.push_back(char(0x80 | ((cp >> 12) & 0x3F)));
+    u8.push_back(char(0x80 | ((cp >> 6) & 0x3F)));
+    u8.push_back(char(0x80 | (cp & 0x3F)));
+  }
+
+  text.insert(cursor, u8);
+  cursor += u8.size();
+  clear_redo();
+  clear_selection();
+}
+
+void rmgui_textbuffer::backspace()
+{
+  if (has_selection()) { 
+    delete_selection(); 
+    return; 
+  }
+
+  if (cursor == 0) 
+    return;
+
+  save_undo();
+  size_t i = cursor - 1;
+  while (i > 0 && (text[i] & 0xC0) == 0x80) --i;
+  text.erase(i, cursor - i);
+  cursor = i;
+  clear_redo();
+  clear_selection();
+}
+
+void rmgui_textbuffer::cut_all()
+{
+  if (text.empty())
+    return;
+
+  save_undo();
+  clipboard = text;
+  text.clear();
+  cursor = 0;
+  clear_redo();
+  clear_selection();
+}
+
+void rmgui_textbuffer::paste()
+{
+  if (has_selection()) 
+    delete_selection();
+
+  if (clipboard.empty()) 
+    return;
+
+  save_undo(); 
+  text.insert(cursor, clipboard); cursor += clipboard.size();
+  clear_redo(); 
+  clear_selection();
+}
+
+void rmgui_textbuffer::undo()
+{
+  if (undos.empty())
+    return;
+
+  redos.push_back({ text, cursor, sel_start, sel_end });
+  auto s = undos.back();
+  undos.pop_back();
+  text = s.text;
+  cursor = s.cur;
+  sel_start = s.sel_start;
+  sel_end = s.sel_end;
+}
+
+void rmgui_textbuffer::redo()
+{
+  if (redos.empty())
+    return;
+
+  undos.push_back({ text, cursor, sel_start, sel_end });
+  auto s = redos.back();
+  redos.pop_back();
+  text = s.text;
+  cursor = s.cur;
+  sel_start = s.sel_start;
+  sel_end = s.sel_end;
+}
+
+void rmgui_textbuffer::move_cursor_left()
+{
+  clear_selection();
+  if (cursor == 0) 
+    return;
+
+  size_t i = cursor - 1;
+  while (i > 0 && (text[i] & 0xC0) == 0x80) --i;
+  cursor = i;
+}
+
+void rmgui_textbuffer::move_cursor_right()
+{
+  clear_selection();
+  if (cursor >= text.size()) 
+    return;
+
+  size_t i = cursor + 1;
+  while (i < text.size() && (text[i] & 0xC0) == 0x80) ++i;
+  cursor = i;
+}
+
+void rmgui_textbuffer::move_cursor_up()
+{
+  clear_selection();
+  size_t pos = cursor;
+  auto prev_nl = (pos == 0 ? std::string::npos : text.rfind('\n', pos - 1));
+
+  if (prev_nl == std::string::npos)
+    return;
+
+  size_t line0_start = prev_nl + 1;
+  size_t col = pos - line0_start;
+
+  auto prev2_nl = (prev_nl == 0 ? std::string::npos : text.rfind('\n', prev_nl - 1));
+  size_t line1_start = (prev2_nl == std::string::npos ? 0 : prev2_nl + 1);
+  size_t line1_end = prev_nl;
+  size_t len1 = line1_end - line1_start;
+
+  cursor = line1_start + std::min(col, len1);
+}
+
+void rmgui_textbuffer::move_cursor_down()
+{
+  clear_selection();
+  size_t pos = cursor;
+  auto next_nl = text.find('\n', pos);
+  if (next_nl == std::string::npos)
+    return;
+
+  size_t line0_start = (pos == 0 ? 0 : text.rfind('\n', pos - 1) + 1);
+  size_t col = pos - line0_start;
+
+  size_t line1_start = next_nl + 1;
+  auto next2_nl = text.find('\n', line1_start);
+  size_t line1_end = (next2_nl == std::string::npos ? text.size() : next2_nl);
+  size_t len1 = line1_end - line1_start;
+
+  cursor = line1_start + std::min(col, len1);
+}
+
+void rmgui_textbuffer::delete_forward()
+{
+  if (has_selection()) {
+    delete_selection();
+    return;
+  }
+
+  if (cursor == 0)
+    return;
+
+  save_undo();
+
+  size_t i = cursor - 1;
+  while (i > 0 && (text[i] & 0xC0) == 0x80) {
+    --i;
+  }
+  text.erase(i, cursor - i);
+  cursor = i;
+
+  clear_redo();
+  clear_selection();
+}
+
+void rmgui_textbuffer::save_undo()
+{
+  undos.push_back({ text, cursor, sel_start, sel_end });
+  if (undos.size() > 100)
+    undos.erase(undos.begin());
+}
+
+void rmgui_textbuffer::delete_selection()
+{
+  if (!has_selection())
+    return;
+
+  save_undo();
+  size_t a = std::min(sel_start, sel_end);
+  size_t b = std::max(sel_start, sel_end);
+  text.erase(a, b - a);
+  cursor = a;
+  clear_redo();
+  clear_selection();
+}

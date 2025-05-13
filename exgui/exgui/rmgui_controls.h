@@ -43,24 +43,101 @@ public:
   virtual void on_draw(NVGcontext* p_ctx) override;
 };
 
+/**
+* TEXT INPUT
+*/
+
 enum RMGUI_TEXT_INPUT_FLAGS {
   RMGUI_TEXT_INPUT_SINGLELINE = 0,
   RMGUI_TEXT_INPUT_MULTILINE = 1 << 0
 };
 
-class rm_text_input : public rm_widget {
-  std::string m_text;
-  bool m_active;
-  rmgui_timer m_timer;
-  bool        m_blink_state;
-  float       m_text_offset;
-  uint32_t    m_flags;
+class rm_text_input_style : public rm_corners_style {
+  NVGcolor      m_text_color;
+  NVGcolor      m_active_bg_color;
+  NVGcolor      m_unactive_bg_color;
+  NVGcolor      m_border_color;
+  NVGcolor      m_blink_color;
+  NVGcolor      m_selection_color;
+  float         m_font_size;
+  float         m_border_width;
+  float         m_text_offset;
+  float         m_blink_width;
+  bool          m_rounded_selection;
 public:
-  rm_text_input(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags/* = RMGUI_TEXT_INPUT_SINGLELINE*/, float blink_cursor_interval = 0.5f);
+  rm_text_input_style() :
+    m_text_color(nvgRGB(0, 0, 0)),
+    m_active_bg_color(nvgRGB(255, 255, 255)),
+    m_unactive_bg_color(nvgRGBA(230, 230, 230, 255)),
+    m_border_color(nvgRGBA(255, 255, 255, 255)),
+    m_blink_color(nvgRGB(0, 0, 0)),
+    m_selection_color(nvgRGBA(51, 153, 255, 128)),
+    m_font_size(14.f), 
+    m_border_width(1.f), 
+    m_text_offset(1.f), m_blink_width(1.f), m_rounded_selection(false) {
+  }
+
+  inline const void     set_rounded_selection(bool enable) { m_rounded_selection = enable; }
+  inline bool           has_rounded_selection() const { return m_rounded_selection; }
+
+  /* selectors  */
+  inline const NVGcolor& get_text_color() const { return m_text_color; }
+  inline const NVGcolor& get_active_bgr_color() const { return m_active_bg_color; }
+  inline const NVGcolor& get_unactive_bgr_color() const { return m_unactive_bg_color; }
+  inline const NVGcolor& get_border_color() const { return m_border_color; }
+  inline const NVGcolor& get_blink_color() const { return m_blink_color; }
+  inline const NVGcolor& get_selection_color() const { return m_selection_color; }
+  inline float           get_font_size() const { return m_font_size; }
+  inline float           get_border_width() const { return m_border_width; }
+  inline float           get_blink_width() const { return m_blink_width; }
+  inline float           get_text_offset() const { return m_text_offset; }
+
+  /* modifiers */
+  inline void set_text_color(NVGcolor clr) { m_text_color = clr; }
+  inline void set_active_bgr_color(NVGcolor clr) { m_active_bg_color = clr; }
+  inline void set_unactive_bgr_color(NVGcolor clr) { m_unactive_bg_color = clr; }
+  inline void set_border_color(NVGcolor clr) { m_border_color = clr; }
+  inline void set_blink_color(NVGcolor clr) { m_blink_color = clr; }
+  inline void set_selection_color(NVGcolor clr) { m_selection_color = clr; }
+  inline void set_font_size(float fsize) { m_font_size = fsize; }
+  inline void set_border_width(float bsize) { m_border_width = bsize; }
+  inline void set_blink_width(float offset) { m_blink_width = offset; }
+  inline void set_text_offsets(float offset) { m_text_offset = offset; }
+};
+
+class rm_text_input : public rm_widget, public rm_styled<rm_text_input_style> {
+  std::vector<float>  m_glyph_positions;
+  std::string         m_text;
+  rmgui_textbuffer    m_buffer;
+  bool                m_ctrl_pressed;
+  bool                m_active;
+  bool                m_dragging;
+  rmgui_timer         m_timer;
+  bool                m_blink_state;
+  uint32_t            m_flags;
+public:
+  rm_text_input(rm_widget* p_parent, int x, int y, int width, int height, rm_text_input_style* pstyle, uint32_t flags/* = RMGUI_TEXT_INPUT_SINGLELINE*/, float blink_cursor_interval = 0.5f);
   virtual ~rm_text_input();
   virtual void on_draw(NVGcontext* p_ctx) override;
+  virtual void on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state) override;
   virtual void on_text_input(int sym) override;
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
+
+  // map local x-coordinate to character index
+  size_t hit_test_index(float px) const {
+    size_t n = m_glyph_positions.size();
+    if (n == 0) return 0;
+    if (px <= m_glyph_positions[0]) return 0;
+    if (px >= m_glyph_positions[n - 1]) return n - 1;
+    for (size_t i = 1; i < n; ++i) {
+      float left = m_glyph_positions[i - 1];
+      float right = m_glyph_positions[i];
+      float mid = (left + right) * 0.5f;
+      if (px < mid)
+        return i - 1;
+    }
+    return n - 1;
+  }
 };
 
 /**
