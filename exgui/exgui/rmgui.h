@@ -584,8 +584,7 @@ public:
   }
 
   rm_widget(int x, int y, int width, int height, rm_widget *p_parent, const char *p_classname,
-    uint32_t flags = EXGUI_FLAG_DEFAULT, 
-    uint32_t uflags = 0, void *p_userptr = nullptr) : m_proot(nullptr),
+    uint32_t flags = EXGUI_FLAG_DEFAULT, uint32_t uflags = 0, void *p_userptr = nullptr) : m_proot(nullptr),
     m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_zindex(0) {
     rm_vec2 parent_coord;
     if (m_pparent) {
@@ -692,7 +691,6 @@ public:
   void keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state);
   void textinput(int sym);
   void mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, int x, int y);
-
 
   NVGcontext* get_context() { return m_pctx; }
 
@@ -914,6 +912,7 @@ public:
     void backspace();
 
     void cut_all();
+    void cut_selection();
     void copy_all() { clipboard = text; }
     void paste();
     void select_all() { sel_start = 0; sel_end = text.size(); cursor = sel_end; }

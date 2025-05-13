@@ -68,7 +68,7 @@ public:
   rm_text_input_style() :
     m_text_color(nvgRGB(0, 0, 0)),
     m_active_bg_color(nvgRGB(255, 255, 255)),
-    m_unactive_bg_color(nvgRGBA(230, 230, 230, 255)),
+    m_unactive_bg_color(nvgRGBA(220, 220, 220, 255)),
     m_border_color(nvgRGBA(255, 255, 255, 255)),
     m_blink_color(nvgRGB(0, 0, 0)),
     m_selection_color(nvgRGBA(51, 153, 255, 128)),

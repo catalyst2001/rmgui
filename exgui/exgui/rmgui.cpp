@@ -125,7 +125,7 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
   bool b_cursor_inside = p_elem->get_bbox().inside(cursor_pos);
   bool b_global_receive_events = p_elem->get_elem_flags().is_set(EXGUI_FLAG_GLOBAL);
   if (b_cursor_inside || b_global_receive_events) {
-    
+
     b_call_next = p_elem->on_mouse(event, vk, state, cursor_pos);
     if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && p_elem != this) {
       if (!(b_global_receive_events && !b_cursor_inside)) {
@@ -138,6 +138,7 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
   p_elem->m_elem_flags.toggle_bits(EXGUI_FLAG_HOVERED, b_cursor_inside);
   if (!b_call_next)
     return false; //this event was break by p_elem
+    
   rm_vec2 local = p_elem->cursor_to_local(cursor_pos);
   const rm_rect& content = p_elem->get_content_area();
   rm_vec2 child_cursor{
@@ -438,6 +439,21 @@ void rmgui_textbuffer::cut_all()
   clipboard = text;
   text.clear();
   cursor = 0;
+  clear_redo();
+  clear_selection();
+}
+
+void rmgui_textbuffer::cut_selection()
+{
+  if (!has_selection()) 
+    return;
+
+  save_undo();
+  size_t a = std::min(sel_start, sel_end);
+  size_t b = std::max(sel_start, sel_end);
+  clipboard = text.substr(a, b - a);
+  text.erase(a, b - a);
+  cursor = a;
   clear_redo();
   clear_selection();
 }

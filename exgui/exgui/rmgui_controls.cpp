@@ -162,7 +162,7 @@ void rm_label::on_draw(NVGcontext* p_ctx) {
 
 rm_text_input::rm_text_input(rm_widget* p_parent, int x, int y, int width, int height,
   rm_text_input_style* pstyle, uint32_t flags, float blink_cursor_interval)
-  : rm_widget(x, y, width, height, p_parent, "ui_text_input"), m_active(false), m_ctrl_pressed(false), m_dragging(false)
+  : rm_widget(x, y, width, height, p_parent, "ui_text_input", EXGUI_FLAG_DEFAULT), m_active(false), m_ctrl_pressed(false), m_dragging(false)
 {
   set_style(pstyle);
   m_blink_state = false;
@@ -311,7 +311,10 @@ void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
     switch (vk) {
     case EXGUI_KEY_C: m_buffer.copy_all();  break;
     case EXGUI_KEY_V: m_buffer.paste();     break;
-    case EXGUI_KEY_X: m_buffer.cut_all();   break;
+    case EXGUI_KEY_X: 
+      if (m_buffer.has_selection())
+      m_buffer.cut_selection();   
+      break;
     case EXGUI_KEY_Z: m_buffer.undo();      break;
     case EXGUI_KEY_Y: m_buffer.redo();      break;
     default:
@@ -342,6 +345,7 @@ bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
 
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == EXGUI_KEY_STATE::DOWN) {
     if (inside) {
+      m_elem_flags.toggle_bits(EXGUI_FLAG_GLOBAL, true); // FIXME: d2 its not better decision (if set flag in constructor 'EXGUI_FLAG_GLOBAL' then breaks all the widgets)
       m_active = true;
       m_dragging = true;
       size_t idx = hit_test_index(local_x);
@@ -350,37 +354,40 @@ bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
       m_buffer.sel_end = idx;
       m_blink_state = true;
       m_timer.reset(get_sysdf());
+      return true;
     }
     else {
+
       m_active = false;
       m_dragging = false;
+      m_buffer.clear_selection();
+      m_elem_flags.toggle_bits(EXGUI_FLAG_GLOBAL, false); // FIXME: d2 its not better decision (if set flag in constructor 'EXGUI_FLAG_GLOBAL' then breaks all the widgets)
+      return false;
     }
-    return true;
   }
 
-  if (event == EXGUI_MOUSE_EVENT_MOVE &&
-    state == EXGUI_KEY_STATE::DOWN &&
-    m_dragging)
+  if (event == EXGUI_MOUSE_EVENT_MOVE && state == EXGUI_KEY_STATE::DOWN && m_dragging)
   {
     m_buffer.sel_end = hit_test_index(local_x);
     return true;
   }
 
-  if (event == EXGUI_MOUSE_EVENT_CLICK &&
-    state == EXGUI_KEY_STATE::UP &&
-    m_dragging)
+  if (event == EXGUI_MOUSE_EVENT_CLICK && state == EXGUI_KEY_STATE::UP)
   {
-    if (m_buffer.sel_start == m_buffer.sel_end)
-      m_buffer.clear_selection();
-    m_dragging = false;
-    return true;
+    if (m_dragging) {
+      if (m_buffer.sel_start == m_buffer.sel_end)
+        m_buffer.clear_selection();
+      m_dragging = false;
+      return true;
+    }
+    return false;
   }
   return false;
 }
 
 void rm_text_input::on_text_input(int sym) {
   if (m_active) {
-    printf("keycode: %d\n", sym);
+    //printf("keycode: %d\n", sym);
     if (sym >= 32) {
       m_buffer.insert_cp(sym);
     }

@@ -105,6 +105,7 @@ EXGUI_KEY translate_glfw_key(int k) {
     return EXGUI_KEY_NONE;
   }
 }
+
 void char_callback(GLFWwindow* window, unsigned int codepoint) {
   g_gui->textinput(codepoint);
 }
