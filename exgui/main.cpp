@@ -368,7 +368,7 @@ int main() {
   //style_inp.set_blink_width(1.f);
 
 
-  rm_text_input* textInput = new rm_text_input(pwindow, 300, 100, 200, 20, &style_inp, RMGUI_TEXT_INPUT_SINGLELINE);
+  rm_text_input* textInput = new rm_text_input(pwindow, 300, 100, 200, 25, &style_inp, RMGUI_TEXT_INPUT_SINGLELINE);
 
   static rm_checkbox_style style;
   style.set_font_size(14.f);

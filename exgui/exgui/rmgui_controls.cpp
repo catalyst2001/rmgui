@@ -176,80 +176,152 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
   const std::string& txt = m_buffer.str();
   //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented this
   nvgFontFaceId(p_ctx, get_font());
+  nvgFontSize(p_ctx, m_pstyle->get_font_size());
+  float asc, desc, line_h;
+  nvgTextMetrics(p_ctx, &asc, &desc, &line_h);
+
   //nvgScissor(p_ctx, 0.f, 0.f, m_relative.width, m_relative.height); //NOTE: K.D. added 12.03.2025
 
+  // background & border
   nvgBeginPath(p_ctx);
-  nvgRoundedRectVarying(p_ctx, 0.f, 0.f, m_size.x, m_size.y, m_pstyle->get_corner_radius(LEFT_TOP),
+  nvgRoundedRectVarying(p_ctx, 0.f, 0.f, m_size.x, m_size.y,
+    m_pstyle->get_corner_radius(LEFT_TOP),
     m_pstyle->get_corner_radius(RIGHT_TOP),
     m_pstyle->get_corner_radius(RIGHT_BOTTOM),
     m_pstyle->get_corner_radius(LEFT_BOTTOM));
-  NVGcolor bgColor = m_active ? m_pstyle->get_active_bgr_color() : m_pstyle->get_unactive_bgr_color();
-  nvgFillColor(p_ctx, bgColor);
+  nvgFillColor(p_ctx, m_active
+    ? m_pstyle->get_active_bgr_color()
+    : m_pstyle->get_unactive_bgr_color());
   nvgFill(p_ctx);
-
   nvgStrokeColor(p_ctx, m_pstyle->get_border_color());
   nvgStrokeWidth(p_ctx, m_pstyle->get_border_width());
   nvgStroke(p_ctx);
 
-  nvgFontSize(p_ctx, m_pstyle->get_font_size());
-  float asc, desc, lineh;
-  nvgTextMetrics(p_ctx, &asc, &desc, &lineh);
-  float baseline_y = m_size.y * 0.5f + (asc + desc) * 0.5f;
-  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
-  nvgFillColor(p_ctx, m_pstyle->get_text_color());
+  bool multiline = (m_flags & RMGUI_TEXT_INPUT_MULTILINE);
   float offset = 0.f;
-  if (!(m_flags & RMGUI_TEXT_INPUT_MULTILINE)) {
-    float available_width = m_size.x - 10.f;
-    float text_width = nvgTextBounds(p_ctx, 0, 0, txt.c_str(), nullptr, nullptr);
-    offset = text_width > available_width ? text_width - available_width : 0;
-    nvgText(p_ctx, 5.f - offset + m_pstyle->get_text_offset(), baseline_y, txt.c_str(), nullptr);
-  }
-  else {
-    float available_width = m_size.x - 10;
-    nvgTextBox(p_ctx, 5.f + m_pstyle->get_text_offset(), 5.f, available_width, txt.c_str(), nullptr);
+  if (!multiline) {
+    float avail = m_size.x - 10.f;
+    float tw = nvgTextBounds(p_ctx, 0, 0, txt.c_str(), nullptr, nullptr);
+    offset = tw > avail ? tw - avail : 0.f;
   }
 
-  m_glyph_positions.clear();
-  m_glyph_positions.push_back(0.f);
-  for (size_t i = 1; i <= txt.size(); ++i) {
-    float w = nvgTextBounds(p_ctx, 0, 0, txt.substr(0, i).c_str(), nullptr, nullptr);
-    m_glyph_positions.push_back(w);
+  // single-line glyph positions
+  if (!multiline) {
+    m_glyph_positions.clear();
+    m_glyph_positions.push_back(0.f);
+    for (size_t i = 1; i <= txt.size(); ++i) {
+      float w = nvgTextBounds(p_ctx, 0, 0, txt.substr(0, i).c_str(), nullptr, nullptr);
+      m_glyph_positions.push_back(w);
+    }
   }
 
-  if (m_buffer.has_selection()) {
-    size_t a = std::min(m_buffer.sel_start, m_buffer.sel_end);
-    size_t b = std::max(m_buffer.sel_start, m_buffer.sel_end);
-    float x0 = (5.f - offset + m_glyph_positions[a]) + m_pstyle->get_text_offset();
-    float x1 = (5.f - offset + m_glyph_positions[b]) + m_pstyle->get_text_offset();
-    nvgBeginPath(p_ctx);
-    if(m_pstyle->has_rounded_selection())
-      nvgRoundedRectVarying(p_ctx, x0, baseline_y - asc, x1 - x0, asc - desc, m_pstyle->get_corner_radius(LEFT_TOP),
-        m_pstyle->get_corner_radius(RIGHT_TOP),
-        m_pstyle->get_corner_radius(RIGHT_BOTTOM),
-        m_pstyle->get_corner_radius(LEFT_BOTTOM));
-    else
-      nvgRect(p_ctx, x0, baseline_y - asc, x1 - x0, asc - desc);
-    nvgFillColor(p_ctx, m_pstyle->get_selection_color());
-    nvgFill(p_ctx);
-  }
-
+  // update blink state
   if (m_timer.has_elapsed(get_sysdf())) {
     m_blink_state = !m_blink_state;
   }
 
-  if (m_active && m_blink_state) {
-    size_t ci = m_buffer.has_selection() ? m_buffer.sel_end : m_buffer.pos();
-    float cw = m_glyph_positions[ci];
-    float x = (5.f - offset + cw) + m_pstyle->get_text_offset();
-    nvgBeginPath(p_ctx);
-    nvgMoveTo(p_ctx, x + 1, baseline_y - asc);
-    nvgLineTo(p_ctx, x + 1, baseline_y - desc);
-    nvgStrokeWidth(p_ctx, m_pstyle->get_blink_width());
-    nvgStrokeColor(p_ctx, m_pstyle->get_blink_color());
-    nvgLineJoin(p_ctx, NVG_SQUARE);
-    nvgLineCap(p_ctx, NVG_SQUARE);
-    nvgStroke(p_ctx);
+  // draw selection
+  if (m_buffer.has_selection()) {
+    nvgFillColor(p_ctx, m_pstyle->get_selection_color());
+    if (!multiline) {
+      size_t a = std::min(m_buffer.sel_start, m_buffer.sel_end);
+      size_t b = std::max(m_buffer.sel_start, m_buffer.sel_end);
+      float x0 = 5.f - offset + m_glyph_positions[a] + m_pstyle->get_text_offset();
+      float x1 = 5.f - offset + m_glyph_positions[b] + m_pstyle->get_text_offset();
+      float baseline = m_size.y * 0.5f + (asc + desc) * 0.5f;
+      nvgBeginPath(p_ctx);
+      nvgRect(p_ctx, x0, baseline - asc, x1 - x0, asc - desc);
+      nvgFill(p_ctx);
+    }
+    else {
+      std::vector<std::string> lines;
+      std::vector<size_t> starts;
+      size_t idx = 0;
+      while (idx <= txt.size()) {
+        size_t nl = txt.find('\n', idx);
+        if (nl == std::string::npos) nl = txt.size();
+        lines.push_back(txt.substr(idx, nl - idx));
+        starts.push_back(idx);
+        idx = nl + 1;
+      }
+      size_t sel_a = std::min(m_buffer.sel_start, m_buffer.sel_end);
+      size_t sel_b = std::max(m_buffer.sel_start, m_buffer.sel_end);
+      float top_pad = 5.f + asc;
+      for (size_t i = 0; i < lines.size(); ++i) {
+        const auto& line = lines[i];
+        size_t ls = starts[i], le = ls + line.size();
+        if (sel_a < le && sel_b > ls) {
+          size_t a = std::max(sel_a, ls) - ls;
+          size_t b = std::min(sel_b, le) - ls;
+          std::string pre = line.substr(0, a);
+          std::string sel = line.substr(a, b - a);
+          float x0 = 5.f - offset + nvgTextBounds(p_ctx, 0, 0, pre.c_str(), nullptr, nullptr);
+          float w = nvgTextBounds(p_ctx, 0, 0, sel.c_str(), nullptr, nullptr);
+          float y0 = top_pad + i * line_h - asc;
+          nvgBeginPath(p_ctx);
+          nvgRect(p_ctx, x0 + m_pstyle->get_text_offset(), y0, w, line_h);
+          nvgFill(p_ctx);
+        }
+      }
+    }
   }
+
+  // draw text and cursor
+  nvgFillColor(p_ctx, m_pstyle->get_text_color());
+  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
+  if (!multiline) {
+    float baseline = m_size.y * 0.5f + (asc + desc) * 0.5f;
+    nvgText(p_ctx, 5.f - offset + m_pstyle->get_text_offset(),
+      baseline, txt.c_str(), nullptr);
+    if (m_active && m_blink_state) {
+      size_t ci = m_buffer.pos();
+      float cw = m_glyph_positions[ci];
+      nvgBeginPath(p_ctx);
+      nvgMoveTo(p_ctx, 5.f - offset + cw + m_pstyle->get_text_offset() + 1, baseline - asc);
+      nvgLineTo(p_ctx, 5.f - offset + cw + m_pstyle->get_text_offset() + 1, baseline - desc);
+      nvgStrokeWidth(p_ctx, m_pstyle->get_blink_width());
+      nvgStrokeColor(p_ctx, m_pstyle->get_blink_color());
+      nvgStroke(p_ctx);
+    }
+  }
+  else {
+    std::vector<std::string> lines;
+    size_t idx = 0;
+    while (idx <= txt.size()) {
+      size_t nl = txt.find('\n', idx);
+      if (nl == std::string::npos) nl = txt.size();
+      lines.push_back(txt.substr(idx, nl - idx));
+      idx = nl + 1;
+    }
+    float top_pad = 5.f + asc;
+    for (size_t i = 0; i < lines.size(); ++i) {
+      float y = top_pad + i * line_h;
+      nvgText(p_ctx, 5.f - offset + m_pstyle->get_text_offset(),
+        y, lines[i].c_str(), nullptr);
+    }
+    if (m_active && m_blink_state) {
+      size_t cp = m_buffer.pos();
+      size_t line_idx = 0;
+      idx = 0;
+      while (line_idx + 1 < lines.size() && cp >= idx + lines[line_idx].size() + 1) {
+        idx += lines[line_idx].size() + 1;
+        ++line_idx;
+      }
+      const auto& line = lines[line_idx];
+      size_t pos_in_line = cp - idx;
+      float pre_w = nvgTextBounds(p_ctx, 0, 0, line.substr(0, pos_in_line).c_str(), nullptr, nullptr);
+      float x = 5.f - offset + m_pstyle->get_text_offset() + pre_w + 1;
+      float y0 = top_pad + line_idx * line_h - asc;
+      float y1 = y0 + line_h;
+      nvgBeginPath(p_ctx);
+      nvgMoveTo(p_ctx, x, y0);
+      nvgLineTo(p_ctx, x, y1);
+      nvgStrokeWidth(p_ctx, m_pstyle->get_blink_width());
+      nvgStrokeColor(p_ctx, m_pstyle->get_blink_color());
+      nvgStroke(p_ctx);
+    }
+  }
+
   //nvgResetScissor(p_ctx);
   rm_widget::on_draw(p_ctx);
 }
@@ -505,6 +577,25 @@ void rm_combobox::on_draw(NVGcontext* p_ctx) {
   nvgFillColor(p_ctx, nvgRGBA(0, 0, 0, 255));
   if (!m_items.empty() && m_selected >= 0 && m_selected < (int)m_items.size())
     nvgText(p_ctx, 5.f, m_size.y / 2.0f, m_items[m_selected].get_name(), nullptr);
+
+  // arrow
+  float x = 0, y = 0, w = m_size.x, h = m_size.y;
+  float r = 4.0f;
+  float ax = x + w - h * 0.5f, ay = y + h * 0.5f, sz = 5.f;
+  nvgBeginPath(p_ctx);
+  if (!m_expanded) {
+    nvgMoveTo(p_ctx, ax - sz, ay - sz * 0.5f);
+    nvgLineTo(p_ctx, ax + sz, ay - sz * 0.5f);
+    nvgLineTo(p_ctx, ax, ay + sz * 0.5f);
+  }
+  else {
+    nvgMoveTo(p_ctx, ax - sz, ay + sz * 0.5f);
+    nvgLineTo(p_ctx, ax + sz, ay + sz * 0.5f);
+    nvgLineTo(p_ctx, ax, ay - sz * 0.5f);
+  }
+  nvgClosePath(p_ctx);
+  nvgFillColor(p_ctx, nvgRGBA(50, 50, 50, 255));
+  nvgFill(p_ctx);
 
   if (m_expanded) {
     for (size_t i = 0; i < m_items.size(); i++) {
