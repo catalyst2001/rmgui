@@ -324,7 +324,8 @@ enum EXGUI_KEY_STATE : uint32_t {
 /* mouse events */
 enum EXGUI_MOUSE_EVENT : uint32_t {
   EXGUI_MOUSE_EVENT_MOVE = 0,
-  EXGUI_MOUSE_EVENT_CLICK
+  EXGUI_MOUSE_EVENT_CLICK,
+  EXGUI_MOUSE_EVENT_DOUBLE_CLICK
 };
 
 /* node event */
@@ -899,7 +900,6 @@ private:
   };
 
   std::string         text;
-  std::string         clipboard;
   size_t              cursor;
   std::vector<state>  undos;
   std::vector<state>  redos;
@@ -911,10 +911,10 @@ public:
     void insert_cp(uint32_t cp);
     void backspace();
 
-    void cut_all();
-    void cut_selection();
-    void copy_all() { clipboard = text; }
-    void paste();
+    //void cut_all();
+    void cut_selection(irmgui_sysdf* psysdf);
+    void copy_all(irmgui_sysdf* psysdf);
+    void paste(irmgui_sysdf* psysdf);
     void select_all() { sel_start = 0; sel_end = text.size(); cursor = sel_end; }
 
     void undo();

@@ -151,9 +151,21 @@ public:
   }
 
   virtual void get_monitor_info(uint32_t monitor_idx, uint32_t* p_dst_DPI, uint32_t* p_w, uint32_t* p_h) {}
-  virtual bool get_clipboard_data_info(EXGUI_CB_DATA_TYPE& dst_data, size_t& dst_size) { return true; }
-  virtual const uint8_t* get_clipboard_data_ex(EXGUI_CB_DATA_TYPE& dst, size_t& size) { return nullptr; }
-  virtual void set_clipboard_data_ex(const uint8_t* p_src, size_t size) {}
+  virtual bool get_clipboard_data_info(EXGUI_CB_DATA_TYPE& dst_data, size_t& dst_size) {
+    return false;
+  }
+
+  virtual const uint8_t* get_clipboard_data_ex(EXGUI_CB_DATA_TYPE& dst, size_t& size) {
+    dst = EXGUI_CLIPBOARD_DATA_TYPE_TEXT;
+    const char *pstring = glfwGetClipboardString(nullptr);
+    size = strlen(pstring);
+    return (uint8_t*)pstring;
+  }
+
+  virtual void set_clipboard_data_ex(const uint8_t* p_src, size_t size) {
+    glfwSetClipboardString(nullptr, (const char *)p_src);
+  }
+
   virtual float get_time() {
     return static_cast<float>(glfwGetTime());
   }
@@ -368,7 +380,7 @@ int main() {
   //style_inp.set_blink_width(1.f);
 
 
-  rm_text_input* textInput = new rm_text_input(pwindow, 300, 100, 200, 25, &style_inp, RMGUI_TEXT_INPUT_SINGLELINE);
+  rm_text_input* textInput = new rm_text_input(pwindow, 300, 100, 200, 20, &style_inp, RMGUI_TEXT_INPUT_SINGLELINE);
 
   static rm_checkbox_style style;
   style.set_font_size(14.f);

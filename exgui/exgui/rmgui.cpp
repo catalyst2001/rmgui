@@ -430,20 +430,20 @@ void rmgui_textbuffer::backspace()
   clear_selection();
 }
 
-void rmgui_textbuffer::cut_all()
-{
-  if (text.empty())
-    return;
+//void rmgui_textbuffer::cut_all()
+//{
+//  if (text.empty())
+//    return;
+//
+//  save_undo();
+//  clipboard = text;
+//  text.clear();
+//  cursor = 0;
+//  clear_redo();
+//  clear_selection();
+//}
 
-  save_undo();
-  clipboard = text;
-  text.clear();
-  cursor = 0;
-  clear_redo();
-  clear_selection();
-}
-
-void rmgui_textbuffer::cut_selection()
+void rmgui_textbuffer::cut_selection(irmgui_sysdf* psysdf)
 {
   if (!has_selection()) 
     return;
@@ -451,23 +451,38 @@ void rmgui_textbuffer::cut_selection()
   save_undo();
   size_t a = std::min(sel_start, sel_end);
   size_t b = std::max(sel_start, sel_end);
-  clipboard = text.substr(a, b - a);
+  std::string to_clipboard = text.substr(a, b - a);
+  psysdf->set_clipboard_data_ex((const uint8_t *)to_clipboard.data(), to_clipboard.size());
   text.erase(a, b - a);
   cursor = a;
   clear_redo();
   clear_selection();
 }
 
-void rmgui_textbuffer::paste()
+void rmgui_textbuffer::copy_all(irmgui_sysdf* psysdf)
 {
+  psysdf->set_clipboard_data_ex((const uint8_t *)text.c_str(), text.size());
+}
+
+void rmgui_textbuffer::paste(irmgui_sysdf* psysdf)
+{
+  size_t clipboard_data_size;
+  EXGUI_CB_DATA_TYPE clipboard_dtype;
+  const char* pclipboard_text = nullptr;
   if (has_selection()) 
     delete_selection();
 
-  if (clipboard.empty()) 
+  pclipboard_text = (const char*)psysdf->get_clipboard_data_ex(clipboard_dtype, clipboard_data_size);
+  if (!pclipboard_text)
+    return;
+
+  /* skip binary data*/
+  if (!clipboard_data_size || clipboard_dtype != EXGUI_CLIPBOARD_DATA_TYPE_TEXT)
     return;
 
   save_undo(); 
-  text.insert(cursor, clipboard); cursor += clipboard.size();
+  text.insert(cursor, pclipboard_text);
+  cursor += clipboard_data_size;
   clear_redo(); 
   clear_selection();
 }

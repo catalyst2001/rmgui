@@ -162,8 +162,10 @@ void rm_label::on_draw(NVGcontext* p_ctx) {
 
 rm_text_input::rm_text_input(rm_widget* p_parent, int x, int y, int width, int height,
   rm_text_input_style* pstyle, uint32_t flags, float blink_cursor_interval)
-  : rm_widget(x, y, width, height, p_parent, "ui_text_input", EXGUI_FLAG_DEFAULT), m_active(false), m_ctrl_pressed(false), m_dragging(false)
+  : rm_widget(x, y, width, height, p_parent, "ui_text_input", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL), m_active(false), m_ctrl_pressed(false), m_dragging(false), 
+  m_scroll_offset(0.f), m_last_click_time(0.0), m_last_click_pos({ 0,0 })
 {
+
   set_style(pstyle);
   m_blink_state = false;
   m_timer.set_interval(blink_cursor_interval);
@@ -174,7 +176,6 @@ rm_text_input::~rm_text_input() {}
 
 void rm_text_input::on_draw(NVGcontext* p_ctx) {
   const std::string& txt = m_buffer.str();
-  //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented this
   nvgFontFaceId(p_ctx, get_font());
   nvgFontSize(p_ctx, m_pstyle->get_font_size());
   float asc, desc, line_h;
@@ -199,21 +200,29 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
 
   bool multiline = (m_flags & RMGUI_TEXT_INPUT_MULTILINE);
   float offset = 0.f;
+  size_t ci = m_buffer.has_selection()
+    ? m_buffer.sel_end
+    : m_buffer.pos();
   if (!multiline) {
-    float avail = m_size.x - 10.f;
-    float tw = nvgTextBounds(p_ctx, 0, 0, txt.c_str(), nullptr, nullptr);
-    offset = tw > avail ? tw - avail : 0.f;
-  }
-
-  // single-line glyph positions
-  if (!multiline) {
+    // single-line glyph positions
     m_glyph_positions.clear();
     m_glyph_positions.push_back(0.f);
     for (size_t i = 1; i <= txt.size(); ++i) {
       float w = nvgTextBounds(p_ctx, 0, 0, txt.substr(0, i).c_str(), nullptr, nullptr);
       m_glyph_positions.push_back(w);
     }
+
+    float avail = m_size.x - 10.f;
+    float caret_x = m_glyph_positions[ci];
+
+    if (caret_x - m_scroll_offset > avail)
+      m_scroll_offset = caret_x - avail;
+    else if (caret_x < m_scroll_offset)
+      m_scroll_offset = caret_x;
+
+    offset = m_scroll_offset;
   }
+  
 
   // update blink state
   if (m_timer.has_elapsed(get_sysdf())) {
@@ -274,7 +283,6 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
     nvgText(p_ctx, 5.f - offset + m_pstyle->get_text_offset(),
       baseline, txt.c_str(), nullptr);
     if (m_active && m_blink_state) {
-      size_t ci = m_buffer.pos();
       float cw = m_glyph_positions[ci];
       nvgBeginPath(p_ctx);
       nvgMoveTo(p_ctx, 5.f - offset + cw + m_pstyle->get_text_offset() + 1, baseline - asc);
@@ -289,7 +297,9 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
     size_t idx = 0;
     while (idx <= txt.size()) {
       size_t nl = txt.find('\n', idx);
-      if (nl == std::string::npos) nl = txt.size();
+      if (nl == std::string::npos)
+        nl = txt.size();
+
       lines.push_back(txt.substr(idx, nl - idx));
       idx = nl + 1;
     }
@@ -329,7 +339,7 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
 void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
 {
   if (!m_active) {
-    rm_widget::on_keybd(sc, vk, state);
+    //rm_widget::on_keybd(sc, vk, state);
     return;
   }
 
@@ -338,34 +348,46 @@ void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
     return;
   }
 
-  if (!m_ctrl_pressed && (state == EXGUI_KEY_STATE::DOWN || state == EXGUI_KEY_STATE::REPEAT)) {
-    bool handled = true;
-    switch (vk) {
-    case EXGUI_KEY_BACKSPACE:
-      m_buffer.backspace();
-      break;
-    case EXGUI_KEY_DELETE:
-      m_buffer.delete_forward();
-      break;
-    case EXGUI_KEY_LEFT:
-      m_buffer.move_cursor_left();
-      break;
-    case EXGUI_KEY_RIGHT:
-      m_buffer.move_cursor_right();
-      break;
-    case EXGUI_KEY_UP:
-      m_buffer.move_cursor_up();
-      break;
-    case EXGUI_KEY_DOWN:
-      m_buffer.move_cursor_down();
-      break;
-    default:
-      handled = false;
+  if ((state == EXGUI_KEY_STATE::DOWN || state == EXGUI_KEY_STATE::REPEAT)) {
+    if (!m_ctrl_pressed) {
+      bool handled = true;
+      switch (vk) {
+      case EXGUI_KEY_BACKSPACE:
+        m_buffer.backspace();
+        break;
+      case EXGUI_KEY_DELETE:
+        m_buffer.delete_forward();
+        break;
+      case EXGUI_KEY_LEFT:
+        m_buffer.move_cursor_left();
+        break;
+      case EXGUI_KEY_RIGHT:
+        m_buffer.move_cursor_right();
+        break;
+      case EXGUI_KEY_UP:
+        m_buffer.move_cursor_up();
+        break;
+      case EXGUI_KEY_DOWN:
+        m_buffer.move_cursor_down();
+        break;
+      default:
+        handled = false;
+      }
+      if (handled) {
+        m_timer.reset(m_psysdf);
+        m_blink_state = true;
+        return;
+      }
     }
-    if (handled) {
-      m_timer.reset(get_sysdf());
-      m_blink_state = true;
-      return;
+    else {
+      switch (vk) {
+      case EXGUI_KEY_Z:
+        m_buffer.undo(); 
+        break;
+      case EXGUI_KEY_Y:
+        m_buffer.redo(); 
+        break;
+      }
     }
   }
 
@@ -374,39 +396,44 @@ void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
 
   if (m_ctrl_pressed && vk == EXGUI_KEY_A) {
     m_buffer.select_all();
-    m_timer.reset(get_sysdf());
+    m_timer.reset(m_psysdf);
     m_blink_state = false;
     return;
   }
 
   if (m_ctrl_pressed) {
     switch (vk) {
-    case EXGUI_KEY_C: m_buffer.copy_all();  break;
-    case EXGUI_KEY_V: m_buffer.paste();     break;
+    case EXGUI_KEY_C:
+      m_buffer.copy_all(m_psysdf); 
+      break;
+
+    case EXGUI_KEY_V:
+      m_buffer.paste(m_psysdf);
+      break;
+
     case EXGUI_KEY_X: 
       if (m_buffer.has_selection())
-      m_buffer.cut_selection();   
+      m_buffer.cut_selection(m_psysdf);
       break;
-    case EXGUI_KEY_Z: m_buffer.undo();      break;
-    case EXGUI_KEY_Y: m_buffer.redo();      break;
+
     default:
-      rm_widget::on_keybd(sc, vk, state);
+      //rm_widget::on_keybd(sc, vk, state);
       return;
     }
 
-    m_timer.reset(get_sysdf());
+    m_timer.reset(m_psysdf);
     m_blink_state = false;
     return;
   }
 
   if (vk == EXGUI_KEY_ENTER && (m_flags & RMGUI_TEXT_INPUT_MULTILINE)) {
     m_buffer.insert_cp('\n');
-    m_timer.reset(get_sysdf());
+    m_timer.reset(m_psysdf);
     m_blink_state = false;
     return;
   }
 
-  rm_widget::on_keybd(sc, vk, state);
+  //rm_widget::on_keybd(sc, vk, state);
 }
 
 bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
@@ -414,10 +441,19 @@ bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
   float offset = m_pstyle->get_text_offset();
   float text_draw_x = m_absolute.x + 5.f + offset;
   float local_x = cursor_pos.x - text_draw_x;
+  const double now = m_psysdf->get_time();
 
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == EXGUI_KEY_STATE::DOWN) {
     if (inside) {
-      m_elem_flags.toggle_bits(EXGUI_FLAG_GLOBAL, true); // FIXME: d2 its not better decision (if set flag in constructor 'EXGUI_FLAG_GLOBAL' then breaks all the widgets)
+      float dx = cursor_pos.x - m_last_click_pos.x;
+      float dy = cursor_pos.y - m_last_click_pos.y;
+      double dt = now - m_last_click_time;
+      if (dt <= DOUBLE_CLICK_THRESHOLD && (dx * dx + dy * dy) <= CLICK_MOVE_THRESHOLD * CLICK_MOVE_THRESHOLD)
+      {
+        m_buffer.select_all();
+        m_timer.reset(m_psysdf);
+        return true;
+      }
       m_active = true;
       m_dragging = true;
       size_t idx = hit_test_index(local_x);
@@ -425,36 +461,69 @@ bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
       m_buffer.sel_start = idx;
       m_buffer.sel_end = idx;
       m_blink_state = true;
-      m_timer.reset(get_sysdf());
+      m_timer.reset(m_psysdf);
+      m_last_click_time = now;
+      m_last_click_pos = cursor_pos;
       return true;
     }
     else {
-
       m_active = false;
       m_dragging = false;
       m_buffer.clear_selection();
-      m_elem_flags.toggle_bits(EXGUI_FLAG_GLOBAL, false); // FIXME: d2 its not better decision (if set flag in constructor 'EXGUI_FLAG_GLOBAL' then breaks all the widgets)
-      return false;
+      return true;
     }
   }
 
-  if (event == EXGUI_MOUSE_EVENT_MOVE && state == EXGUI_KEY_STATE::DOWN && m_dragging)
-  {
-    m_buffer.sel_end = hit_test_index(local_x);
+  if (event == EXGUI_MOUSE_EVENT_CLICK && state == EXGUI_KEY_STATE::DOWN) {
+    m_buffer.select_all();
+    m_timer.reset(m_psysdf);
+    m_blink_state = false;
     return true;
   }
 
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == EXGUI_KEY_STATE::UP)
-  {
+  if (event == EXGUI_MOUSE_EVENT_MOVE && state == EXGUI_KEY_STATE::DOWN && m_dragging) {
+    m_buffer.sel_end = hit_test_index(local_x);
+    ensure_visible(m_buffer.sel_end);
+    return true;
+  }
+
+  if (event == EXGUI_MOUSE_EVENT_CLICK && state == EXGUI_KEY_STATE::UP) {
     if (m_dragging) {
       if (m_buffer.sel_start == m_buffer.sel_end)
         m_buffer.clear_selection();
       m_dragging = false;
       return true;
     }
-    return false;
+    return true;
   }
-  return false;
+  return true;
+}
+
+size_t rm_text_input::hit_test_index(float px) const
+{
+  float pos = px + m_scroll_offset - m_pstyle->get_text_offset();
+  auto it = std::lower_bound(
+    m_glyph_positions.begin(),
+    m_glyph_positions.end(),
+    pos
+  );
+  size_t idx = it - m_glyph_positions.begin();
+  if (idx >= m_glyph_positions.size())
+    idx = m_glyph_positions.size() - 1;
+  return idx;
+}
+
+void rm_text_input::ensure_visible(size_t idx) {
+  float avail = m_size.x - 10.f;
+
+  if (idx >= m_glyph_positions.size()) 
+    idx = m_glyph_positions.size() - 1;
+  float x = m_glyph_positions[idx];
+
+  if (x - m_scroll_offset > avail)
+    m_scroll_offset = x - avail;
+  else if (x < m_scroll_offset)
+    m_scroll_offset = x;
 }
 
 void rm_text_input::on_text_input(int sym) {
@@ -464,7 +533,7 @@ void rm_text_input::on_text_input(int sym) {
       m_buffer.insert_cp(sym);
     }
   }
-  m_timer.reset(get_sysdf());
+  m_timer.reset(m_psysdf);
   m_blink_state = false;
 }
 

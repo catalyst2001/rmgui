@@ -106,15 +106,21 @@ public:
 };
 
 class rm_text_input : public rm_widget, public rm_styled<rm_text_input_style> {
-  std::vector<float>  m_glyph_positions;
-  std::string         m_text;
-  rmgui_textbuffer    m_buffer;
-  bool                m_ctrl_pressed;
-  bool                m_active;
-  bool                m_dragging;
-  rmgui_timer         m_timer;
-  bool                m_blink_state;
-  uint32_t            m_flags;
+  std::vector<float>              m_glyph_positions;
+  rmgui_textbuffer                m_buffer;
+  bool                            m_ctrl_pressed;
+  bool                            m_active;
+  bool                            m_dragging;
+  rmgui_timer                     m_timer;
+  bool                            m_blink_state;
+  uint32_t                        m_flags;
+  float                           m_scroll_offset;
+  double                          m_last_click_time;
+  rm_vec2                         m_last_click_pos;
+
+
+  static constexpr double DOUBLE_CLICK_THRESHOLD = 0.35;
+  static constexpr float  CLICK_MOVE_THRESHOLD = 4.f;
 public:
   rm_text_input(rm_widget* p_parent, int x, int y, int width, int height, rm_text_input_style* pstyle, uint32_t flags/* = RMGUI_TEXT_INPUT_SINGLELINE*/, float blink_cursor_interval = 0.5f);
   virtual ~rm_text_input();
@@ -124,20 +130,9 @@ public:
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
 
   // map local x-coordinate to character index
-  size_t hit_test_index(float px) const {
-    size_t n = m_glyph_positions.size();
-    if (n == 0) return 0;
-    if (px <= m_glyph_positions[0]) return 0;
-    if (px >= m_glyph_positions[n - 1]) return n - 1;
-    for (size_t i = 1; i < n; ++i) {
-      float left = m_glyph_positions[i - 1];
-      float right = m_glyph_positions[i];
-      float mid = (left + right) * 0.5f;
-      if (px < mid)
-        return i - 1;
-    }
-    return n - 1;
-  }
+  size_t hit_test_index(float px) const;
+
+  void ensure_visible(size_t idx);
 };
 
 /**
