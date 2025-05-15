@@ -184,11 +184,12 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
 
   // background & border
   nvgBeginPath(p_ctx);
+  float ar = (m_size.x / m_size.y) * (m_size.y / m_size.x);
   nvgRoundedRectVarying(p_ctx, 0.f, 0.f, m_size.x, m_size.y,
-    m_pstyle->get_corner_radius(LEFT_TOP),
-    m_pstyle->get_corner_radius(RIGHT_TOP),
-    m_pstyle->get_corner_radius(RIGHT_BOTTOM),
-    m_pstyle->get_corner_radius(LEFT_BOTTOM));
+    m_pstyle->get_corner_radius(LEFT_TOP) * ar,
+    m_pstyle->get_corner_radius(RIGHT_TOP) * ar,
+    m_pstyle->get_corner_radius(RIGHT_BOTTOM) * ar,
+    m_pstyle->get_corner_radius(LEFT_BOTTOM) * ar);
   nvgFillColor(p_ctx, m_active
     ? m_pstyle->get_active_bgr_color()
     : m_pstyle->get_unactive_bgr_color());
