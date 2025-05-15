@@ -293,7 +293,7 @@ protected:
 public:
   rm_progress_base(rm_widget* p_parent, int x, int y, int width, int height, float inital=0.1f, float corner_round=0.5f);
   virtual ~rm_progress_base();
-  void         set_percent(float p) { m_percent = rmgui_clamp(p, 0.f, 100.f); }
+  void         set_percent(float p) { m_percent = rm_clamp(p, 0.f, 100.f); }
   inline float get_percent() const { return m_percent; }
   void         set_corner_round(float p) { m_round = p; }
   inline float get_corner_round() const { return m_round; }
@@ -637,4 +637,9 @@ public:
   inline rm_tree_node* get_selected() const { return m_selected; }
   inline void set_row_height(float h) { m_rowHeight = h; }
   inline void set_indent(float i) { m_indent = i; }
+};
+
+class rm_output_text : public rm_widget
+{
+public:
 };

@@ -31,8 +31,9 @@
 #include "rmgui_resources.h"
 
 /* utils */
-#define EXGUI_COUNTOF(x) (sizeof(x) / sizeof(x[0]))
-#define RMGUI_UNUSED(x) (void)(x)
+#define RM_COUNTOF(x) (sizeof(x) / sizeof(x[0]))
+#define RM_UNUSED(x) (void)(x)
+#define RM_HANDLE_EXCEPTIONS(retval, expr) try { expr } catch (...) { return retval; }
 
 /**
 * object base class
@@ -116,7 +117,7 @@ public:
   inline bool operator<=(rm_vec2& vec) { return x <= vec.x && y <= vec.y; }
   inline bool operator>(rm_vec2& vec) { return x > vec.x && y > vec.y; }
   inline bool operator>=(rm_vec2& vec) { return x >= vec.x && y >= vec.y; }
-  inline float operator[](int idx) { assert(idx < EXGUI_COUNTOF(v) && "index out of bounds"); return v[idx]; }
+  inline float operator[](int idx) { assert(idx < RM_COUNTOF(v) && "index out of bounds"); return v[idx]; }
 };
 
 class rm_rect
@@ -148,7 +149,7 @@ public:
     height = float(hheight);
   }
 
-  inline float operator[](int idx) { assert(idx < EXGUI_COUNTOF(v) && "index out of bounds"); return v[idx]; }
+  inline float operator[](int idx) { assert(idx < RM_COUNTOF(v) && "index out of bounds"); return v[idx]; }
 };
 
 /* undef min/max if defined macro */
@@ -160,7 +161,7 @@ public:
 #endif
 
 template<class _type>
-_type rmgui_min(_type a, _type b)
+_type rm_min(_type a, _type b)
 {
   if (a < b)
     return a;
@@ -168,7 +169,7 @@ _type rmgui_min(_type a, _type b)
 }
 
 template<class _type>
-_type rmgui_max(_type a, _type b)
+_type rm_max(_type a, _type b)
 {
   if (a > b)
     return a;
@@ -176,9 +177,9 @@ _type rmgui_max(_type a, _type b)
 }
 
 template<class _type>
-_type rmgui_clamp(_type v, _type minval, _type maxval)
+_type rm_clamp(_type v, _type minval, _type maxval)
 {
-  return rmgui_max(minval, rmgui_min(v, maxval));
+  return rm_max(minval, rm_min(v, maxval));
 }
 
 class rm_bbox
@@ -236,7 +237,7 @@ public:
   rmgui_vector3 operator/=(float s) { x /= s; y /= s; z /= s; return *this; }
   rmgui_vector3 operator+=(float s) { x += s; y += s; z += s; return *this; }
   rmgui_vector3 operator-=(float s) { x -= s; y -= s; z -= s; return *this; }
-  float         operator[](int idx) { assert(idx < EXGUI_COUNTOF(v) && "index out of bounds"); return v[idx]; }
+  float         operator[](int idx) { assert(idx < RM_COUNTOF(v) && "index out of bounds"); return v[idx]; }
 };
 
 /* virtual keys */
@@ -419,7 +420,7 @@ enum EXGUI_CB_DATA_TYPE : uint32_t {
 /**
 * system dependend operations
 */
-class irmgui_sysdf
+class irm_sysdf
 {
 public:
   //virtual                   ~irmgui_sysdf() = 0;
@@ -506,8 +507,8 @@ class rm_widget : protected irmgui_widget
 protected:
   /* irmgui_element empty impls */
   virtual bool on_event(EXGUI_EVENT event, rm_widget *p_from) {
-    RMGUI_UNUSED(event);
-    RMGUI_UNUSED(p_from);
+    RM_UNUSED(event);
+    RM_UNUSED(p_from);
     return true;
   }
   virtual void on_draw(NVGcontext* p_ctx) {
@@ -523,18 +524,18 @@ protected:
 #endif
   }
   virtual void on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state) {
-    RMGUI_UNUSED(sc);
-    RMGUI_UNUSED(vk);
-    RMGUI_UNUSED(state);
+    RM_UNUSED(sc);
+    RM_UNUSED(vk);
+    RM_UNUSED(state);
   }
   virtual void on_text_input(int sym) {
-    RMGUI_UNUSED(sym);
+    RM_UNUSED(sym);
   }
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
-    RMGUI_UNUSED(event);
-    RMGUI_UNUSED(vk);
-    RMGUI_UNUSED(state);
-    RMGUI_UNUSED(cursor_pos);
+    RM_UNUSED(event);
+    RM_UNUSED(vk);
+    RM_UNUSED(state);
+    RM_UNUSED(cursor_pos);
     return true;
   }
 
@@ -544,7 +545,7 @@ protected:
   rm_surface      *m_proot;
   rm_widget       *m_pparent;
   void            *m_puserptr;
-  irmgui_sysdf    *m_psysdf;
+  irm_sysdf       *m_psysdf;
   rmgui_flags_elem m_elem_flags;
   uint32_t         m_user_flags;
   rm_font          m_font;
@@ -644,7 +645,7 @@ public:
   inline const bool is_enabled() {return m_elem_flags.has_active();}
 
   /* system dependend functions interface */
-  inline irmgui_sysdf  *get_sysdf() { return m_psysdf; }
+  inline irm_sysdf  *get_sysdf() { return m_psysdf; }
 
   /* font */
   inline void           set_font(rm_font font) { m_font = font; }
@@ -684,7 +685,7 @@ class rm_surface : public rm_widget, rm_object_accrssor
   void draw_recursive(rm_widget* p_elem, float dt);
 
 public:
-  rm_surface(NVGcontext *p_ctx, int width, int height, irmgui_sysdf *p_sysdf);
+  rm_surface(NVGcontext *p_ctx, int width, int height, irm_sysdf *p_sysdf);
   ~rm_surface();
 
   /* main events */
@@ -726,9 +727,9 @@ public:
   void  set_interval(float f) { m_interval = f; }
   float get_interval() { return m_interval; }
 
-  bool has_elapsed(irmgui_sysdf* p_sysdf);
+  bool has_elapsed(irm_sysdf* p_sysdf);
 
-  void reset(irmgui_sysdf* p_sysdf) { m_curr_time = p_sysdf->get_time(); m_next_time = m_curr_time + m_interval; }
+  void reset(irm_sysdf* p_sysdf) { m_curr_time = p_sysdf->get_time(); m_next_time = m_curr_time + m_interval; }
 };
 
 /**
@@ -836,7 +837,7 @@ public:
   inline NVGcolor &get_active_background_color() { return m_active_background_color; }
   inline NVGcolor &get_inactive_background_color() { return m_inactive_background_color; }
   inline NVGcolor &get_background_color(int idx) { 
-    assert(idx < EXGUI_COUNTOF(m_background_colors) && "index out of bounds");
+    assert(idx < RM_COUNTOF(m_background_colors) && "index out of bounds");
     return m_background_colors[idx];
   }
   inline NVGcolor &get_titlebar_background_color() { return m_titlebar_background_color; }
@@ -912,9 +913,9 @@ public:
     void backspace();
 
     //void cut_all();
-    void cut_selection(irmgui_sysdf* psysdf);
-    void copy_all(irmgui_sysdf* psysdf);
-    void paste(irmgui_sysdf* psysdf);
+    void cut_selection(irm_sysdf* psysdf);
+    void copy_all(irm_sysdf* psysdf);
+    void paste(irm_sysdf* psysdf);
     void select_all() { sel_start = 0; sel_end = text.size(); cursor = sel_end; }
 
     void undo();
@@ -938,4 +939,108 @@ private:
   void save_undo();
   void clear_redo() { redos.clear(); }
   void delete_selection();
+};
+
+/**
+* class utils
+*/
+template<class _class, typename ..._args>
+void rm_construct(_class& obj, _args... args) {
+  new (obj) _class(args...);
+}
+
+template<class _class>
+void rm_destruct(_class& obj) {
+  _class::operator delete(&obj);
+}
+
+class rm_string_tokenizer
+{
+  char         m_delim;
+  bool         m_next_token_available;
+  size_t       m_last_pos;
+  size_t       m_cur_pos;
+  std::string& m_str;
+public:
+  rm_string_tokenizer(std::string& target, char delim) :
+    m_delim(delim), m_next_token_available(false), m_last_pos(0), m_cur_pos(0), m_str(target) {}
+  inline bool get_token(std::string& dst) {
+    m_cur_pos = m_str.find_first_of(m_delim, m_last_pos);
+    if (m_cur_pos == std::string::npos) {
+      m_next_token_available = false;
+      /* delims not found in string */
+      if (!m_last_pos) {
+        dst = m_str;
+        return true; //source string
+      }
+      dst = m_str.substr(m_last_pos);
+      return true;
+    }
+    m_next_token_available = true;
+    dst = m_str.substr(m_last_pos, m_cur_pos - m_last_pos);
+    m_last_pos = m_cur_pos + 1;
+    return true;
+  }
+
+  inline bool next_token() {
+    return m_next_token_available;
+  }
+};
+
+class rm_line_ring_buffer
+{
+public:
+  /**
+  * ring buffer one line
+  */
+  class rm_rb_line {
+    using _width_vec = std::vector<float>;
+    size_t      m_sel_begin;
+    size_t      m_sel_end;
+    size_t      m_cursor;
+    _width_vec  m_syms_width;
+    std::string m_line;
+  public:
+    rm_rb_line();
+    bool                      set_string(const char* pstr);
+    bool                      insert_from_cursor(const char* pstr);
+    void                      sym_widths_recompute(NVGcontext* pctx);
+    bool                      get_substring_from_selection(std::string& dst);
+    inline const std::string& get_string() const { return m_line; }
+    inline void               clear() { m_line.clear(); }
+    inline const char* get_cstr() const { return m_line.c_str(); }
+    inline const std::vector<float>& get_line_widths() const { return m_syms_width; }
+    inline bool               is_valid_cusor() const { return m_cursor < m_line.size(); }
+  };
+private:
+  size_t m_start_line;
+  size_t m_num_output_lines;
+  size_t m_sel_line_begin;
+  size_t m_sel_line_end;
+  std::vector<rm_rb_line> m_lines_buf;
+
+  rm_rb_line* get_line_for_write();
+  const char* format_string(std::string& dst, const char* pformat, va_list argptr);
+public:
+  rm_line_ring_buffer(size_t ringbuf_size = 32768, size_t line_limit = 512, size_t num_output_lines = 16);
+  void set_selection(size_t beginline, size_t endline);
+  void get_selection(size_t& beginline, size_t& endline);
+  bool get_selection_text_size(size_t& dstlen);
+  bool copy_selection(std::string& dst);
+  bool clipboard_copy(irm_sysdf* psdf);
+  void set_num_output_lines(size_t numlines);
+
+  /* work with lines */
+  inline size_t      get_num_lines() const { return m_lines_buf.size(); }
+  inline rm_rb_line* get_line(size_t idx) {
+    assert(idx < m_lines_buf.size() && "line index out of bounds!");
+    return &m_lines_buf[idx];
+  }
+
+  /* get lines for output (drawing text) */
+  inline size_t     get_num_output_lines() const { return m_num_output_lines; }
+  const rm_rb_line* get_output_line(size_t idx);
+
+  bool append_text(std::string& content);
+  bool append_text(const char* pformat, ...);
 };

@@ -141,7 +141,7 @@ GLFWwindow* initWindow(int width, int height, const char* title) {
   return window;
 }
 
-class csysdf : public irmgui_sysdf
+class csysdf : public irm_sysdf
 {
 public:
   virtual void get_cursor_pos(int* p_dst_x, int* p_dst_y) {}
@@ -372,8 +372,8 @@ int main() {
   style_inp.set_corner_radius(RIGHT_BOTTOM, 4.f);
   style_inp.set_corner_radius(LEFT_BOTTOM, 4.f);
 
-  //style_inp.set_border_color(nvgRGB(0,0,255));
-  //style_inp.set_border_width(2.f);
+  style_inp.set_border_color(nvgRGB(0,0,255));
+  style_inp.set_border_width(2.f);
   style_inp.set_rounded_selection(0);
   
   //style_inp.set_active_bgr_color({ 0,0,0 });

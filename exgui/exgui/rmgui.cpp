@@ -1,4 +1,6 @@
 ﻿#include <algorithm>
+#include <cstdarg>
+
 #include "rmgui.h"
 
 void rm_widget::move_recursive(rm_widget* pwidget, float newx, float newy)
@@ -82,7 +84,7 @@ void rm_widget::resize(int width, int height)
 
 void rm_surface::event_dispatcher(rm_widget* p_elem)
 {
-  RMGUI_UNUSED(p_elem);
+  RM_UNUSED(p_elem);
 }
 
 void rm_surface::keybd_dispatcher(rm_widget* p_elem, int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
@@ -302,7 +304,7 @@ void rm_surface::free_font(rm_font& font)
   //NOTE: K.D. nvg not free fonts
 }
 
-rm_surface::rm_surface(NVGcontext* p_ctx, int width, int height, irmgui_sysdf* p_sysdf) : rm_widget(0, 0, width, height, nullptr, "ui_root_node")
+rm_surface::rm_surface(NVGcontext* p_ctx, int width, int height, irm_sysdf* p_sysdf) : rm_widget(0, 0, width, height, nullptr, "ui_root_node")
 {
   m_psysdf = p_sysdf;
   set_root(this);
@@ -350,7 +352,7 @@ rm_window::~rm_window()
 {
 }
 
-bool rmgui_timer::has_elapsed(irmgui_sysdf* p_sysdf)
+bool rmgui_timer::has_elapsed(irm_sysdf* p_sysdf)
 {
   float current_time = p_sysdf->get_time();
   if (current_time > m_next_time) {
@@ -443,7 +445,7 @@ void rmgui_textbuffer::backspace()
 //  clear_selection();
 //}
 
-void rmgui_textbuffer::cut_selection(irmgui_sysdf* psysdf)
+void rmgui_textbuffer::cut_selection(irm_sysdf* psysdf)
 {
   if (!has_selection()) 
     return;
@@ -459,12 +461,12 @@ void rmgui_textbuffer::cut_selection(irmgui_sysdf* psysdf)
   clear_selection();
 }
 
-void rmgui_textbuffer::copy_all(irmgui_sysdf* psysdf)
+void rmgui_textbuffer::copy_all(irm_sysdf* psysdf)
 {
   psysdf->set_clipboard_data_ex((const uint8_t *)text.c_str(), text.size());
 }
 
-void rmgui_textbuffer::paste(irmgui_sysdf* psysdf)
+void rmgui_textbuffer::paste(irm_sysdf* psysdf)
 {
   size_t clipboard_data_size;
   EXGUI_CB_DATA_TYPE clipboard_dtype;
@@ -618,4 +620,166 @@ void rmgui_textbuffer::delete_selection()
   cursor = a;
   clear_redo();
   clear_selection();
+}
+
+rm_line_ring_buffer::rm_rb_line::rm_rb_line() : m_cursor(0), m_sel_begin(0), m_sel_end(0)
+{
+}
+
+
+
+bool rm_line_ring_buffer::rm_rb_line::set_string(const char* pstr)
+{
+  RM_HANDLE_EXCEPTIONS(false,
+    m_line.assign(pstr);
+  m_cursor = m_line.length();
+    )
+    return true;
+}
+
+bool rm_line_ring_buffer::rm_rb_line::insert_from_cursor(const char* pstr)
+{
+  RM_HANDLE_EXCEPTIONS(false,
+    if (m_cursor < m_line.length()) {
+      m_line.insert(m_cursor, pstr);
+    }
+    else {
+      m_line.append(pstr);
+    }
+      )
+    return false;
+}
+
+rm_line_ring_buffer::rm_rb_line* rm_line_ring_buffer::get_line_for_write()
+{
+  rm_rb_line* pline = get_line(m_start_line);
+  m_start_line = (m_start_line + 1) % get_num_lines();
+  pline->clear();
+  return pline;
+}
+
+const char* rm_line_ring_buffer::format_string(std::string& dst, const char* pformat, va_list argptr)
+{
+  vsnprintf(&dst[0], dst.size(), pformat, argptr);
+  return dst.c_str();
+}
+
+rm_line_ring_buffer::rm_line_ring_buffer(size_t ringbuf_size, size_t line_limit, size_t num_output_lines) :
+  m_lines_buf(ringbuf_size),
+  m_start_line(0),
+  m_num_output_lines(num_output_lines),
+  m_sel_line_begin(0),
+  m_sel_line_end(0)
+{
+}
+
+void rm_line_ring_buffer::set_selection(size_t beginline, size_t endline)
+{
+  m_sel_line_begin = rm_min(beginline, endline);
+  m_sel_line_end = rm_max(endline, beginline);
+}
+
+void rm_line_ring_buffer::get_selection(size_t& beginline, size_t& endline)
+{
+  beginline = m_sel_line_begin;
+  endline = m_sel_line_end;
+}
+
+bool rm_line_ring_buffer::get_selection_text_size(size_t& dstlen)
+{
+  assert(m_sel_line_begin < m_sel_line_end && "line positions is not reordered!");
+
+
+  return false;
+}
+
+bool rm_line_ring_buffer::copy_selection(std::string& dst)
+{
+  assert(m_sel_line_begin < m_sel_line_end && "line positions is not reordered!");
+  dst.clear();
+  for (size_t i = m_sel_line_begin; i < m_sel_line_end; i++) {
+    const rm_rb_line* pline = get_line(i);
+    RM_HANDLE_EXCEPTIONS(false,
+      dst.append(pline->get_string());
+    );
+  }
+  return true;
+}
+
+bool rm_line_ring_buffer::clipboard_copy(irm_sysdf* psdf)
+{
+  std::string content;
+  if (copy_selection(content)) {
+    psdf->set_clipboard_data_ex((const uint8_t*)content.c_str(), content.length());
+    return true;
+  }
+  return false;
+}
+
+void rm_line_ring_buffer::set_num_output_lines(size_t numlines)
+{
+  m_num_output_lines = numlines;
+  if (m_num_output_lines >= get_num_lines())
+    m_num_output_lines = get_num_lines();
+}
+
+const rm_line_ring_buffer::rm_rb_line* rm_line_ring_buffer::get_output_line(size_t idx)
+{
+  assert(idx < m_num_output_lines && "output line index out of bounds");
+  size_t lineidx = m_start_line + idx;
+  return &m_lines_buf[lineidx % m_num_output_lines];
+}
+
+bool rm_line_ring_buffer::append_text(std::string& content)
+{
+  //rm_rb_line* pline;
+  //size_t      off = 0;
+  //size_t      last_off = 0;
+  //if (content.length()) {
+  //  while (1) {
+  //    off = content.find_first_of('\n', last_off);
+  //    if(off != std::string::npos)
+
+  //    size_t count = off - last_off;
+  //    std::string tok = content.substr(last_off, count);
+  //    last_off = off+1;
+  //    pline = get_line_for_write();
+  //    if (!pline)
+  //      return false;
+
+  //    printf("substr: %s\n", tok.c_str());
+  //    pline->set_string(tok.c_str());
+  //  }
+  //}
+  return true;
+}
+
+bool rm_line_ring_buffer::append_text(const char* pformat, ...)
+{
+  va_list     argptr;
+  std::string content;
+  content.resize(8096);
+  va_start(argptr, pformat);
+  format_string(content, pformat, argptr);
+  va_end(argptr);
+  return append_text(content);
+}
+
+void rm_line_ring_buffer::rm_rb_line::sym_widths_recompute(NVGcontext* pctx)
+{
+  //nvgTextBounds();
+}
+
+bool rm_line_ring_buffer::rm_rb_line::get_substring_from_selection(std::string& dst)
+{
+  assert(m_sel_begin < m_sel_end && "selection cursors is not reordered!");
+  assert(m_sel_begin < m_line.size() && "m_sel_begin selection out of bounds");
+  assert(m_sel_end < m_line.size() && "m_sel_end selection out of bounds");
+  size_t begin = rm_min(m_sel_begin, m_sel_end);
+  size_t end = rm_max(m_sel_end, m_sel_begin);
+  size_t count = end - begin;
+  RM_HANDLE_EXCEPTIONS(false,
+    dst = m_line.substr(m_sel_begin, count);
+  )
+    return true;
 }
