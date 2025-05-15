@@ -163,9 +163,7 @@ void rm_label::on_draw(NVGcontext* p_ctx) {
 rm_text_input::rm_text_input(rm_widget* p_parent, int x, int y, int width, int height,
   rm_text_input_style* pstyle, uint32_t flags, float blink_cursor_interval)
   : rm_widget(x, y, width, height, p_parent, "ui_text_input", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL), m_active(false), m_ctrl_pressed(false), m_dragging(false), 
-  m_scroll_offset(0.f), m_last_click_time(0.0), m_last_click_pos({ 0,0 })
-{
-
+  m_scroll_offset(0.f), m_last_click_time(0.0), m_last_click_pos({ 0,0 }), m_asc(0.f), m_line_h(0.f){
   set_style(pstyle);
   m_blink_state = false;
   m_timer.set_interval(blink_cursor_interval);
@@ -176,12 +174,13 @@ rm_text_input::~rm_text_input() {}
 
 void rm_text_input::on_draw(NVGcontext* p_ctx) {
   const std::string& txt = m_buffer.str();
+  float desc;
+  std::vector<std::string> lines;
+  std::vector<size_t>      starts;
+
   nvgFontFaceId(p_ctx, get_font());
   nvgFontSize(p_ctx, m_pstyle->get_font_size());
-  float asc, desc, line_h;
-  nvgTextMetrics(p_ctx, &asc, &desc, &line_h);
-
-  //nvgScissor(p_ctx, 0.f, 0.f, m_relative.width, m_relative.height); //NOTE: K.D. added 12.03.2025
+  nvgTextMetrics(p_ctx, &m_asc, &desc, &m_line_h);
 
   // background & border
   nvgBeginPath(p_ctx);
@@ -200,9 +199,7 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
 
   bool multiline = (m_flags & RMGUI_TEXT_INPUT_MULTILINE);
   float offset = 0.f;
-  size_t ci = m_buffer.has_selection()
-    ? m_buffer.sel_end
-    : m_buffer.pos();
+  size_t ci = m_buffer.has_selection() ? m_buffer.sel_end : m_buffer.pos();
   if (!multiline) {
     // single-line glyph positions
     m_glyph_positions.clear();
@@ -222,7 +219,42 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
 
     offset = m_scroll_offset;
   }
-  
+  else {
+    lines.reserve(8);
+    starts.reserve(8);
+    size_t pos = 0;
+    while (pos <= txt.size()) {
+      size_t nl = txt.find('\n', pos);
+      if (nl == std::string::npos) nl = txt.size();
+      starts.push_back(pos);
+      lines.push_back(txt.substr(pos, nl - pos));
+      pos = nl + 1;
+    }
+
+    m_line_starts = starts;
+    m_line_glyphs.clear();
+    m_line_glyphs.reserve(lines.size());
+    float max_w = 0.f;
+
+    for (auto& line : lines) {
+      std::vector<float> gp;
+      gp.reserve(line.size() + 1);
+      gp.push_back(0.f);
+      for (size_t i = 1; i <= line.size(); ++i) {
+        float w = nvgTextBounds(p_ctx, 0, 0,
+          line.substr(0, i).c_str(),
+          nullptr, nullptr);
+        gp.push_back(w);
+      }
+      max_w = std::max(max_w, gp.back());
+      m_line_glyphs.push_back(std::move(gp));
+    }
+
+    float avail = m_size.x - 10.f;
+    float max_offset = std::max(0.f, max_w - avail);
+    m_scroll_offset = std::clamp(m_scroll_offset, 0.f, max_offset);
+    offset = m_scroll_offset;
+  }
 
   // update blink state
   if (m_timer.has_elapsed(get_sysdf())) {
@@ -237,25 +269,15 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
       size_t b = std::max(m_buffer.sel_start, m_buffer.sel_end);
       float x0 = 5.f - offset + m_glyph_positions[a] + m_pstyle->get_text_offset();
       float x1 = 5.f - offset + m_glyph_positions[b] + m_pstyle->get_text_offset();
-      float baseline = m_size.y * 0.5f + (asc + desc) * 0.5f;
+      float baseline = m_size.y * 0.5f + (m_asc + desc) * 0.5f;
       nvgBeginPath(p_ctx);
-      nvgRect(p_ctx, x0, baseline - asc, x1 - x0, asc - desc);
+      nvgRect(p_ctx, x0, baseline - m_asc, x1 - x0, m_asc - desc);
       nvgFill(p_ctx);
     }
     else {
-      std::vector<std::string> lines;
-      std::vector<size_t> starts;
-      size_t idx = 0;
-      while (idx <= txt.size()) {
-        size_t nl = txt.find('\n', idx);
-        if (nl == std::string::npos) nl = txt.size();
-        lines.push_back(txt.substr(idx, nl - idx));
-        starts.push_back(idx);
-        idx = nl + 1;
-      }
       size_t sel_a = std::min(m_buffer.sel_start, m_buffer.sel_end);
       size_t sel_b = std::max(m_buffer.sel_start, m_buffer.sel_end);
-      float top_pad = 5.f + asc;
+      float top_pad = 5.f + m_asc;
       for (size_t i = 0; i < lines.size(); ++i) {
         const auto& line = lines[i];
         size_t ls = starts[i], le = ls + line.size();
@@ -266,9 +288,9 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
           std::string sel = line.substr(a, b - a);
           float x0 = 5.f - offset + nvgTextBounds(p_ctx, 0, 0, pre.c_str(), nullptr, nullptr);
           float w = nvgTextBounds(p_ctx, 0, 0, sel.c_str(), nullptr, nullptr);
-          float y0 = top_pad + i * line_h - asc;
+          float y0 = top_pad + i * m_line_h - m_asc;
           nvgBeginPath(p_ctx);
-          nvgRect(p_ctx, x0 + m_pstyle->get_text_offset(), y0, w, line_h);
+          nvgRect(p_ctx, x0 + m_pstyle->get_text_offset(), y0, w, m_line_h);
           nvgFill(p_ctx);
         }
       }
@@ -279,13 +301,13 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
   nvgFillColor(p_ctx, m_pstyle->get_text_color());
   nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
   if (!multiline) {
-    float baseline = m_size.y * 0.5f + (asc + desc) * 0.5f;
+    float baseline = m_size.y * 0.5f + (m_asc + desc) * 0.5f;
     nvgText(p_ctx, 5.f - offset + m_pstyle->get_text_offset(),
       baseline, txt.c_str(), nullptr);
     if (m_active && m_blink_state) {
       float cw = m_glyph_positions[ci];
       nvgBeginPath(p_ctx);
-      nvgMoveTo(p_ctx, 5.f - offset + cw + m_pstyle->get_text_offset() + 1, baseline - asc);
+      nvgMoveTo(p_ctx, 5.f - offset + cw + m_pstyle->get_text_offset() + 1, baseline - m_asc);
       nvgLineTo(p_ctx, 5.f - offset + cw + m_pstyle->get_text_offset() + 1, baseline - desc);
       nvgStrokeWidth(p_ctx, m_pstyle->get_blink_width());
       nvgStrokeColor(p_ctx, m_pstyle->get_blink_color());
@@ -293,53 +315,32 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
     }
   }
   else {
-    std::vector<std::string> lines;
-    size_t idx = 0;
-    while (idx <= txt.size()) {
-      size_t nl = txt.find('\n', idx);
-      if (nl == std::string::npos)
-        nl = txt.size();
-
-      lines.push_back(txt.substr(idx, nl - idx));
-      idx = nl + 1;
-    }
-    float top_pad = 5.f + asc;
+    float top_pad = 5.f + m_asc;
     for (size_t i = 0; i < lines.size(); ++i) {
-      float y = top_pad + i * line_h;
-      nvgText(p_ctx, 5.f - offset + m_pstyle->get_text_offset(),
-        y, lines[i].c_str(), nullptr);
+      float y = top_pad + i * m_line_h;
+      nvgText(p_ctx, 5.f - offset + m_pstyle->get_text_offset(), y, lines[i].c_str(), nullptr);
     }
+
     if (m_active && m_blink_state) {
-      size_t cp = m_buffer.pos();
-      size_t line_idx = 0;
-      idx = 0;
-      while (line_idx + 1 < lines.size() && cp >= idx + lines[line_idx].size() + 1) {
-        idx += lines[line_idx].size() + 1;
-        ++line_idx;
-      }
-      const auto& line = lines[line_idx];
-      size_t pos_in_line = cp - idx;
-      float pre_w = nvgTextBounds(p_ctx, 0, 0, line.substr(0, pos_in_line).c_str(), nullptr, nullptr);
-      float x = 5.f - offset + m_pstyle->get_text_offset() + pre_w + 1;
-      float y0 = top_pad + line_idx * line_h - asc;
-      float y1 = y0 + line_h;
+      int cli = int(std::upper_bound(m_line_starts.begin(), m_line_starts.end(), ci) - m_line_starts.begin()) - 1;
+      size_t off = ci - m_line_starts[cli];
+      float cx = m_line_glyphs[cli][off];
+      float cy = 5.f + m_asc + cli * m_line_h;
       nvgBeginPath(p_ctx);
-      nvgMoveTo(p_ctx, x, y0);
-      nvgLineTo(p_ctx, x, y1);
+      nvgMoveTo(p_ctx, 5.f - offset + cx + m_pstyle->get_text_offset() + 1, cy - m_asc);
+      nvgLineTo(p_ctx, 5.f - offset + cx + m_pstyle->get_text_offset() + 1, cy - m_asc + m_line_h);
       nvgStrokeWidth(p_ctx, m_pstyle->get_blink_width());
       nvgStrokeColor(p_ctx, m_pstyle->get_blink_color());
       nvgStroke(p_ctx);
     }
   }
 
-  //nvgResetScissor(p_ctx);
   rm_widget::on_draw(p_ctx);
 }
 
 void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
 {
   if (!m_active) {
-    //rm_widget::on_keybd(sc, vk, state);
     return;
   }
 
@@ -417,7 +418,6 @@ void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
       break;
 
     default:
-      //rm_widget::on_keybd(sc, vk, state);
       return;
     }
 
@@ -432,8 +432,6 @@ void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
     m_blink_state = false;
     return;
   }
-
-  //rm_widget::on_keybd(sc, vk, state);
 }
 
 bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
@@ -441,7 +439,9 @@ bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
   float offset = m_pstyle->get_text_offset();
   float text_draw_x = m_absolute.x + 5.f + offset;
   float local_x = cursor_pos.x - text_draw_x;
+  float local_y = cursor_pos.y - m_absolute.y;
   const double now = m_psysdf->get_time();
+  bool multiline = (m_flags & RMGUI_TEXT_INPUT_MULTILINE);
 
   if (event == EXGUI_MOUSE_EVENT_CLICK && state == EXGUI_KEY_STATE::DOWN) {
     if (inside) {
@@ -456,7 +456,7 @@ bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
       }
       m_active = true;
       m_dragging = true;
-      size_t idx = hit_test_index(local_x);
+      size_t idx = multiline ? hit_test_index(local_x + m_scroll_offset, local_y) : hit_test_index(local_x);
       m_buffer.set_cursor(idx);
       m_buffer.sel_start = idx;
       m_buffer.sel_end = idx;
@@ -482,8 +482,11 @@ bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
   }
 
   if (event == EXGUI_MOUSE_EVENT_MOVE && state == EXGUI_KEY_STATE::DOWN && m_dragging) {
-    m_buffer.sel_end = hit_test_index(local_x);
-    ensure_visible(m_buffer.sel_end);
+    size_t idx = multiline ? hit_test_index(local_x + m_scroll_offset, local_y) : hit_test_index(local_x);
+    m_buffer.sel_end = idx;
+    if (!multiline) {
+      ensure_visible(idx);
+    }
     return true;
   }
 
@@ -499,18 +502,33 @@ bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
   return true;
 }
 
-size_t rm_text_input::hit_test_index(float px) const
+size_t rm_text_input::hit_test_index(float px, float py) const
 {
-  float pos = px + m_scroll_offset - m_pstyle->get_text_offset();
-  auto it = std::lower_bound(
-    m_glyph_positions.begin(),
-    m_glyph_positions.end(),
-    pos
-  );
-  size_t idx = it - m_glyph_positions.begin();
-  if (idx >= m_glyph_positions.size())
-    idx = m_glyph_positions.size() - 1;
-  return idx;
+  float x = px + m_scroll_offset - m_pstyle->get_text_offset();
+
+  if (!(m_flags & RMGUI_TEXT_INPUT_MULTILINE)) {
+    auto it = std::lower_bound(m_glyph_positions.begin(), m_glyph_positions.end(), x);
+    size_t idx = it - m_glyph_positions.begin();
+    if (idx >= m_glyph_positions.size())
+      idx = m_glyph_positions.size() - 1;
+    return idx;
+  }
+
+  float top_pad = 5.f + m_asc;
+  int   li = int((py - top_pad + (m_line_h * 0.5f)) / m_line_h);
+  li = std::clamp(li, 0, int(m_line_starts.size()) - 1);
+
+  size_t start = m_line_starts[li];
+  size_t end = (li + 1 < m_line_starts.size())
+    ? m_line_starts[li + 1] - 1
+    : m_buffer.str().size();
+
+  const auto& gp = m_line_glyphs[li];
+  auto it2 = std::lower_bound(gp.begin(), gp.end(), x);
+  size_t ci = it2 - gp.begin();
+  if (ci >= gp.size()) ci = gp.size() - 1;
+
+  return start + ci;
 }
 
 void rm_text_input::ensure_visible(size_t idx) {

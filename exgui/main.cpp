@@ -379,7 +379,7 @@ int main() {
   //style_inp.set_active_bgr_color({ 0,0,0 });
   //style_inp.set_blink_width(1.f);
 
-
+  //RMGUI_TEXT_INPUT_MULTILINE RMGUI_TEXT_INPUT_SINGLELINE
   rm_text_input* textInput = new rm_text_input(pwindow, 300, 100, 200, 20, &style_inp, RMGUI_TEXT_INPUT_SINGLELINE);
 
   static rm_checkbox_style style;

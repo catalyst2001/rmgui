@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "rmgui.h"
 #include <string>
 #include <vector>
@@ -118,6 +118,10 @@ class rm_text_input : public rm_widget, public rm_styled<rm_text_input_style> {
   double                          m_last_click_time;
   rm_vec2                         m_last_click_pos;
 
+  std::vector<size_t>             m_line_starts;
+  std::vector<std::vector<float>> m_line_glyphs;
+  float                           m_asc;
+  float                           m_line_h;
 
   static constexpr double DOUBLE_CLICK_THRESHOLD = 0.35;
   static constexpr float  CLICK_MOVE_THRESHOLD = 4.f;
@@ -129,8 +133,8 @@ public:
   virtual void on_text_input(int sym) override;
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
 
-  // map local x-coordinate to character index
-  size_t hit_test_index(float px) const;
+  // map local xy-coordinate to character index
+  size_t hit_test_index(float px, float py = NAN) const;
 
   void ensure_visible(size_t idx);
 };
