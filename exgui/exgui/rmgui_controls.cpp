@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <cstdarg>
 #include <cmath>
 
 #include "stb_image.h"
@@ -935,6 +936,9 @@ void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_
 {
   rm_rect thumb_rect;
   float   thumb_size;
+  float   background_round;
+  float   thumb_round;
+
   assert(m_orientation != RM_ORIENT_AUTO && "[K.D.] m_orientation have undefined value! You called rm_scroll_base::orient_detect() from init/resize?");
   if (m_orientation == RM_ORIENT_HORZ) {
     if (content.x <= window.x)
@@ -951,6 +955,8 @@ void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_
     thumb_rect.y = (window.y - thumb_thickness) * 0.5f;
     thumb_rect.width = thumb_size;
     thumb_rect.height = thumb_thickness;
+    background_round = (window.y / 2.f) * pstyle->get_scroll_corner_radius();
+    thumb_round = (thumb_rect.height / 2.f) * pstyle->get_scroll_corner_radius();
   }
   else {
     if (content.y <= window.y)
@@ -967,23 +973,23 @@ void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_
     thumb_rect.y = thumb_y;
     thumb_rect.width = thumb_thickness;
     thumb_rect.height = thumb_size;
+    background_round = (window.x / 2.f) * pstyle->get_scroll_corner_radius();
+    thumb_round = (thumb_rect.width / 2.f) * pstyle->get_scroll_corner_radius();
   }
 
   // paint background
-  float round_radius = (window.y / 2.f) * pstyle->get_scroll_corner_radius();
   nvgBeginPath(p_ctx);
   nvgFillColor(p_ctx, pstyle->get_scroll_background_color());
-  nvgRoundedRect(p_ctx, 0, 0, window.x, window.y, round_radius);
+  nvgRoundedRect(p_ctx, 0, 0, window.x, window.y, background_round);
   nvgFill(p_ctx);
   nvgStrokeWidth(p_ctx, pstyle->get_background_stroke_width());
   nvgStrokeColor(p_ctx, pstyle->get_scroll_background_border_color());
   nvgStroke(p_ctx);
 
   // paint thumb
-  round_radius = (thumb_rect.height / 2.f) * pstyle->get_scroll_corner_radius();
   nvgBeginPath(p_ctx);
   nvgFillColor(p_ctx, pstyle->get_scroll_thumb_color());
-  nvgRoundedRect(p_ctx, thumb_rect.x, thumb_rect.y, thumb_rect.width, thumb_rect.height, round_radius);
+  nvgRoundedRect(p_ctx, thumb_rect.x, thumb_rect.y, thumb_rect.width, thumb_rect.height, thumb_round);
   nvgFill(p_ctx);
   nvgStrokeWidth(p_ctx, pstyle->get_thumb_stroke_width());
   nvgStrokeColor(p_ctx, pstyle->get_scroll_thumb_border_color());
@@ -1363,4 +1369,85 @@ bool rm_treeview::hit_test(const rm_vec2& pos,
   }
 
   return false;
+}
+
+void rm_output_text::on_draw(NVGcontext* p_ctx)
+{
+  rm_vec2 textpos(5.f, 0.f);
+  //nvgBeginPath(p_ctx);
+  //nvgRoundedRect(p_ctx, 1.f, 1.f, m_size.x - 1.f, m_size.y - 1.f, 4.f);
+  //nvgFillColor(p_ctx, nvgRGB(255, 255, 255));
+  ////nvgStrokeColor(p_ctx, nvgRGB(0, 0, 0));
+  //nvgFill(p_ctx);
+  ////nvgStroke(p_ctx);
+
+  rm_vec2 pos(1.f, 1.f);
+  rm_vec2 size(m_size.x - 1.f, m_size.y - 1.f);
+  NVGcolor background = nvgRGB(255, 255, 255);
+  NVGcolor stroke = nvgRGB(0, 0, 0);
+  NVGcolor colors[rm_utl::RM_BFRM_MAX_COLORS] = {nvgRGB(128, 128, 128), nvgRGB(60, 60, 60)};
+  rm_corners_style cstyle;
+  cstyle.set_all_corners_radius(8.f);
+  rm_utl::draw_frame(p_ctx, pos, size, rm_utl::RM_BFRM_MODE_SUNKEN, background, stroke,
+    1.f, colors, &cstyle);
+  
+  nvgFontFaceId(p_ctx, get_font());
+  nvgFillColor(p_ctx, nvgRGBA(0, 0, 0, 255));
+  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+  for (size_t i = 0; i < m_linesbuf.get_num_output_lines(); i++) {
+    const rm_line_ring_buffer::rm_rb_line* pline = m_linesbuf.get_output_line(i);
+    nvgText(p_ctx, textpos.x, textpos.y, pline->get_cstr(), nullptr);
+    textpos.y += m_line_height;
+  }
+}
+
+bool rm_output_text::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
+{
+  return true;
+}
+
+rm_output_text::rm_output_text(rm_widget* p_parent, int x, int y, int width, int height, float line_height, size_t num_lines) :
+  rm_widget(x, y, width, height, p_parent, "ui_outputtext", EXGUI_FLAG_DEFAULT), m_linesbuf(num_lines, 512, num_lines), m_line_height(line_height)
+{
+  m_textbuf.resize(8096);
+}
+
+void rm_output_text::printf(const char* pformat, ...)
+{
+  va_list argptr;
+  va_start(argptr, pformat);
+  vsnprintf(&m_textbuf[0], m_textbuf.size(), pformat, argptr);
+  va_end(argptr);
+  m_linesbuf.append_text(m_textbuf);
+}
+
+void rm_number_input::draw_buttons(NVGcontext* p_ctx)
+{
+  //nvgBeginPath(p_ctx);
+
+}
+
+void rm_number_input::on_draw(NVGcontext* p_ctx)
+{
+  //nvgBeginPath(p_ctx);
+  
+}
+
+bool rm_number_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
+{
+  return false;
+}
+
+rm_number_input::rm_number_input(rm_widget* p_parent, int x, int y, int width, int height, 
+  input_type type, float value, float step, float minval, float maxval) :
+  rm_widget(x, y, width, height, p_parent, "ui_outputtext", EXGUI_FLAG_DEFAULT),
+  m_type(type), m_value(value), m_step(step), m_minval(minval), m_maxval(maxval)
+{
+}
+
+rm_number_input::rm_number_input(rm_widget* p_parent, int x, int y, int width, int height, 
+  input_type type, int value, int step, int minval, int maxval) :
+  rm_widget(x, y, width, height, p_parent, "ui_outputtext", EXGUI_FLAG_DEFAULT),
+  m_type(type), m_value(value), m_step(step), m_minval(minval), m_maxval(maxval)
+{
 }

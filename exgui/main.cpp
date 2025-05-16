@@ -8,6 +8,10 @@
 #include <vector>
 #include "blendish_test.h"
 
+#define NOMINMAX
+#include <Windows.h> //for Sleep
+#define sleep(ms) Sleep(ms)
+
 static rm_surface* g_gui = nullptr;
 
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
@@ -324,8 +328,34 @@ void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float h
 }
 #pragma endregion
 
+void testtrb()
+{
+  auto gen_rand_string = []() -> const char* {
+    size_t i;
+    const size_t arrlen = 32+1;
+    static char buf[arrlen];
+    for (i = 0; i < arrlen-1; i++)
+      buf[i] = 64 + (rand() % 90);
+    buf[i] = 0;
+    return buf;
+  };
+
+  rm_line_ring_buffer ringbuf(32, 512, 32);
+  while (1) {
+    ringbuf.append_text(gen_rand_string());
+    for (size_t i = 0; i < ringbuf.get_num_lines(); i++) {
+      printf("[%zd] %s\n", i+1, ringbuf.get_output_line(i)->get_cstr());
+    }
+    sleep(1);
+    system("cls");
+  }
+}
+
 int main() {
-  const int winWidth = 800, winHeight = 600;
+  //testtrb();
+  //return 0;
+
+  const int winWidth = 1280, winHeight = 1024;
   GLFWwindow* window = initWindow(winWidth, winHeight, "Test rmgui Controls");
   if (!window) return -1;
 
@@ -355,7 +385,7 @@ int main() {
 
   static rm_window_style default_style;
   default_style.apply_defaults();
-  rm_window* pwindow = new rm_window(gui, 10, 10, 500, 500);
+  rm_window* pwindow = new rm_window(gui, 1, 1, 1024, 768);
   pwindow->set_style(&default_style);
   pwindow->set_zindex(-1);
 
@@ -365,17 +395,10 @@ int main() {
 
   static rm_text_input_style style_inp;
   //style_inp.set_text_offsets(10.0f);
-
-
-  style_inp.set_corner_radius(LEFT_TOP, 4.f);
-  style_inp.set_corner_radius(RIGHT_TOP, 4.f);
-  style_inp.set_corner_radius(RIGHT_BOTTOM, 4.f);
-  style_inp.set_corner_radius(LEFT_BOTTOM, 4.f);
-
+  style_inp.set_all_corners_radius(4.f);
   style_inp.set_border_color(nvgRGB(0,0,255));
   style_inp.set_border_width(2.f);
   style_inp.set_rounded_selection(0);
-  
   //style_inp.set_active_bgr_color({ 0,0,0 });
   //style_inp.set_blink_width(1.f);
 
@@ -393,14 +416,17 @@ int main() {
   //style.set_corner_radius(RIGHT_TOP, 4.f);
   //style.set_corner_radius(RIGHT_BOTTOM, 4.f);
   //style.set_corner_radius(LEFT_BOTTOM, 4.f);
-  rm_checkbox* checkbox = new rm_checkbox(pwindow, 20, 40 + 30 + 20, 100, &style, "Enable");
+  rm_checkbox* checkbox = new rm_checkbox(pwindow, 20, 40 + 30 + 20, 100, &style, "Enable",
+    [](rm_checkbox* pcheckbox) -> bool {
+      pcheckbox->get_userptr<rm_output_text>()->printf("%s time output", pcheckbox->is_checked() ? "Enabled" : "Disabled");
+      return true;
+    }
+  );
+
   rm_checkbox* checkbox2 = new rm_checkbox(pwindow, 150, 40 + 30 + 20, 100, &style, u8"Включить");
 
   static rm_tabcontrol_style tabcontrol_style;
-  tabcontrol_style.set_corner_radius(LEFT_TOP, 4.f);
-  tabcontrol_style.set_corner_radius(RIGHT_TOP, 4.f);
-  tabcontrol_style.set_corner_radius(RIGHT_BOTTOM, 4.f);
-  tabcontrol_style.set_corner_radius(LEFT_BOTTOM, 4.f);
+  tabcontrol_style.set_all_corners_radius(4.f);
   tabcontrol_style.set_horizontal(!!true);
   tabcontrol_style.set_tab_height(30);
   rm_tabcontrol* tabs = new rm_tabcontrol(pwindow, 10, 190, 300, 300,
@@ -425,24 +451,24 @@ int main() {
   rm_checkbox* setting_chk = new rm_checkbox(t1, 10, 0, 150, &style, "Enable Feature");
   //rm_text_input* setting_input = new rm_text_input(t1, 10, 25, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
 
-
+  rm_vec2& size = pwindow->get_size();
+  rm_output_text* potext = new rm_output_text(pwindow, 
+    1.f, size.y-200.f-10.f, pwindow->get_size().x, 200.f);
+#if 0
   rm_treeview* tree = new rm_treeview(290, 230, 200, 200, pwindow,
     [](rm_treeview* tv, rm_tree_node* node) {
       printf("Selected node: %s\n", node->name.c_str());
     }
   );
-
   rm_tree_node* root1 = tree->add_root("Root 1");
   rm_tree_node* root2 = tree->add_root("Root 2");
-
   root1->add_child("Child 1.1");
   rm_tree_node* sub = root1->add_child("Child 1.2");
   sub->add_child("Child 1.2.1");
-
   root2->add_child("Child 1.2");
-
   root1->expanded = true;
-
+#endif
+  checkbox->set_userptr(potext);
 
   rm_animation* anim = new rm_animation(pwindow, 20, 100, 100, 100, image_pat);
   anim->set_speed(8.f);
@@ -457,20 +483,22 @@ int main() {
   combobox->add_item("Item 2");
   combobox->add_item("Item 3");
 
-  static rm_scroll_style scrollbar_style;
-  scrollbar_style.set_scroll_corner_round(1.f);
-  scrollbar_style.set_scroll_thumb_color(nvgRGB(90, 90, 90));
-  scrollbar_style.set_thumb_size(10);
-  rm_scrollbar* pscroll = new rm_scrollbar(pwindow, RM_ORIENT_HORZ, &scrollbar_style);
+  //static rm_scroll_style scrollbar_style;
+  //scrollbar_style.set_scroll_corner_round(1.f);
+  //scrollbar_style.set_scroll_thumb_color(nvgRGB(90, 90, 90));
+  //scrollbar_style.set_thumb_size(10);
+  //rm_scrollbar* pscroll = new rm_scrollbar(pwindow, RM_ORIENT_VERT, &scrollbar_style);
 
   rm_slider* slider = new rm_slider(pwindow, 50, 400, 400, 40, 0.0f, 100.0f, 50.0f,
     [](rm_slider *psilder) {
-      printf("slider value changed: %f\n", psilder->get_value());
+      psilder->get_userptr<rm_output_text>()->printf("slider value changed: %f", psilder->get_value());
     }
   );
+  slider->set_userptr(potext);
+
   rm_progress_base* progress = new rm_progress_base(pwindow, 50, 350, 300, 10, 0.f, 5.f);
   rm_progress_image* progress2 = new rm_progress_image(pwindow, 50, 350 + 10 + 5, 300, 10, image_pat, 0.f, 1.f, 0.f, 5.f);
- 
+
   glfwSetCursorPosCallback(window, cursor_position_callback);
   glfwSetMouseButtonCallback(window, mouse_button_callback);
   glfwSetCharCallback(window, char_callback);
@@ -495,7 +523,10 @@ int main() {
     float percent = sinabs * 100.f;
     progress->set_percent(percent);
     progress2->set_percent(slider->get_value());
-    pscroll->set_position(sinabs);
+    //pscroll->set_position(sinabs);
+
+    if(checkbox->is_checked())
+      potext->printf("current time is %f", current_time);
 
     gui->resize(fbWidth, fbHeight);
     gui->draw(dt);

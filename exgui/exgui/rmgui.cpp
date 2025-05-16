@@ -363,24 +363,6 @@ bool rmgui_timer::has_elapsed(irm_sysdf* p_sysdf)
   return false;
 }
 
-void rmgui_utl::draw_border_frame(NVGcontext* ctx, rm_rect& rect, uint32_t mode, const NVGcolor colors[])
-{
-  const NVGcolor& color = colors[mode];
-
-  //nvgBeginPath(ctx);
-  //nvgStrokeWidth(ctx, 1.0f);
-  //nvgRoundedRect(ctx, mPos.x() + 0.5f, mPos.y() + (mPushed ? 0.5f : 1.5f), mSize.x() - 1,
-  //  mSize.y() - 1 - (mPushed ? 0.0f : 1.0f), mTheme->mButtonCornerRadius);
-  //nvgStrokeColor(ctx, mTheme->mBorderLight);
-  //nvgStroke(ctx);
-
-  //nvgBeginPath(ctx);
-  //nvgRoundedRect(ctx, mPos.x() + 0.5f, mPos.y() + 0.5f, mSize.x() - 1,
-  //  mSize.y() - 2, mTheme->mButtonCornerRadius);
-  //nvgStrokeColor(ctx, mTheme->mBorderDark);
-  //nvgStroke(ctx);
-}
-
 void rmgui_textbuffer::insert_cp(uint32_t cp)
 {
   if (has_selection()) 
@@ -632,9 +614,9 @@ bool rm_line_ring_buffer::rm_rb_line::set_string(const char* pstr)
 {
   RM_HANDLE_EXCEPTIONS(false,
     m_line.assign(pstr);
-  m_cursor = m_line.length();
-    )
-    return true;
+    m_cursor = m_line.length();
+  )
+  return true;
 }
 
 bool rm_line_ring_buffer::rm_rb_line::insert_from_cursor(const char* pstr)
@@ -646,8 +628,8 @@ bool rm_line_ring_buffer::rm_rb_line::insert_from_cursor(const char* pstr)
     else {
       m_line.append(pstr);
     }
-      )
-    return false;
+  )
+  return false;
 }
 
 rm_line_ring_buffer::rm_rb_line* rm_line_ring_buffer::get_line_for_write()
@@ -730,40 +712,38 @@ const rm_line_ring_buffer::rm_rb_line* rm_line_ring_buffer::get_output_line(size
   return &m_lines_buf[lineidx % m_num_output_lines];
 }
 
-bool rm_line_ring_buffer::append_text(std::string& content)
+bool rm_line_ring_buffer::append_text(const std::string& content)
 {
-  //rm_rb_line* pline;
-  //size_t      off = 0;
-  //size_t      last_off = 0;
-  //if (content.length()) {
-  //  while (1) {
-  //    off = content.find_first_of('\n', last_off);
-  //    if(off != std::string::npos)
+  rm_rb_line* pline;
+  size_t      off = 0;
+  size_t      last_off = 0;
 
-  //    size_t count = off - last_off;
-  //    std::string tok = content.substr(last_off, count);
-  //    last_off = off+1;
-  //    pline = get_line_for_write();
-  //    if (!pline)
-  //      return false;
+  if (content.length()) {
+    std::string token;
+    rm_string_tokenizer tokenizer(content, '\n');
+    while (tokenizer.get_token(token)) {
+      pline = get_line_for_write();
+      if (!pline)
+        return false;
 
-  //    printf("substr: %s\n", tok.c_str());
-  //    pline->set_string(tok.c_str());
-  //  }
-  //}
-  return true;
+      //printf("substr: %s\n", token.c_str());
+      pline->set_string(token.c_str());
+    }
+    return true;
+  }
+  return false;
 }
 
-bool rm_line_ring_buffer::append_text(const char* pformat, ...)
-{
-  va_list     argptr;
-  std::string content;
-  content.resize(8096);
-  va_start(argptr, pformat);
-  format_string(content, pformat, argptr);
-  va_end(argptr);
-  return append_text(content);
-}
+//bool rm_line_ring_buffer::append_text(const char* pformat, ...)
+//{
+//  va_list     argptr;
+//  std::string content;
+//  content.resize(8096);
+//  va_start(argptr, pformat);
+//  format_string(content, pformat, argptr);
+//  va_end(argptr);
+//  return append_text(content);
+//}
 
 void rm_line_ring_buffer::rm_rb_line::sym_widths_recompute(NVGcontext* pctx)
 {
@@ -782,4 +762,57 @@ bool rm_line_ring_buffer::rm_rb_line::get_substring_from_selection(std::string& 
     dst = m_line.substr(m_sel_begin, count);
   )
     return true;
+}
+
+rm_string_tokenizer::rm_string_tokenizer(const std::string& target, char delim) :
+  m_delim(delim), m_next_token_available(true), m_last_pos(0), m_cur_pos(0), m_str(target) {
+}
+
+bool rm_string_tokenizer::get_token(std::string& dst)
+{
+  if (!m_next_token_available)
+    return false;
+
+  m_cur_pos = m_str.find_first_of(m_delim, m_last_pos);
+  if (m_cur_pos == std::string::npos) {
+    m_next_token_available = false;
+    /* delims not found in string */
+    if (!m_last_pos) {
+      dst = m_str;
+      return true; //source string
+    }
+    dst = m_str.substr(m_last_pos);
+    return true;
+  }
+  dst = m_str.substr(m_last_pos, m_cur_pos - m_last_pos);
+  m_last_pos = m_cur_pos + 1;
+  return true;
+}
+
+void rm_utl::draw_frame(NVGcontext* pctx, rm_vec2& pos, rm_vec2& size,
+  uint32_t mode,
+  const NVGcolor& background,
+  const NVGcolor& stroke, float stroke_width,
+  const NVGcolor colors[],
+  const rm_corners_style* pcstyle,
+  float shadow_offset)
+{
+  float sign = (mode == RM_BFRM_MODE_RAISED) ? 1.f : -1.f;
+  const NVGcolor& scolor = colors[RM_BFRM_MODE_SUNKEN];
+  const NVGcolor& sdwcolor = colors[RM_BFRM_MODE_RAISED];
+  /* paint background */
+  
+  nvgBeginPath(pctx);
+  nvgSave(pctx); //TODO: K.D. save state for store old scissor
+  nvgFillColor(pctx, background);
+  nvgStrokeColor(pctx, stroke);
+  nvgRoundedRectVarying(pctx, pos.x, pos.y, size.x, size.y,
+    pcstyle->get_top_left(), pcstyle->get_top_right(),
+    pcstyle->get_bottom_right(), pcstyle->get_bottom_left()
+  );
+  nvgFill(pctx);
+  nvgStroke(pctx);
+  nvgScissor(pctx, pos.x, pos.y, size.x - stroke_width, size.y- stroke_width);
+
+  nvgRestore(pctx);
 }

@@ -465,12 +465,49 @@ public:
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) = 0;
 };
 
+enum EXGUI_CORNER : uint32_t {
+  LEFT_TOP = 0,
+  RIGHT_TOP,
+  RIGHT_BOTTOM,
+  LEFT_BOTTOM,
+
+  EXGUI_NUM_CORNERS
+};
+
+class rm_corners_style
+{
+protected:
+  float m_corner_radius[EXGUI_NUM_CORNERS];
+public:
+  rm_corners_style() {
+    m_corner_radius[LEFT_TOP] = 0.f;
+    m_corner_radius[RIGHT_TOP] = 0.f;
+    m_corner_radius[RIGHT_BOTTOM] = 0.f;
+    m_corner_radius[LEFT_BOTTOM] = 0.f;
+  }
+  ~rm_corners_style() {}
+
+  inline float get_top_left() const { return m_corner_radius[LEFT_TOP]; }
+  inline float get_top_right() const { return m_corner_radius[RIGHT_TOP]; }
+  inline float get_bottom_right() const { return m_corner_radius[RIGHT_BOTTOM]; }
+  inline float get_bottom_left() const { return m_corner_radius[LEFT_BOTTOM]; }
+
+  inline void  set_all_corners_radius(float radius) {
+    m_corner_radius[LEFT_TOP] = 
+    m_corner_radius[RIGHT_TOP] = 
+    m_corner_radius[RIGHT_BOTTOM] = 
+    m_corner_radius[LEFT_BOTTOM] = radius;
+  }
+  inline void  set_corner_radius(EXGUI_CORNER corner, float radius) { m_corner_radius[corner] = radius; }
+  inline float get_corner_radius(EXGUI_CORNER corner) { return m_corner_radius[corner]; }
+};
+
 /**
 * rendering utilites
 */
-class rmgui_utl
+class rm_utl
 {
-protected:
+public:
 
   /**
   * draw_border_frame
@@ -486,9 +523,34 @@ protected:
   */
   enum {
     RM_BFRM_MODE_SUNKEN = 0,
-    RM_BFRM_MODE_RAISED
+    RM_BFRM_MODE_RAISED,
+    RM_BFRM_MAX_COLORS //not use! reserved for colors array size!
   };
-  void draw_border_frame(NVGcontext* ctx, rm_rect& rect, uint32_t mode, const NVGcolor colors[]);
+
+  /**
+  * @brief Draws a frame with a lowered or raised edge
+  * @param pctx - nanovg context
+  * @param pos - position of frame in current transform
+  * @param size - size of frame
+  * @param mode - RM_BFRM_MODE_SUNKEN or RM_BFRM_MODE_RAISED
+  * @param background - background color for filling
+  * @param stroke - stroke color
+  * @param stroke_width - stroke width
+  * @param colors[] - colors of light (RM_BFRM_MODE_SUNKEN) and shadow (RM_BFRM_MODE_RAISED). Size of this array must be RM_BFRM_MAX_COLORS
+  * @param pcstyle - defined corners radius style
+  * @param shadow_offset - offset of shadow inside of frame
+  * @returns nothing
+  */
+  static void draw_frame(NVGcontext* pctx,
+    rm_vec2 &pos,
+    rm_vec2 &size,
+    uint32_t mode,
+    const NVGcolor &background,
+    const NVGcolor &stroke,
+    float stroke_width, 
+    const NVGcolor colors[],
+    const rm_corners_style *pcstyle,
+    float shadow_offset=1.f);
 };
 
 /**
@@ -611,6 +673,9 @@ public:
 
   inline const char *get_classname() { return m_szclass; }
   inline void       *get_userptr() { return m_puserptr; }
+
+  template<class _dst_type>
+  inline _dst_type  *get_userptr() { return reinterpret_cast<_dst_type*>(m_puserptr); }
   inline void        set_userptr(void* p) { m_puserptr = p; }
 
   /* rect && bbox */
@@ -775,33 +840,6 @@ public:
   inline void             set_style(_dst_style_type* p_style) { m_pstyle = p_style; }
 };
 
-enum EXGUI_CORNER : uint32_t {
-  LEFT_TOP = 0,
-  RIGHT_TOP,
-  RIGHT_BOTTOM,
-  LEFT_BOTTOM,
-
-  EXGUI_NUM_CORNERS
-};
-
-class rm_corners_style
-{
-protected:
-  float m_corner_radius[EXGUI_NUM_CORNERS];
-public:
-  rm_corners_style() {
-    m_corner_radius[LEFT_TOP] = 0.f;
-    m_corner_radius[RIGHT_TOP] = 0.f;
-    m_corner_radius[RIGHT_BOTTOM] = 0.f;
-    m_corner_radius[LEFT_BOTTOM] = 0.f;
-  }
-  ~rm_corners_style() {}
-
-  inline void  set_corner_radius(EXGUI_CORNER corner, float radius) { m_corner_radius[corner] = radius; }
-  inline float get_corner_radius(EXGUI_CORNER corner) { return m_corner_radius[corner]; }
-};
-
-
 /**
 * Window
 */
@@ -960,31 +998,11 @@ class rm_string_tokenizer
   bool         m_next_token_available;
   size_t       m_last_pos;
   size_t       m_cur_pos;
-  std::string& m_str;
+  const std::string& m_str;
 public:
-  rm_string_tokenizer(std::string& target, char delim) :
-    m_delim(delim), m_next_token_available(false), m_last_pos(0), m_cur_pos(0), m_str(target) {}
-  inline bool get_token(std::string& dst) {
-    m_cur_pos = m_str.find_first_of(m_delim, m_last_pos);
-    if (m_cur_pos == std::string::npos) {
-      m_next_token_available = false;
-      /* delims not found in string */
-      if (!m_last_pos) {
-        dst = m_str;
-        return true; //source string
-      }
-      dst = m_str.substr(m_last_pos);
-      return true;
-    }
-    m_next_token_available = true;
-    dst = m_str.substr(m_last_pos, m_cur_pos - m_last_pos);
-    m_last_pos = m_cur_pos + 1;
-    return true;
-  }
-
-  inline bool next_token() {
-    return m_next_token_available;
-  }
+  rm_string_tokenizer(const std::string& target, char delim);
+  bool get_token(std::string& dst);
+  inline bool next_token() { return m_next_token_available; }
 };
 
 class rm_line_ring_buffer
@@ -1041,6 +1059,6 @@ public:
   inline size_t     get_num_output_lines() const { return m_num_output_lines; }
   const rm_rb_line* get_output_line(size_t idx);
 
-  bool append_text(std::string& content);
-  bool append_text(const char* pformat, ...);
+  bool append_text(const std::string& content);
+  //bool append_text(const char* pformat, ...);
 };

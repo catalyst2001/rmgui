@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <type_traits>
 
 class rmgui_image {
 public:
@@ -641,5 +642,51 @@ public:
 
 class rm_output_text : public rm_widget
 {
+  rm_line_ring_buffer m_linesbuf;
+  std::string         m_textbuf;
+  float               m_line_height;
+protected:
+  virtual void on_draw(NVGcontext* p_ctx) override;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
 public:
+  rm_output_text(rm_widget* p_parent, int x, int y, int width, int height, float line_height=16.f, size_t num_lines=16);
+  virtual ~rm_output_text() {}
+
+  inline void print(const std::string& text) { m_linesbuf.append_text(text); }
+  inline void print(const char* ptext) { m_linesbuf.append_text(ptext); }
+  void printf(const char* pformat, ...);
+};
+
+/**
+* @brief Numbers input widget
+*/
+class rm_number_input : public rm_widget
+{
+public:
+  enum input_type : uint32_t {
+    type_int = 0,
+    type_float
+  };
+protected:
+  input_type       m_type;
+  float            m_value;
+  float            m_minval;
+  float            m_maxval;
+  float            m_step;
+  rmgui_textbuffer m_buffer;
+
+  void         draw_buttons(NVGcontext* p_ctx);
+  virtual void on_draw(NVGcontext* p_ctx) override;
+  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) override;
+public:
+  rm_number_input(rm_widget* p_parent, int x, int y, int width, int height, 
+    input_type type = type_float, float value = 0.f, float step = 0.1f, float minval = 0.f, float maxval = 100.f);
+  rm_number_input(rm_widget* p_parent, int x, int y, int width, int height,
+    input_type type, int value = 0, int step = 1, int minval = 0, int maxval = 100);
+
+  inline input_type           get_type() const { return m_type; }
+  template<class _type> _type get_value() const { return static_cast<_type>(m_value); }
+  template<class _type> _type get_min() const { return static_cast<_type>(m_minval); }
+  template<class _type> _type get_max() const { return static_cast<_type>(m_maxval); }
+  template<class _type> _type get_step() const { return static_cast<_type>(m_step); }
 };
