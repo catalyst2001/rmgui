@@ -304,11 +304,11 @@ void rm_surface::free_font(rm_font& font)
   //NOTE: K.D. nvg not free fonts
 }
 
-rm_surface::rm_surface(NVGcontext* p_ctx, int width, int height, irm_sysdf* p_sysdf) : rm_widget(0, 0, width, height, nullptr, "ui_root_node")
+rm_surface::rm_surface(NVGcontext* pctx, int width, int height, irm_sysdf* p_sysdf) : rm_widget(0, 0, width, height, nullptr, "ui_root_node")
 {
   m_psysdf = p_sysdf;
   set_root(this);
-  m_pctx = p_ctx;
+  m_pctx = pctx;
   m_pfocus = nullptr;
   m_delta_time = 0.f;
   load_font_from_memory(fontawesomewebfont, FONT_SIZE, "fontawesome");
@@ -318,19 +318,24 @@ rm_surface::~rm_surface()
 {
 }
 
-void rm_window::on_draw(NVGcontext* p_ctx)
+void rm_window::on_draw(NVGcontext* pctx)
 {
   rm_window_style* p_style = get_style();
   assert(p_style && "rmgui_window::on_draw(): window style is not set! Use rmgui_window::set_style(rmgui_wi1ndow_style *)");
   int b_is_active = (int)(get_elem_flags().is_focused() || get_elem_flags().is_hovered());
+
+  rm_vec2 pos(0.f, 0.f);
+  NVGcolor shadow_color = nvgRGBA(0, 0, 0, 200);
+  rm_utl::draw_shadow(pctx, pos, m_size, shadow_color, 8.f, get_style()->get_corner_radius(LEFT_TOP));
+
   /* draw window background */
-  nvgBeginPath(p_ctx);
-  nvgFillColor(p_ctx, p_style->get_background_color(b_is_active));
-  nvgRoundedRectVarying(p_ctx,
+  nvgBeginPath(pctx);
+  nvgFillColor(pctx, p_style->get_background_color(b_is_active));
+  nvgRoundedRectVarying(pctx,
     0.f, 0.f, m_size.x, m_size.y,
     p_style->get_corner_radius(LEFT_TOP), p_style->get_corner_radius(RIGHT_TOP),
     p_style->get_corner_radius(RIGHT_BOTTOM), p_style->get_corner_radius(LEFT_BOTTOM));
-  nvgFill(p_ctx);
+  nvgFill(pctx);
 }
 
 bool rm_window::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
@@ -801,7 +806,6 @@ void rm_utl::draw_frame(NVGcontext* pctx, rm_vec2& pos, rm_vec2& size,
   const NVGcolor& scolor = colors[RM_BFRM_MODE_SUNKEN];
   const NVGcolor& sdwcolor = colors[RM_BFRM_MODE_RAISED];
   /* paint background */
-  
   nvgBeginPath(pctx);
   nvgSave(pctx); //TODO: K.D. save state for store old scissor
   nvgFillColor(pctx, background);
@@ -812,7 +816,36 @@ void rm_utl::draw_frame(NVGcontext* pctx, rm_vec2& pos, rm_vec2& size,
   );
   nvgFill(pctx);
   nvgStroke(pctx);
-  nvgScissor(pctx, pos.x, pos.y, size.x - stroke_width, size.y- stroke_width);
+  //nvgScissor(pctx, pos.x, pos.y, size.x - stroke_width, size.y- stroke_width);
 
+  nvgFillColor(pctx, background);
+  nvgStrokeColor(pctx, stroke);
+  nvgRoundedRectVarying(pctx, pos.x+ sign, pos.y + sign, size.x, size.y,
+    pcstyle->get_top_left(), pcstyle->get_top_right(),
+    pcstyle->get_bottom_right(), pcstyle->get_bottom_left()
+  );
+  nvgStroke(pctx);
+
+  nvgRestore(pctx);
+}
+
+void rm_utl::draw_shadow(NVGcontext* pctx, rm_vec2& pos, rm_vec2& size, 
+  const NVGcolor& shadow_color, float shadow_size, float corner_radius)
+{
+  nvgSave(pctx);
+  nvgResetScissor(pctx);
+  nvgBeginPath(pctx);
+  const NVGcolor& transparent = rm_utl::get_transparent();
+  NVGpaint shadow_paint = nvgBoxGradient(pctx, pos.x, pos.y, size.x, size.y, 
+    corner_radius * 2.f, shadow_size * 2.f, shadow_color, transparent);
+  nvgRect(pctx, pos.x - shadow_size, 
+    pos.y - shadow_size, 
+    size.x + 2 * shadow_size,
+    size.y + 2 * shadow_size
+  );
+  nvgRoundedRect(pctx, pos.x, pos.y, size.x, size.y, corner_radius);
+  nvgPathWinding(pctx, NVG_HOLE);
+  nvgFillPaint(pctx, shadow_paint);
+  nvgFill(pctx);
   nvgRestore(pctx);
 }

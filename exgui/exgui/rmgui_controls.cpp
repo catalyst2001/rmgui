@@ -81,24 +81,24 @@ rm_image_button::~rm_image_button() {
   }
 }
 
-void rm_image_button::on_draw(NVGcontext* p_ctx) {
+void rm_image_button::on_draw(NVGcontext* pctx) {
   //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented this
-  //nvgBeginPath(p_ctx);
-  //nvgRect(p_ctx, 0.f, 0.f, m_relative.width, m_relative.height);
-  //nvgFillColor(p_ctx, nvgRGBA(200, 200, 200, 255));
-  //nvgFill(p_ctx);
+  //nvgBeginPath(pctx);
+  //nvgRect(pctx, 0.f, 0.f, m_relative.width, m_relative.height);
+  //nvgFillColor(pctx, nvgRGBA(200, 200, 200, 255));
+  //nvgFill(pctx);
 
   if (m_image && m_image->imageId != -1) {
-    NVGpaint imgPaint = nvgImagePattern(p_ctx,
+    NVGpaint imgPaint = nvgImagePattern(pctx,
       0.f, 0.f,
       m_size.x, m_size.y,
       0.0f, m_image->imageId, 1.0f);
-    nvgBeginPath(p_ctx);
-    nvgRoundedRect(p_ctx, 0.f, 0.f, m_size.x, m_size.y, 4.0f);
-    nvgFillPaint(p_ctx, imgPaint);
-    nvgFill(p_ctx);
+    nvgBeginPath(pctx);
+    nvgRoundedRect(pctx, 0.f, 0.f, m_size.x, m_size.y, 4.0f);
+    nvgFillPaint(pctx, imgPaint);
+    nvgFill(pctx);
   }
-  rm_widget::on_draw(p_ctx);
+  rm_widget::on_draw(pctx);
 }
 
 bool rm_image_button::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
@@ -116,25 +116,25 @@ rm_button::rm_button(rm_widget* p_parent, int x, int y, int width, int height, c
 
 rm_button::~rm_button() {}
 
-void rm_button::on_draw(NVGcontext* p_ctx) {
+void rm_button::on_draw(NVGcontext* pctx) {
   //m_bbox.from_rect(m_absolute);  //NOTE: K.D. commented this
-  nvgFontFaceId(p_ctx, get_font());
-  nvgFontSize(p_ctx, 20.0f);
+  nvgFontFaceId(pctx, get_font());
+  nvgFontSize(pctx, 20.0f);
 
-  nvgBeginPath(p_ctx);
-  nvgRoundedRect(p_ctx, 0.f, 0.f, m_size.x, m_size.y, 4.0f);
+  nvgBeginPath(pctx);
+  nvgRoundedRect(pctx, 0.f, 0.f, m_size.x, m_size.y, 4.0f);
   NVGcolor fillColor = nvgRGBA(100, 100, 250, 255);
   if (m_elem_flags.is_hovered())
     fillColor = nvgRGBA(120, 120, 255, 255);
-  nvgFillColor(p_ctx, fillColor);
-  nvgFill(p_ctx);
+  nvgFillColor(pctx, fillColor);
+  nvgFill(pctx);
 
-  nvgTextAlign(p_ctx, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-  nvgFillColor(p_ctx, nvgRGBA(255, 255, 255, 255));
+  nvgTextAlign(pctx, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+  nvgFillColor(pctx, nvgRGBA(255, 255, 255, 255));
   float cx = m_size.x / 2.0f;
   float cy = m_size.y / 2.0f;
-  nvgText(p_ctx, cx, cy, m_text.c_str(), nullptr);
-  rm_widget::on_draw(p_ctx);
+  nvgText(pctx, cx, cy, m_text.c_str(), nullptr);
+  rm_widget::on_draw(pctx);
 }
 
 bool rm_button::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
@@ -152,13 +152,13 @@ rm_label::rm_label(rm_widget* p_parent, int x, int y, const std::string& text)
 
 rm_label::~rm_label() {}
 
-void rm_label::on_draw(NVGcontext* p_ctx) {
-  nvgFontFaceId(p_ctx, get_font());
-  nvgFontSize(p_ctx, 18.0f);
-  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
-  nvgFillColor(p_ctx, nvgRGBA(255, 255, 255, 255));
-  nvgText(p_ctx, 0.f, m_size.y * 0.5f, m_text.c_str(), nullptr);
-  rm_widget::on_draw(p_ctx);
+void rm_label::on_draw(NVGcontext* pctx) {
+  nvgFontFaceId(pctx, get_font());
+  nvgFontSize(pctx, 18.0f);
+  nvgTextAlign(pctx, NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+  nvgFillColor(pctx, nvgRGBA(255, 255, 255, 255));
+  nvgText(pctx, 0.f, m_size.y * 0.5f, m_text.c_str(), nullptr);
+  rm_widget::on_draw(pctx);
 }
 
 rm_text_input::rm_text_input(rm_widget* p_parent, int x, int y, int width, int height,
@@ -173,31 +173,31 @@ rm_text_input::rm_text_input(rm_widget* p_parent, int x, int y, int width, int h
 
 rm_text_input::~rm_text_input() {}
 
-void rm_text_input::on_draw(NVGcontext* p_ctx) {
+void rm_text_input::on_draw(NVGcontext* pctx) {
   const std::string& txt = m_buffer.str();
   float desc;
   std::vector<std::string> lines;
   std::vector<size_t>      starts;
 
-  nvgFontFaceId(p_ctx, get_font());
-  nvgFontSize(p_ctx, m_pstyle->get_font_size());
-  nvgTextMetrics(p_ctx, &m_asc, &desc, &m_line_h);
+  nvgFontFaceId(pctx, get_font());
+  nvgFontSize(pctx, m_pstyle->get_font_size());
+  nvgTextMetrics(pctx, &m_asc, &desc, &m_line_h);
 
   // background & border
-  nvgBeginPath(p_ctx);
+  nvgBeginPath(pctx);
   float stroke_width = m_pstyle->get_border_width();
-  nvgRoundedRectVarying(p_ctx, stroke_width, stroke_width, m_size.x - stroke_width*2, m_size.y - stroke_width * 2,
+  nvgRoundedRectVarying(pctx, stroke_width, stroke_width, m_size.x - stroke_width*2, m_size.y - stroke_width * 2,
     m_pstyle->get_corner_radius(LEFT_TOP),
     m_pstyle->get_corner_radius(RIGHT_TOP),
     m_pstyle->get_corner_radius(RIGHT_BOTTOM),
     m_pstyle->get_corner_radius(LEFT_BOTTOM));
-  nvgFillColor(p_ctx, m_active
+  nvgFillColor(pctx, m_active
     ? m_pstyle->get_active_bgr_color()
     : m_pstyle->get_unactive_bgr_color());
-  nvgFill(p_ctx);
-  nvgStrokeColor(p_ctx, m_pstyle->get_border_color());
-  nvgStrokeWidth(p_ctx, m_pstyle->get_border_width());
-  nvgStroke(p_ctx);
+  nvgFill(pctx);
+  nvgStrokeColor(pctx, m_pstyle->get_border_color());
+  nvgStrokeWidth(pctx, m_pstyle->get_border_width());
+  nvgStroke(pctx);
 
   bool multiline = (m_flags & RMGUI_TEXT_INPUT_MULTILINE);
   float offset = 0.f;
@@ -207,7 +207,7 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
     m_glyph_positions.clear();
     m_glyph_positions.push_back(0.f);
     for (size_t i = 1; i <= txt.size(); ++i) {
-      float w = nvgTextBounds(p_ctx, 0, 0, txt.substr(0, i).c_str(), nullptr, nullptr);
+      float w = nvgTextBounds(pctx, 0, 0, txt.substr(0, i).c_str(), nullptr, nullptr);
       m_glyph_positions.push_back(w);
     }
 
@@ -243,7 +243,7 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
       gp.reserve(line.size() + 1);
       gp.push_back(0.f);
       for (size_t i = 1; i <= line.size(); ++i) {
-        float w = nvgTextBounds(p_ctx, 0, 0,
+        float w = nvgTextBounds(pctx, 0, 0,
           line.substr(0, i).c_str(),
           nullptr, nullptr);
         gp.push_back(w);
@@ -265,16 +265,16 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
 
   // draw selection
   if (m_buffer.has_selection()) {
-    nvgFillColor(p_ctx, m_pstyle->get_selection_color());
+    nvgFillColor(pctx, m_pstyle->get_selection_color());
     if (!multiline) {
       size_t a = std::min(m_buffer.sel_start, m_buffer.sel_end);
       size_t b = std::max(m_buffer.sel_start, m_buffer.sel_end);
       float x0 = 5.f - offset + m_glyph_positions[a] + m_pstyle->get_text_offset();
       float x1 = 5.f - offset + m_glyph_positions[b] + m_pstyle->get_text_offset();
       float baseline = m_size.y * 0.5f + (m_asc + desc) * 0.5f;
-      nvgBeginPath(p_ctx);
-      nvgRect(p_ctx, x0, baseline - m_asc, x1 - x0, m_asc - desc);
-      nvgFill(p_ctx);
+      nvgBeginPath(pctx);
+      nvgRect(pctx, x0, baseline - m_asc, x1 - x0, m_asc - desc);
+      nvgFill(pctx);
     }
     else {
       size_t sel_a = std::min(m_buffer.sel_start, m_buffer.sel_end);
@@ -288,39 +288,39 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
           size_t b = std::min(sel_b, le) - ls;
           std::string pre = line.substr(0, a);
           std::string sel = line.substr(a, b - a);
-          float x0 = 5.f - offset + nvgTextBounds(p_ctx, 0, 0, pre.c_str(), nullptr, nullptr);
-          float w = nvgTextBounds(p_ctx, 0, 0, sel.c_str(), nullptr, nullptr);
+          float x0 = 5.f - offset + nvgTextBounds(pctx, 0, 0, pre.c_str(), nullptr, nullptr);
+          float w = nvgTextBounds(pctx, 0, 0, sel.c_str(), nullptr, nullptr);
           float y0 = top_pad + i * m_line_h - m_asc;
-          nvgBeginPath(p_ctx);
-          nvgRect(p_ctx, x0 + m_pstyle->get_text_offset(), y0, w, m_line_h);
-          nvgFill(p_ctx);
+          nvgBeginPath(pctx);
+          nvgRect(pctx, x0 + m_pstyle->get_text_offset(), y0, w, m_line_h);
+          nvgFill(pctx);
         }
       }
     }
   }
 
   // draw text and cursor
-  nvgFillColor(p_ctx, m_pstyle->get_text_color());
-  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
+  nvgFillColor(pctx, m_pstyle->get_text_color());
+  nvgTextAlign(pctx, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
   if (!multiline) {
     float baseline = m_size.y * 0.5f + (m_asc + desc) * 0.5f;
-    nvgText(p_ctx, 5.f - offset + m_pstyle->get_text_offset(),
+    nvgText(pctx, 5.f - offset + m_pstyle->get_text_offset(),
       baseline, txt.c_str(), nullptr);
     if (m_active && m_blink_state) {
       float cw = m_glyph_positions[ci];
-      nvgBeginPath(p_ctx);
-      nvgMoveTo(p_ctx, 5.f - offset + cw + m_pstyle->get_text_offset() + 1, baseline - m_asc);
-      nvgLineTo(p_ctx, 5.f - offset + cw + m_pstyle->get_text_offset() + 1, baseline - desc);
-      nvgStrokeWidth(p_ctx, m_pstyle->get_blink_width());
-      nvgStrokeColor(p_ctx, m_pstyle->get_blink_color());
-      nvgStroke(p_ctx);
+      nvgBeginPath(pctx);
+      nvgMoveTo(pctx, 5.f - offset + cw + m_pstyle->get_text_offset() + 1, baseline - m_asc);
+      nvgLineTo(pctx, 5.f - offset + cw + m_pstyle->get_text_offset() + 1, baseline - desc);
+      nvgStrokeWidth(pctx, m_pstyle->get_blink_width());
+      nvgStrokeColor(pctx, m_pstyle->get_blink_color());
+      nvgStroke(pctx);
     }
   }
   else {
     float top_pad = 5.f + m_asc;
     for (size_t i = 0; i < lines.size(); ++i) {
       float y = top_pad + i * m_line_h;
-      nvgText(p_ctx, 5.f - offset + m_pstyle->get_text_offset(), y, lines[i].c_str(), nullptr);
+      nvgText(pctx, 5.f - offset + m_pstyle->get_text_offset(), y, lines[i].c_str(), nullptr);
     }
 
     if (m_active && m_blink_state) {
@@ -328,16 +328,16 @@ void rm_text_input::on_draw(NVGcontext* p_ctx) {
       size_t off = ci - m_line_starts[cli];
       float cx = m_line_glyphs[cli][off];
       float cy = 5.f + m_asc + cli * m_line_h;
-      nvgBeginPath(p_ctx);
-      nvgMoveTo(p_ctx, 5.f - offset + cx + m_pstyle->get_text_offset() + 1, cy - m_asc);
-      nvgLineTo(p_ctx, 5.f - offset + cx + m_pstyle->get_text_offset() + 1, cy - m_asc + m_line_h);
-      nvgStrokeWidth(p_ctx, m_pstyle->get_blink_width());
-      nvgStrokeColor(p_ctx, m_pstyle->get_blink_color());
-      nvgStroke(p_ctx);
+      nvgBeginPath(pctx);
+      nvgMoveTo(pctx, 5.f - offset + cx + m_pstyle->get_text_offset() + 1, cy - m_asc);
+      nvgLineTo(pctx, 5.f - offset + cx + m_pstyle->get_text_offset() + 1, cy - m_asc + m_line_h);
+      nvgStrokeWidth(pctx, m_pstyle->get_blink_width());
+      nvgStrokeColor(pctx, m_pstyle->get_blink_color());
+      nvgStroke(pctx);
     }
   }
 
-  rm_widget::on_draw(p_ctx);
+  rm_widget::on_draw(pctx);
 }
 
 void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
@@ -568,45 +568,45 @@ rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkb
 
 rm_checkbox::~rm_checkbox() {}
 
-void rm_checkbox::on_draw(NVGcontext* p_ctx) {
+void rm_checkbox::on_draw(NVGcontext* pctx) {
   float xo, yo;
   //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented this
-  nvgFontFaceId(p_ctx, get_font());
+  nvgFontFaceId(pctx, get_font());
 
   /* paint background */
-  nvgBeginPath(p_ctx);
-  nvgRoundedRectVarying(p_ctx,
+  nvgBeginPath(pctx);
+  nvgRoundedRectVarying(pctx,
     0.5f, 0.5f, m_size.y-1.f, m_size.y-1.f,
     m_pstyle->get_corner_radius(LEFT_TOP),
     m_pstyle->get_corner_radius(RIGHT_TOP),
     m_pstyle->get_corner_radius(RIGHT_BOTTOM),
     m_pstyle->get_corner_radius(LEFT_BOTTOM)
   );
-  nvgFillColor(p_ctx, m_pstyle->get_background_color());
-  nvgFill(p_ctx);
-  nvgStrokeWidth(p_ctx, m_pstyle->get_border_width());
-  nvgStrokeColor(p_ctx, m_pstyle->get_border_color());
-  nvgStroke(p_ctx);
+  nvgFillColor(pctx, m_pstyle->get_background_color());
+  nvgFill(pctx);
+  nvgStrokeWidth(pctx, m_pstyle->get_border_width());
+  nvgStrokeColor(pctx, m_pstyle->get_border_color());
+  nvgStroke(pctx);
 
   if (m_checked) {
     /* draw mark */
-    nvgFontFaceId(p_ctx, m_icon_font);
-    nvgFontSize(p_ctx, 16.f);
-    nvgTextAlign(p_ctx, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-    nvgFillColor(p_ctx, m_pstyle->get_text_color());
+    nvgFontFaceId(pctx, m_icon_font);
+    nvgFontSize(pctx, 16.f);
+    nvgTextAlign(pctx, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+    nvgFillColor(pctx, m_pstyle->get_text_color());
     xo = m_size.y / 2.f;
     yo = m_size.y / 2.f;
-    nvgText(p_ctx, xo, yo, ICON_FA_CHECK, nullptr);
+    nvgText(pctx, xo, yo, ICON_FA_CHECK, nullptr);
   }
 
-  nvgFontFaceId(p_ctx, get_font());
-  nvgFontSize(p_ctx, m_pstyle->get_font_size());
-  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-  nvgFillColor(p_ctx, m_pstyle->get_text_color());
+  nvgFontFaceId(pctx, get_font());
+  nvgFontSize(pctx, m_pstyle->get_font_size());
+  nvgTextAlign(pctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  nvgFillColor(pctx, m_pstyle->get_text_color());
 
   const rm_vec2& text_offsets = m_pstyle->get_text_offsets();
-  nvgText(p_ctx, m_size.y + text_offsets.x, (m_size.y / 2.0f) + text_offsets.y, m_label.c_str(), nullptr);
-  rm_widget::on_draw(p_ctx);
+  nvgText(pctx, m_size.y + text_offsets.x, (m_size.y / 2.0f) + text_offsets.y, m_label.c_str(), nullptr);
+  rm_widget::on_draw(pctx);
 }
 
 bool rm_checkbox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
@@ -649,42 +649,42 @@ size_t rm_combobox::find_item(const char* pitem)
   return rm_combobox::kinvalid_index;
 }
 
-void rm_combobox::on_draw(NVGcontext* p_ctx) {
+void rm_combobox::on_draw(NVGcontext* pctx) {
   //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
-  nvgFontFaceId(p_ctx, get_font());
+  nvgFontFaceId(pctx, get_font());
 
   //bgr
-  nvgBeginPath(p_ctx);
-  nvgRoundedRect(p_ctx, 0.f, 0.f, m_size.x, m_size.y, 4.0f);
-  nvgFillColor(p_ctx, nvgRGBA(180, 180, 180, 255));
-  nvgFill(p_ctx);
-  nvgStrokeColor(p_ctx, nvgRGBA(0, 0, 0, 255));
-  nvgStroke(p_ctx);
+  nvgBeginPath(pctx);
+  nvgRoundedRect(pctx, 0.f, 0.f, m_size.x, m_size.y, 4.0f);
+  nvgFillColor(pctx, nvgRGBA(180, 180, 180, 255));
+  nvgFill(pctx);
+  nvgStrokeColor(pctx, nvgRGBA(0, 0, 0, 255));
+  nvgStroke(pctx);
 
-  nvgFontSize(p_ctx, 18.0f);
-  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-  nvgFillColor(p_ctx, nvgRGBA(0, 0, 0, 255));
+  nvgFontSize(pctx, 18.0f);
+  nvgTextAlign(pctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  nvgFillColor(pctx, nvgRGBA(0, 0, 0, 255));
   if (!m_items.empty() && m_selected >= 0 && m_selected < (int)m_items.size())
-    nvgText(p_ctx, 5.f, m_size.y / 2.0f, m_items[m_selected].get_name(), nullptr);
+    nvgText(pctx, 5.f, m_size.y / 2.0f, m_items[m_selected].get_name(), nullptr);
 
   // arrow
   float x = 0, y = 0, w = m_size.x, h = m_size.y;
   float r = 4.0f;
   float ax = x + w - h * 0.5f, ay = y + h * 0.5f, sz = 5.f;
-  nvgBeginPath(p_ctx);
+  nvgBeginPath(pctx);
   if (!m_expanded) {
-    nvgMoveTo(p_ctx, ax - sz, ay - sz * 0.5f);
-    nvgLineTo(p_ctx, ax + sz, ay - sz * 0.5f);
-    nvgLineTo(p_ctx, ax, ay + sz * 0.5f);
+    nvgMoveTo(pctx, ax - sz, ay - sz * 0.5f);
+    nvgLineTo(pctx, ax + sz, ay - sz * 0.5f);
+    nvgLineTo(pctx, ax, ay + sz * 0.5f);
   }
   else {
-    nvgMoveTo(p_ctx, ax - sz, ay + sz * 0.5f);
-    nvgLineTo(p_ctx, ax + sz, ay + sz * 0.5f);
-    nvgLineTo(p_ctx, ax, ay - sz * 0.5f);
+    nvgMoveTo(pctx, ax - sz, ay + sz * 0.5f);
+    nvgLineTo(pctx, ax + sz, ay + sz * 0.5f);
+    nvgLineTo(pctx, ax, ay - sz * 0.5f);
   }
-  nvgClosePath(p_ctx);
-  nvgFillColor(p_ctx, nvgRGBA(50, 50, 50, 255));
-  nvgFill(p_ctx);
+  nvgClosePath(pctx);
+  nvgFillColor(pctx, nvgRGBA(50, 50, 50, 255));
+  nvgFill(pctx);
 
   if (m_expanded) {
     for (size_t i = 0; i < m_items.size(); i++) {
@@ -693,16 +693,16 @@ void rm_combobox::on_draw(NVGcontext* p_ctx) {
       rm_bbox bbox;
       rm_vec2 item_pos(m_absolute.x, m_absolute.y + itemY);
       bbox.init(item_pos, m_size);
-      nvgBeginPath(p_ctx);
-      nvgRect(p_ctx, 0.f, itemY, m_size.x, m_size.y);
-      nvgFillColor(p_ctx, bbox.inside(m_cursor) ? nvgRGBA(80, 80, 80, 255) : nvgRGBA(200, 200, 200, 255));
-      nvgFill(p_ctx);
-      nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-      nvgFillColor(p_ctx, nvgRGBA(0, 0, 0, 255));
-      nvgText(p_ctx, 5.f, itemY + m_size.y / 2.0f, item.get_name(), nullptr);
+      nvgBeginPath(pctx);
+      nvgRect(pctx, 0.f, itemY, m_size.x, m_size.y);
+      nvgFillColor(pctx, bbox.inside(m_cursor) ? nvgRGBA(80, 80, 80, 255) : nvgRGBA(200, 200, 200, 255));
+      nvgFill(pctx);
+      nvgTextAlign(pctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+      nvgFillColor(pctx, nvgRGBA(0, 0, 0, 255));
+      nvgText(pctx, 5.f, itemY + m_size.y / 2.0f, item.get_name(), nullptr);
     }
   }
-  rm_widget::on_draw(p_ctx);
+  rm_widget::on_draw(pctx);
 }
 
 bool rm_combobox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
@@ -770,24 +770,24 @@ rm_slider::rm_slider(rm_widget* p_parent, int x, int y, int width, int height, f
 
 rm_slider::~rm_slider() {}
 
-void rm_slider::on_draw(NVGcontext* p_ctx) {
+void rm_slider::on_draw(NVGcontext* pctx) {
   //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
 
   float trackY = m_inner_rect.y + m_inner_rect.height / 2.0f;
-  nvgBeginPath(p_ctx);
-  nvgMoveTo(p_ctx, m_inner_rect.x, trackY);
-  nvgLineTo(p_ctx, m_inner_rect.x + m_inner_rect.width, trackY);
-  nvgStrokeColor(p_ctx, nvgRGBA(150, 150, 150, 255));
-  nvgStroke(p_ctx);
+  nvgBeginPath(pctx);
+  nvgMoveTo(pctx, m_inner_rect.x, trackY);
+  nvgLineTo(pctx, m_inner_rect.x + m_inner_rect.width, trackY);
+  nvgStrokeColor(pctx, nvgRGBA(150, 150, 150, 255));
+  nvgStroke(pctx);
 
   float fraction = (m_value - m_min) / (m_max - m_min);
   float thumbX = m_inner_rect.x + fraction * m_inner_rect.width;
 
-  nvgBeginPath(p_ctx);
-  nvgCircle(p_ctx, thumbX, trackY, m_inner_rect.height / 2.5f);
-  nvgFillColor(p_ctx, nvgRGBA(100, 100, 250, 255));
-  nvgFill(p_ctx);
-  rm_widget::on_draw(p_ctx);
+  nvgBeginPath(pctx);
+  nvgCircle(pctx, thumbX, trackY, m_inner_rect.height / 2.5f);
+  nvgFillColor(pctx, nvgRGBA(100, 100, 250, 255));
+  nvgFill(pctx);
+  rm_widget::on_draw(pctx);
 }
 
 bool rm_slider::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
@@ -818,31 +818,31 @@ rm_progress_base::~rm_progress_base()
 {
 }
 
-void rm_progress_base::on_draw(NVGcontext* p_ctx)
+void rm_progress_base::on_draw(NVGcontext* pctx)
 {
   // paint background
-  nvgBeginPath(p_ctx);
-  nvgFillColor(p_ctx, nvgRGB(0, 0, 0));
-  nvgRoundedRect(p_ctx, 0.f, 0.f, m_size.x, m_size.y, m_round);
-  nvgFill(p_ctx);
+  nvgBeginPath(pctx);
+  nvgFillColor(pctx, nvgRGB(0, 0, 0));
+  nvgRoundedRect(pctx, 0.f, 0.f, m_size.x, m_size.y, m_round);
+  nvgFill(pctx);
 
   // paint progres bar
   float identity_percent = m_percent / 100.f; // 0.f-1.f
   rm_rect percent_rect(0.f, 0.f, m_size);
   percent_rect.width *= identity_percent;
 
-  NVGpaint paint = nvgLinearGradient(p_ctx, 
+  NVGpaint paint = nvgLinearGradient(pctx, 
     percent_rect.x, percent_rect.y,
     percent_rect.x + percent_rect.width, percent_rect.y,
     nvgRGB(232, 43, 231), nvgRGB(40, 5, 229));
 
-  nvgBeginPath(p_ctx);
-  nvgRoundedRect(p_ctx,
+  nvgBeginPath(pctx);
+  nvgRoundedRect(pctx,
     percent_rect.x, percent_rect.y,
     percent_rect.width, percent_rect.height, m_round);
-  nvgFillPaint(p_ctx, paint);
-  nvgFill(p_ctx);
-  rm_widget::on_draw(p_ctx);
+  nvgFillPaint(pctx, paint);
+  nvgFill(pctx);
+  rm_widget::on_draw(pctx);
 }
 
 bool rm_progress_base::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
@@ -863,31 +863,31 @@ rm_progress_image::~rm_progress_image()
 {
 }
 
-void rm_progress_image::on_draw(NVGcontext* p_ctx)
+void rm_progress_image::on_draw(NVGcontext* pctx)
 {
   int iw, ih;
   // paint background
-  nvgBeginPath(p_ctx);
-  nvgFillColor(p_ctx, nvgRGB(0, 0, 0));
-  nvgRoundedRect(p_ctx, 0.f, 0.f, m_size.x, m_size.y, m_round);
-  nvgFill(p_ctx);
+  nvgBeginPath(pctx);
+  nvgFillColor(pctx, nvgRGB(0, 0, 0));
+  nvgRoundedRect(pctx, 0.f, 0.f, m_size.x, m_size.y, m_round);
+  nvgFill(pctx);
 
   // paint progres bar
   float identity_percent = m_percent / 100.f; // 0.f-1.f
   rm_rect percent_rect(0.f, 0.f, m_size);
   percent_rect.width *= identity_percent;
 
-  nvgImageSize(p_ctx, m_image, &iw, &ih);
-  NVGpaint paint = nvgImagePattern(p_ctx, 0, 0, percent_rect.width, percent_rect.height, m_angle, m_image, m_alpha);
-  nvgBeginPath(p_ctx);
-  nvgRoundedRect(p_ctx,
+  nvgImageSize(pctx, m_image, &iw, &ih);
+  NVGpaint paint = nvgImagePattern(pctx, 0, 0, percent_rect.width, percent_rect.height, m_angle, m_image, m_alpha);
+  nvgBeginPath(pctx);
+  nvgRoundedRect(pctx,
     percent_rect.x, percent_rect.y,
     percent_rect.width, percent_rect.height, m_round);
-  nvgFillPaint(p_ctx, paint);
-  nvgFill(p_ctx);
+  nvgFillPaint(pctx, paint);
+  nvgFill(pctx);
 
-  drawSprite(p_ctx, m_image, m_alpha, 0.f, 0.f, 13.f, 15.f, percent_rect.x, percent_rect.y, percent_rect.width, percent_rect.height, m_round, m_round, m_round, m_round);
-  rm_widget::on_draw(p_ctx);
+  drawSprite(pctx, m_image, m_alpha, 0.f, 0.f, 13.f, 15.f, percent_rect.x, percent_rect.y, percent_rect.width, percent_rect.height, m_round, m_round, m_round, m_round);
+  rm_widget::on_draw(pctx);
 }
 
 void rm_scroll_base::orient_detect(const rm_rect& background)
@@ -895,7 +895,7 @@ void rm_scroll_base::orient_detect(const rm_rect& background)
   m_orientation = (background.width > background.height) ? RM_ORIENT_HORZ : RM_ORIENT_VERT;
 }
 
-void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, const rm_vec2& back, rm_scroll_style* pstyle, float pos)
+void rm_scroll_base::draw_scroll(NVGcontext* pctx, const rm_vec2& back, rm_scroll_style* pstyle, float pos)
 {
   rm_rect thumb_rect;
   assert(m_orientation != RM_ORIENT_AUTO && "[K.D.] m_orientation have undefined value! You called rm_scroll_base::orient_detect() from init/resize?");
@@ -913,25 +913,25 @@ void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, const rm_vec2& back, rm_scro
   }
 
   /* paint background */
-  nvgBeginPath(p_ctx);
-  nvgFillColor(p_ctx, pstyle->get_scroll_background_color());
-  nvgRoundedRect(p_ctx, 0, 0, back.x, back.y, pstyle->get_scroll_corner_radius());
-  nvgFill(p_ctx);
-  nvgStrokeWidth(p_ctx, pstyle->get_background_stroke_width());
-  nvgStrokeColor(p_ctx, pstyle->get_scroll_background_border_color());
-  nvgStroke(p_ctx);
+  nvgBeginPath(pctx);
+  nvgFillColor(pctx, pstyle->get_scroll_background_color());
+  nvgRoundedRect(pctx, 0, 0, back.x, back.y, pstyle->get_scroll_corner_radius());
+  nvgFill(pctx);
+  nvgStrokeWidth(pctx, pstyle->get_background_stroke_width());
+  nvgStrokeColor(pctx, pstyle->get_scroll_background_border_color());
+  nvgStroke(pctx);
 
   /* paint thumb */
-  nvgBeginPath(p_ctx);
-  nvgFillColor(p_ctx, pstyle->get_scroll_thumb_color());
-  nvgRoundedRect(p_ctx, thumb_rect.x, thumb_rect.y, thumb_rect.width, thumb_rect.height, pstyle->get_scroll_corner_radius());
-  nvgFill(p_ctx);
-  nvgStrokeWidth(p_ctx, pstyle->get_thumb_stroke_width());
-  nvgStrokeColor(p_ctx, pstyle->get_scroll_thumb_border_color());
-  nvgStroke(p_ctx);
+  nvgBeginPath(pctx);
+  nvgFillColor(pctx, pstyle->get_scroll_thumb_color());
+  nvgRoundedRect(pctx, thumb_rect.x, thumb_rect.y, thumb_rect.width, thumb_rect.height, pstyle->get_scroll_corner_radius());
+  nvgFill(pctx);
+  nvgStrokeWidth(pctx, pstyle->get_thumb_stroke_width());
+  nvgStrokeColor(pctx, pstyle->get_scroll_thumb_border_color());
+  nvgStroke(pctx);
 }
 
-void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_vec2 content,
+void rm_scroll_base::draw_scroll(NVGcontext* pctx, rm_scroll_style* pstyle, rm_vec2 content,
   const rm_vec2& window, float thumb_thickness, float pos)
 {
   rm_rect thumb_rect;
@@ -978,38 +978,38 @@ void rm_scroll_base::draw_scroll(NVGcontext* p_ctx, rm_scroll_style* pstyle, rm_
   }
 
   // paint background
-  nvgBeginPath(p_ctx);
-  nvgFillColor(p_ctx, pstyle->get_scroll_background_color());
-  nvgRoundedRect(p_ctx, 0, 0, window.x, window.y, background_round);
-  nvgFill(p_ctx);
-  nvgStrokeWidth(p_ctx, pstyle->get_background_stroke_width());
-  nvgStrokeColor(p_ctx, pstyle->get_scroll_background_border_color());
-  nvgStroke(p_ctx);
+  nvgBeginPath(pctx);
+  nvgFillColor(pctx, pstyle->get_scroll_background_color());
+  nvgRoundedRect(pctx, 0, 0, window.x, window.y, background_round);
+  nvgFill(pctx);
+  nvgStrokeWidth(pctx, pstyle->get_background_stroke_width());
+  nvgStrokeColor(pctx, pstyle->get_scroll_background_border_color());
+  nvgStroke(pctx);
 
   // paint thumb
-  nvgBeginPath(p_ctx);
-  nvgFillColor(p_ctx, pstyle->get_scroll_thumb_color());
-  nvgRoundedRect(p_ctx, thumb_rect.x, thumb_rect.y, thumb_rect.width, thumb_rect.height, thumb_round);
-  nvgFill(p_ctx);
-  nvgStrokeWidth(p_ctx, pstyle->get_thumb_stroke_width());
-  nvgStrokeColor(p_ctx, pstyle->get_scroll_thumb_border_color());
-  nvgStroke(p_ctx);
+  nvgBeginPath(pctx);
+  nvgFillColor(pctx, pstyle->get_scroll_thumb_color());
+  nvgRoundedRect(pctx, thumb_rect.x, thumb_rect.y, thumb_rect.width, thumb_rect.height, thumb_round);
+  nvgFill(pctx);
+  nvgStrokeWidth(pctx, pstyle->get_thumb_stroke_width());
+  nvgStrokeColor(pctx, pstyle->get_scroll_thumb_border_color());
+  nvgStroke(pctx);
 }
 
-void rm_animation::on_draw(NVGcontext* p_ctx)
+void rm_animation::on_draw(NVGcontext* pctx)
 {
   rm_vec2 pos(m_size.x / 2.f, m_size.y / 2.f);
-  rm_widget::on_draw(p_ctx);
-  nvgTranslate(p_ctx, pos.x, pos.y);
-  nvgRotate(p_ctx, m_angle);
-  nvgScale(p_ctx, m_scale, m_scale);
-  nvgTranslate(p_ctx, -pos.x, -pos.y);
-  nvgBeginPath(p_ctx);
-  NVGpaint imgPaint = nvgImagePattern(p_ctx, 0.f, 0.f, m_size.x, m_size.y, 0.0f, m_image, 1.0f);
-  nvgBeginPath(p_ctx);
-  nvgRoundedRect(p_ctx, 0.f, 0.f, m_size.x, m_size.y, 4.0f);
-  nvgFillPaint(p_ctx, imgPaint);
-  nvgFill(p_ctx);
+  rm_widget::on_draw(pctx);
+  nvgTranslate(pctx, pos.x, pos.y);
+  nvgRotate(pctx, m_angle);
+  nvgScale(pctx, m_scale, m_scale);
+  nvgTranslate(pctx, -pos.x, -pos.y);
+  nvgBeginPath(pctx);
+  NVGpaint imgPaint = nvgImagePattern(pctx, 0.f, 0.f, m_size.x, m_size.y, 0.0f, m_image, 1.0f);
+  nvgBeginPath(pctx);
+  nvgRoundedRect(pctx, 0.f, 0.f, m_size.x, m_size.y, 4.0f);
+  nvgFillPaint(pctx, imgPaint);
+  nvgFill(pctx);
   m_angle += m_speed * m_proot->get_delta_time();
 }
 
@@ -1049,11 +1049,11 @@ void rm_scrollbar::adjust_position()
   }
 }
 
-void rm_scrollbar::on_draw(NVGcontext* p_ctx)
+void rm_scrollbar::on_draw(NVGcontext* pctx)
 {
   rm_vec2 content_rect(1000, 1000);
-  draw_scroll(p_ctx, m_pstyle, content_rect, m_size, m_pstyle->get_thumb_size(), m_position);
-  rm_widget::on_draw(p_ctx);
+  draw_scroll(pctx, m_pstyle, content_rect, m_size, m_pstyle->get_thumb_size(), m_position);
+  rm_widget::on_draw(pctx);
 }
 
 bool rm_scrollbar::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
@@ -1131,17 +1131,17 @@ void rm_tabcontrol::get_tabcontrol_size(rm_vec2& dst)
   dst.init(m_pstyle->get_tab_height(), m_size.y);
 }
 
-void rm_tabcontrol::on_draw(NVGcontext* p_ctx) {
+void rm_tabcontrol::on_draw(NVGcontext* pctx) {
   //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
-  nvgFontFaceId(p_ctx, get_font());
+  nvgFontFaceId(pctx, get_font());
 
   // background
-  //nvgBeginPath(p_ctx);
-  //nvgRoundedRect(p_ctx, 0.f, 0.f, m_relative.width, m_relative.height, 4.0f);
-  //nvgFillColor(p_ctx, m_pstyle->get_background_color());
-  //nvgFill(p_ctx);
-  //nvgStrokeColor(p_ctx, m_pstyle->get_border_color());
-  //nvgStroke(p_ctx);
+  //nvgBeginPath(pctx);
+  //nvgRoundedRect(pctx, 0.f, 0.f, m_relative.width, m_relative.height, 4.0f);
+  //nvgFillColor(pctx, m_pstyle->get_background_color());
+  //nvgFill(pctx);
+  //nvgStrokeColor(pctx, m_pstyle->get_border_color());
+  //nvgStroke(pctx);
   bool is_horizontal = m_pstyle->is_horizontal();
   size_t num_tabs = m_tabs.size();
   if (!num_tabs)
@@ -1150,8 +1150,8 @@ void rm_tabcontrol::on_draw(NVGcontext* p_ctx) {
   rm_vec2 tab_size;
   get_one_tab_size(tab_size);
 
-  nvgFontSize(p_ctx, m_pstyle->get_font_size());
-  nvgTextAlign(p_ctx, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+  nvgFontSize(pctx, m_pstyle->get_font_size());
+  nvgTextAlign(pctx, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
 
   for (size_t i = 0; i < num_tabs; ++i) {
     bool is_first = i == 0;
@@ -1159,22 +1159,22 @@ void rm_tabcontrol::on_draw(NVGcontext* p_ctx) {
     float x = (is_horizontal ? i * tab_size.x : 0.f);
     float y = (is_horizontal ? 0.f : i * tab_size.y);
 
-    nvgBeginPath(p_ctx);
-    nvgFillColor(p_ctx, (int(i) == m_selected) ? m_pstyle->get_selected_color() : m_pstyle->get_unselected_color());
-    nvgRoundedRectVarying(p_ctx, x, y, tab_size.x, tab_size.y,
+    nvgBeginPath(pctx);
+    nvgFillColor(pctx, (int(i) == m_selected) ? m_pstyle->get_selected_color() : m_pstyle->get_unselected_color());
+    nvgRoundedRectVarying(pctx, x, y, tab_size.x, tab_size.y,
       is_first ? m_pstyle->get_corner_radius(LEFT_TOP) : 0.f,
       (is_horizontal ? is_last : is_first) ? m_pstyle->get_corner_radius(RIGHT_TOP) : 0.f,
       is_last ? m_pstyle->get_corner_radius(RIGHT_BOTTOM) : 0.f,
       (is_horizontal ? is_first : is_last) ? m_pstyle->get_corner_radius(LEFT_BOTTOM) : 0.f);
-    nvgFill(p_ctx);
-    nvgStrokeColor(p_ctx, m_pstyle->get_border_color());
-    nvgStroke(p_ctx);
-    nvgFillColor(p_ctx, m_pstyle->get_text_color());
-    nvgText(p_ctx, (x + tab_size.x * 0.5f) + m_pstyle->get_text_offsets().x,
+    nvgFill(pctx);
+    nvgStrokeColor(pctx, m_pstyle->get_border_color());
+    nvgStroke(pctx);
+    nvgFillColor(pctx, m_pstyle->get_text_color());
+    nvgText(pctx, (x + tab_size.x * 0.5f) + m_pstyle->get_text_offsets().x,
       (y + tab_size.y * 0.5f) + m_pstyle->get_text_offsets().y,
       m_tabs[i].get_name(),
       NULL);
-    rm_widget::on_draw(p_ctx);
+    rm_widget::on_draw(pctx);
   }
 }
 
@@ -1241,69 +1241,69 @@ void rm_tabcontrol::get_one_tab_size(rm_vec2& dst_size)
   }
 }
 
-void rm_treeview::on_draw(NVGcontext* p_ctx) {
+void rm_treeview::on_draw(NVGcontext* pctx) {
   //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
-  nvgFontFaceId(p_ctx, get_font());
-  nvgFontSize(p_ctx, m_rowHeight * 0.8f);
-  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  nvgFontFaceId(pctx, get_font());
+  nvgFontSize(pctx, m_rowHeight * 0.8f);
+  nvgTextAlign(pctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 
   // background
-  nvgBeginPath(p_ctx);
-  nvgRect(p_ctx, 0.f, 0.f, m_size.x, m_size.y);
-  nvgFillColor(p_ctx, nvgRGBA(245, 245, 245, 255));
-  nvgFill(p_ctx);
+  nvgBeginPath(pctx);
+  nvgRect(pctx, 0.f, 0.f, m_size.x, m_size.y);
+  nvgFillColor(pctx, nvgRGBA(245, 245, 245, 255));
+  nvgFill(pctx);
 
   float y = 0.f;
   for (auto root : m_roots) {
-    y = draw_node(p_ctx, root, 0.f, y);
+    y = draw_node(pctx, root, 0.f, y);
     if (y > m_size.y)
       break; // clip
   }
-  rm_widget::on_draw(p_ctx);
+  rm_widget::on_draw(pctx);
 }
 
-float rm_treeview::draw_node(NVGcontext* p_ctx, rm_tree_node* node, float x, float y) {
+float rm_treeview::draw_node(NVGcontext* pctx, rm_tree_node* node, float x, float y) {
   // background if selected
   if (node == m_selected) {
-    nvgBeginPath(p_ctx);
-    nvgRect(p_ctx, x, y, m_size.x - x, m_rowHeight);
-    nvgFillColor(p_ctx, nvgRGBA(200, 230, 255, 255));
-    nvgFill(p_ctx);
+    nvgBeginPath(pctx);
+    nvgRect(pctx, x, y, m_size.x - x, m_rowHeight);
+    nvgFillColor(pctx, nvgRGBA(200, 230, 255, 255));
+    nvgFill(pctx);
   }
   // expand/collapse icon
   if (!node->children.empty()) {
     const float sz = m_rowHeight * 0.5f;
     float cx = x + (m_indent - sz) * 0.5f;
     float cy = y + (m_rowHeight - sz) * 0.5f;
-    nvgBeginPath(p_ctx);
+    nvgBeginPath(pctx);
 
     //TODO: k.d replace by icons
     if (node->expanded) {
       // draw '-'
-      nvgMoveTo(p_ctx, cx, cy + sz / 2);
-      nvgLineTo(p_ctx, cx + sz, cy + sz / 2);
+      nvgMoveTo(pctx, cx, cy + sz / 2);
+      nvgLineTo(pctx, cx + sz, cy + sz / 2);
     }
     else {
       // draw '+'
-      nvgMoveTo(p_ctx, cx, cy + sz / 2);
-      nvgLineTo(p_ctx, cx + sz, cy + sz / 2);
-      nvgMoveTo(p_ctx, cx + sz / 2, cy);
-      nvgLineTo(p_ctx, cx + sz / 2, cy + sz);
+      nvgMoveTo(pctx, cx, cy + sz / 2);
+      nvgLineTo(pctx, cx + sz, cy + sz / 2);
+      nvgMoveTo(pctx, cx + sz / 2, cy);
+      nvgLineTo(pctx, cx + sz / 2, cy + sz);
     }
-    nvgStrokeColor(p_ctx, nvgRGBA(100, 100, 100, 255));
-    nvgStroke(p_ctx);
+    nvgStrokeColor(pctx, nvgRGBA(100, 100, 100, 255));
+    nvgStroke(pctx);
   }
   // draw text
   float tx = x + m_indent;
   float ty = y + m_rowHeight * 0.5f;
-  nvgFillColor(p_ctx, nvgRGBA(0, 0, 0, 255));
-  nvgText(p_ctx, tx, ty, node->name.c_str(), nullptr);
+  nvgFillColor(pctx, nvgRGBA(0, 0, 0, 255));
+  nvgText(pctx, tx, ty, node->name.c_str(), nullptr);
 
   y += m_rowHeight;
   // draw children
   if (node->expanded) {
     for (auto child : node->children) {
-      y = draw_node(p_ctx, child, x + m_indent, y);
+      y = draw_node(pctx, child, x + m_indent, y);
       if (y > m_size.y)
         break;
     }
@@ -1371,15 +1371,15 @@ bool rm_treeview::hit_test(const rm_vec2& pos,
   return false;
 }
 
-void rm_output_text::on_draw(NVGcontext* p_ctx)
+void rm_output_text::on_draw(NVGcontext* pctx)
 {
   rm_vec2 textpos(5.f, 0.f);
-  //nvgBeginPath(p_ctx);
-  //nvgRoundedRect(p_ctx, 1.f, 1.f, m_size.x - 1.f, m_size.y - 1.f, 4.f);
-  //nvgFillColor(p_ctx, nvgRGB(255, 255, 255));
-  ////nvgStrokeColor(p_ctx, nvgRGB(0, 0, 0));
-  //nvgFill(p_ctx);
-  ////nvgStroke(p_ctx);
+  //nvgBeginPath(pctx);
+  //nvgRoundedRect(pctx, 1.f, 1.f, m_size.x - 1.f, m_size.y - 1.f, 4.f);
+  //nvgFillColor(pctx, nvgRGB(255, 255, 255));
+  ////nvgStrokeColor(pctx, nvgRGB(0, 0, 0));
+  //nvgFill(pctx);
+  ////nvgStroke(pctx);
 
   rm_vec2 pos(1.f, 1.f);
   rm_vec2 size(m_size.x - 1.f, m_size.y - 1.f);
@@ -1388,15 +1388,15 @@ void rm_output_text::on_draw(NVGcontext* p_ctx)
   NVGcolor colors[rm_utl::RM_BFRM_MAX_COLORS] = {nvgRGB(128, 128, 128), nvgRGB(60, 60, 60)};
   rm_corners_style cstyle;
   cstyle.set_all_corners_radius(8.f);
-  rm_utl::draw_frame(p_ctx, pos, size, rm_utl::RM_BFRM_MODE_SUNKEN, background, stroke,
+  rm_utl::draw_frame(pctx, pos, size, rm_utl::RM_BFRM_MODE_SUNKEN, background, stroke,
     1.f, colors, &cstyle);
   
-  nvgFontFaceId(p_ctx, get_font());
-  nvgFillColor(p_ctx, nvgRGBA(0, 0, 0, 255));
-  nvgTextAlign(p_ctx, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+  nvgFontFaceId(pctx, get_font());
+  nvgFillColor(pctx, nvgRGBA(0, 0, 0, 255));
+  nvgTextAlign(pctx, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
   for (size_t i = 0; i < m_linesbuf.get_num_output_lines(); i++) {
     const rm_line_ring_buffer::rm_rb_line* pline = m_linesbuf.get_output_line(i);
-    nvgText(p_ctx, textpos.x, textpos.y, pline->get_cstr(), nullptr);
+    nvgText(pctx, textpos.x, textpos.y, pline->get_cstr(), nullptr);
     textpos.y += m_line_height;
   }
 }
@@ -1421,15 +1421,15 @@ void rm_output_text::printf(const char* pformat, ...)
   m_linesbuf.append_text(m_textbuf);
 }
 
-void rm_number_input::draw_buttons(NVGcontext* p_ctx)
+void rm_number_input::draw_buttons(NVGcontext* pctx)
 {
-  //nvgBeginPath(p_ctx);
+  //nvgBeginPath(pctx);
 
 }
 
-void rm_number_input::on_draw(NVGcontext* p_ctx)
+void rm_number_input::on_draw(NVGcontext* pctx)
 {
-  //nvgBeginPath(p_ctx);
+  //nvgBeginPath(pctx);
   
 }
 
@@ -1449,5 +1449,19 @@ rm_number_input::rm_number_input(rm_widget* p_parent, int x, int y, int width, i
   input_type type, int value, int step, int minval, int maxval) :
   rm_widget(x, y, width, height, p_parent, "ui_outputtext", EXGUI_FLAG_DEFAULT),
   m_type(type), m_value(value), m_step(step), m_minval(minval), m_maxval(maxval)
+{
+}
+
+void rm_tabcontrol_ex::on_draw(NVGcontext* pctx)
+{
+}
+
+bool rm_tabcontrol_ex::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
+{
+  return false;
+}
+
+rm_tabcontrol_ex::rm_tabcontrol_ex(rm_widget* p_parent, int x, int y, int width, int height, uint32_t tab_flags) : 
+  rm_widget(x, y, width, height, p_parent, "ui_kdtabcontrol", EXGUI_FLAG_DEFAULT)
 {
 }

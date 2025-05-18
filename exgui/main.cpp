@@ -351,41 +351,11 @@ void testtrb()
   }
 }
 
-int main() {
-  //testtrb();
-  //return 0;
-
-  const int winWidth = 1280, winHeight = 1024;
-  GLFWwindow* window = initWindow(winWidth, winHeight, "Test rmgui Controls");
-  if (!window) return -1;
-
-  glfwSwapInterval(1);
-
-  NVGcontext* vg = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
-  if (!vg) {
-    std::cerr << "Failed to create NanoVG context\n";
-    glfwDestroyWindow(window);
-    glfwTerminate();
-    return -1;
-  }
-
-  rm_surface* gui = new rm_surface(vg, winWidth, winHeight, &instance);
-  rm_font default_font = gui->load_font("Gogh_Regular.ttf", "default");
-  if (!default_font.is_valid()) {
-    printf("can't load font!\n");
-  }
-
-  rm_image image_pat = gui->load_image("ipat.png", NVG_IMAGE_REPEATX);
-  if (!image_pat.is_valid()) {
-    printf("can't load image\n");
-  }
-
-  gui->set_font(default_font);
-  g_gui = gui;
-
+void test_old(rm_surface* gui)
+{
   static rm_window_style default_style;
   default_style.apply_defaults();
-  rm_window* pwindow = new rm_window(gui, 1, 1, 1024, 768);
+  rm_window* pwindow = new rm_window(gui, 20, 20, 1024, 768);
   pwindow->set_style(&default_style);
   pwindow->set_zindex(-1);
 
@@ -396,7 +366,7 @@ int main() {
   static rm_text_input_style style_inp;
   //style_inp.set_text_offsets(10.0f);
   style_inp.set_all_corners_radius(4.f);
-  style_inp.set_border_color(nvgRGB(0,0,255));
+  style_inp.set_border_color(nvgRGB(0, 0, 255));
   style_inp.set_border_width(2.f);
   style_inp.set_rounded_selection(0);
   //style_inp.set_active_bgr_color({ 0,0,0 });
@@ -411,7 +381,7 @@ int main() {
   style.set_border_color(nvgRGB(80, 80, 80));
   style.set_mark_color(nvgRGB(111, 111, 255));
   style.set_border_width(1.f);
-  
+
   //style.set_corner_radius(LEFT_TOP, 4.f);
   //style.set_corner_radius(RIGHT_TOP, 4.f);
   //style.set_corner_radius(RIGHT_BOTTOM, 4.f);
@@ -436,13 +406,13 @@ int main() {
   );
   tabs->set_style(&tabcontrol_style);
 
-  rm_widget *t0 = tabs->add_tab("Home");
+  rm_widget* t0 = tabs->add_tab("Home");
   t0->get_content_area().y = 10;
 
-  rm_widget *t1 = tabs->add_tab("Settings");
+  rm_widget* t1 = tabs->add_tab("Settings");
   t1->get_content_area().y = 100;
 
-  rm_widget *t2 = tabs->add_tab("Test1");
+  rm_widget* t2 = tabs->add_tab("Test1");
   t2->get_content_area().y = 100;
 
   rm_label* home_label = new rm_label(t0, 0, 0, "Welcome to the Home tab");
@@ -452,8 +422,8 @@ int main() {
   //rm_text_input* setting_input = new rm_text_input(t1, 10, 25, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
 
   rm_vec2& size = pwindow->get_size();
-  rm_output_text* potext = new rm_output_text(pwindow, 
-    1.f, size.y-200.f-10.f, pwindow->get_size().x, 200.f);
+  rm_output_text* potext = new rm_output_text(pwindow,
+    1.f, size.y - 200.f - 10.f, pwindow->get_size().x, 200.f);
 #if 0
   rm_treeview* tree = new rm_treeview(290, 230, 200, 200, pwindow,
     [](rm_treeview* tv, rm_tree_node* node) {
@@ -470,15 +440,15 @@ int main() {
 #endif
   checkbox->set_userptr(potext);
 
-  rm_animation* anim = new rm_animation(pwindow, 20, 100, 100, 100, image_pat);
-  anim->set_speed(8.f);
-  anim->set_scale(0.5f);
+  //rm_animation* anim = new rm_animation(pwindow, 20, 100, 100, 100, image_pat);
+  //anim->set_speed(8.f);
+  //anim->set_scale(0.5f);
 
-  rm_animation* anim2 = new rm_animation(pwindow, 20 + 100, 100, 100, 100, image_pat);
-  anim2->set_speed(-8.f);
-  anim2->set_scale(0.5f);
+  //rm_animation* anim2 = new rm_animation(pwindow, 20 + 100, 100, 100, 100, image_pat);
+  //anim2->set_speed(-8.f);
+  //anim2->set_scale(0.5f);
 
-  rm_combobox* combobox = new rm_combobox(pwindow, 300, 100+50, 200, 20);
+  rm_combobox* combobox = new rm_combobox(pwindow, 300, 100 + 50, 200, 20);
   combobox->add_item("Item 1");
   combobox->add_item("Item 2");
   combobox->add_item("Item 3");
@@ -488,16 +458,164 @@ int main() {
   //scrollbar_style.set_scroll_thumb_color(nvgRGB(90, 90, 90));
   //scrollbar_style.set_thumb_size(10);
   //rm_scrollbar* pscroll = new rm_scrollbar(pwindow, RM_ORIENT_VERT, &scrollbar_style);
-
+   
   rm_slider* slider = new rm_slider(pwindow, 50, 400, 400, 40, 0.0f, 100.0f, 50.0f,
-    [](rm_slider *psilder) {
+    [](rm_slider* psilder) {
       psilder->get_userptr<rm_output_text>()->printf("slider value changed: %f", psilder->get_value());
     }
   );
   slider->set_userptr(potext);
 
   rm_progress_base* progress = new rm_progress_base(pwindow, 50, 350, 300, 10, 0.f, 5.f);
-  rm_progress_image* progress2 = new rm_progress_image(pwindow, 50, 350 + 10 + 5, 300, 10, image_pat, 0.f, 1.f, 0.f, 5.f);
+  //rm_progress_image* progress2 = new rm_progress_image(pwindow, 50, 350 + 10 + 5, 300, 10, image_pat, 0.f, 1.f, 0.f, 5.f);
+}
+
+#define NVG_KAPPA90 0.5522847493f
+
+void draw_tab_bezier(NVGcontext* ctx,
+  rm_vec2 pos,
+  rm_vec2 size,
+  rm_vec2 up_offsets,
+  float r)
+{
+  float xBL = pos.x;
+  float yBL = pos.y + size.y;
+  float xBR = pos.x + size.x;
+  float yBR = pos.y + size.y;
+  float xTR = pos.x + size.x + up_offsets.y;
+  float yTR = pos.y;
+  float xTL = pos.x + up_offsets.x;
+  float yTL = pos.y;
+  const float k = r * (4.0f * (std::sqrt(2.0f) - 1.0f) / 3.0f);
+
+  nvgBeginPath(ctx);
+  nvgMoveTo(ctx, xBL, yBL);
+  nvgLineTo(ctx, xBR, yBR);
+  nvgLineTo(ctx, xTR, yTR + r);
+  // (xTR - r, yTR)
+  nvgBezierTo(ctx,
+    xTR, yTR + r - k, // ctrl1
+    xTR - r + k, yTR, // ctrl2
+    xTR - r, yTR); // end
+
+  // (xTL + r, yTL)
+  nvgLineTo(ctx, xTL + r, yTL);
+  // (xTL, yTL + r)
+  nvgBezierTo(ctx,
+    xTL + r - k, yTL, // ctrl1
+    xTL, yTL + r - k, // ctrl2
+    xTL, yTL + r); // end
+  nvgLineTo(ctx, xBL, yBL);
+  nvgClosePath(ctx);
+}
+
+void draw_tab(NVGcontext* pctx, rm_vec2 pos, rm_vec2 size, rm_vec2 up_offsets, float r)
+{
+  float x0 = pos.x + up_offsets.x;  
+  float x1 = pos.x;   
+  float x2 = pos.x + size.x;              
+  float x3 = pos.x + size.x + up_offsets.y;
+  float y0 = pos.y;                      
+  float y1 = pos.y + size.y;           
+
+  nvgBeginPath(pctx);
+  nvgMoveTo(pctx, x0 + r, y0);
+  nvgLineTo(pctx, x3 - r, y0);
+  nvgArcTo(pctx, x3, y0,
+    x3, y0 + r,
+    r);
+  nvgLineTo(pctx, x2, y1);
+  nvgLineTo(pctx, x1, y1);
+  nvgLineTo(pctx, x0, y0 + r);
+  nvgArcTo(pctx, x0, y0,
+    x0 + r, y0,
+    r);
+  nvgClosePath(pctx);
+}
+
+
+#include <nanovg.h>
+
+void draw_tab_path(NVGcontext* pctx,
+  rm_vec2 pos,
+  rm_vec2 size,
+  rm_vec2 up_offsets,
+  float r)
+{
+  float xBL = pos.x;
+  float yBL = pos.y + size.y;
+  float xBR = pos.x + size.x;
+  float yBR = pos.y + size.y;
+  float xTR = pos.x + size.x + up_offsets.y;
+  float yTR = pos.y;
+  float xTL = pos.x + up_offsets.x;
+  float yTL = pos.y;
+
+  nvgBeginPath(pctx);
+  nvgMoveTo(pctx, xBL, yBL);
+  nvgLineTo(pctx, xBR, yBR);
+  nvgArcTo(pctx,
+    xTR, yTR,
+    xTL, yTL,
+    r);
+  nvgArcTo(pctx,
+    xTL, yTL,
+    xBL, yBL,
+    r);
+  nvgClosePath(pctx);
+}
+
+
+
+void example_widgets(rm_surface* gui)
+{
+  static class debug_widget : public rm_widget {
+  public:
+    debug_widget(rm_widget *pparent) : rm_widget(20, 20, 800, 800, pparent, "debug_widget") {}
+    void on_draw(NVGcontext* pctx) override {
+      draw_tab_path(pctx, rm_vec2(0.f, 0.f), rm_vec2(100.f, 20.f), rm_vec2(0.f, 0.f), 4.f);
+      nvgFillColor(pctx, nvgRGB(93, 93, 95));
+      nvgStrokeWidth(pctx, 1.f);
+      nvgStrokeColor(pctx, nvgRGB(102, 102, 104));
+      nvgFill(pctx);
+      nvgStroke(pctx);
+    }
+  } dbg_widget(gui);
+
+
+}
+
+int main() {
+  //testtrb();
+  //return 0;
+
+  const int winWidth = 1280, winHeight = 1024;
+  GLFWwindow* window = initWindow(winWidth, winHeight, "Test rmgui Controls");
+  if (!window) return -1;
+
+  glfwSwapInterval(1);
+
+  NVGcontext* vg = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+  if (!vg) {
+    std::cerr << "Failed to create NanoVG context\n";
+    glfwDestroyWindow(window);
+    glfwTerminate();
+    return -1;
+  }
+
+  g_gui = new rm_surface(vg, winWidth, winHeight, &instance);
+  rm_font default_font = g_gui->load_font("Gogh_Regular.ttf", "default");
+  if (!default_font.is_valid()) {
+    printf("can't load font!\n");
+  }
+
+  rm_image image_pat = g_gui->load_image("ipat.png", NVG_IMAGE_REPEATX);
+  if (!image_pat.is_valid()) {
+    printf("can't load image\n");
+  }
+
+  g_gui->set_font(default_font);
+  example_widgets(g_gui);
 
   glfwSetCursorPosCallback(window, cursor_position_callback);
   glfwSetMouseButtonCallback(window, mouse_button_callback);
@@ -513,7 +631,7 @@ int main() {
     int fbWidth, fbHeight;
     glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
     glViewport(0, 0, fbWidth, fbHeight);
-    glClearColor(0.3f, 0.3f, 0.32f, 1.0f);
+    glClearColor(34/255.f, 32 / 255.f, 33 / 255.f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     last_time = current_time;
@@ -521,15 +639,8 @@ int main() {
     float dt = current_time - last_time;
     float sinabs = fabsf(sinf(current_time));
     float percent = sinabs * 100.f;
-    progress->set_percent(percent);
-    progress2->set_percent(slider->get_value());
-    //pscroll->set_position(sinabs);
-
-    if(checkbox->is_checked())
-      potext->printf("current time is %f", current_time);
-
-    gui->resize(fbWidth, fbHeight);
-    gui->draw(dt);
+    g_gui->resize(fbWidth, fbHeight);
+    g_gui->draw(dt);
 
 #if 0
     int w, h;
@@ -543,15 +654,7 @@ int main() {
 #endif
     glfwSwapBuffers(window);
   }
-
-  delete imgButton;
-  delete textButton;
-  delete label;
-  delete textInput;
-  delete checkbox;
-  delete combobox;
-  delete slider;
-  delete gui;
+  delete g_gui;
   nvgDeleteGL3(vg);
   glfwDestroyWindow(window);
   glfwTerminate();

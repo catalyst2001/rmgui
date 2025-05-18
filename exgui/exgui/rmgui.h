@@ -177,9 +177,25 @@ _type rm_max(_type a, _type b)
 }
 
 template<class _type>
+_type rm_abs(_type a)
+{
+  //static_assert(std::is_integral<_type>() || std::is_floating_point<_type>(), "rm_abs have unsupported type!");
+  if (a < (_type)0)
+    return -a;
+
+  return a;
+}
+
+template<class _type>
 _type rm_clamp(_type v, _type minval, _type maxval)
 {
   return rm_max(minval, rm_min(v, maxval));
+}
+
+template<class _type>
+_type rm_sign(_type v)
+{
+  return (v < (_type)0) ? (_type)-1 : (_type)1;
 }
 
 class rm_bbox
@@ -434,6 +450,42 @@ public:
   virtual float              get_time() = 0;
 };
 
+/**
+* 
+*/
+class rm_color : public NVGcolor
+{
+public:
+  rm_color(const NVGcolor& nvgcolor) {
+    r = nvgcolor.r;
+    g = nvgcolor.g;
+    b = nvgcolor.b;
+    a = nvgcolor.a;
+  }
+  rm_color(const rm_color& color) {
+    r = color.r;
+    g = color.g;
+    b = color.b;
+    a = color.a;
+  }
+  inline void from_RGB(uint8_t _r, uint8_t _g, uint8_t _b) { *this = nvgRGB(_r, _g, _b); }//TODO: K.D. optimize stack costs!!
+  inline void from_RGBA(uint8_t _r, uint8_t _g, uint8_t _b, uint8_t _a) { *this = nvgRGBA(_r, _g, _b, _a); }//TODO: K.D. optimize stack costs!!
+  inline void from_HSL(float h, float s, float l) { *this = nvgHSL(h, s, l); }//TODO: K.D. optimize stack costs!!
+  inline void from_HSLA(float h, float s, float l, float a) { *this = nvgHSLA(h, s, l, a); }//TODO: K.D. optimize stack costs!!
+  inline rm_color& lerp(rm_color &color, float u) {
+    *this = nvgLerpRGBA(*this, color, u);//TODO: K.D. optimize stack costs!!
+    return *this;
+  }
+  inline rm_color& set_transp(uint8_t alpha) {
+    *this = nvgTransRGBA(*this, alpha);//TODO: K.D. optimize stack costs!!
+    return *this;
+  }
+  rm_color(uint8_t _r, uint8_t _g, uint8_t _b) { from_RGB(_r, _g, _b); }
+  rm_color(uint8_t _r, uint8_t _g, uint8_t _b, uint8_t _a) { *this = nvgRGBA(_r, _g, _b, _a); }
+  rm_color(float _r, float _g, float _b) { *this = nvgRGBf(_r, _g, _b); }
+  rm_color(float _r, float _g, float _b, float _a) { *this = nvgRGBAf(_r, _g, _b, _a); }
+};
+
 class rm_widget;
 
 /**
@@ -444,7 +496,7 @@ class irmgui_widget
 public:
   //virtual     ~irmgui_widget() = 0;
   virtual bool on_event(EXGUI_EVENT event, rm_widget *p_from) = 0;
-  virtual void on_draw(NVGcontext* p_ctx) = 0;
+  virtual void on_draw(NVGcontext* pctx) = 0;
   virtual void on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state) = 0;
 
   /**
@@ -551,6 +603,14 @@ public:
     const NVGcolor colors[],
     const rm_corners_style *pcstyle,
     float shadow_offset=1.f);
+
+  static void draw_shadow(NVGcontext* pctx, rm_vec2& pos, rm_vec2& size, 
+    const NVGcolor &shadow_color, float shadow_size, float corner_radius);
+
+  static inline const NVGcolor &get_transparent() {
+    static const NVGcolor g_transparent_color = nvgRGBA(0, 0, 0, 0);
+    return g_transparent_color;
+  }
 };
 
 /**
@@ -573,16 +633,16 @@ protected:
     RM_UNUSED(p_from);
     return true;
   }
-  virtual void on_draw(NVGcontext* p_ctx) {
+  virtual void on_draw(NVGcontext* pctx) {
 #ifdef RMGUI_DEBUG_DRAW
     static NVGcolor colors[] = {
       nvgRGB(255, 0, 0), nvgRGB(0, 255, 0)
     };
-    nvgBeginPath(p_ctx);
-    nvgRect(p_ctx, 0.f, 0.f, m_size.x, m_size.y);
-    nvgStrokeColor(p_ctx, colors[get_elem_flags().is_hovered()]);
-    nvgStrokeWidth(p_ctx, 2.f);
-    nvgStroke(p_ctx);
+    nvgBeginPath(pctx);
+    nvgRect(pctx, 0.f, 0.f, m_size.x, m_size.y);
+    nvgStrokeColor(pctx, colors[get_elem_flags().is_hovered()]);
+    nvgStrokeWidth(pctx, 2.f);
+    nvgStroke(pctx);
 #endif
   }
   virtual void on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state) {
@@ -750,7 +810,7 @@ class rm_surface : public rm_widget, rm_object_accrssor
   void draw_recursive(rm_widget* p_elem, float dt);
 
 public:
-  rm_surface(NVGcontext *p_ctx, int width, int height, irm_sysdf *p_sysdf);
+  rm_surface(NVGcontext *pctx, int width, int height, irm_sysdf *p_sysdf);
   ~rm_surface();
 
   /* main events */
@@ -865,8 +925,9 @@ protected:
   NVGcolor m_window_top_gradient;
   NVGcolor m_window_bottom_gradient;
 public:
-  rm_window_style() {}
-  ~rm_window_style() {}
+  rm_window_style() {
+    apply_defaults();
+  }
 
   inline float     get_font_size() { return m_title_font_size; }
   inline float     get_font_blur_factor() { return m_title_font_blur_factor; }
@@ -923,7 +984,7 @@ class rm_window : public rm_widget, public rm_styled<rm_window_style>
   std::vector<rm_widget*> m_top_widgets;
 
   /* paint window background */
-  virtual void on_draw(NVGcontext* p_ctx);
+  virtual void on_draw(NVGcontext* pctx);
   virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos);
 
 public:
@@ -943,35 +1004,33 @@ private:
   std::vector<state>  undos;
   std::vector<state>  redos;
 public:
-    rmgui_textbuffer() : cursor(0), sel_start(0), sel_end(0) {}
+  rmgui_textbuffer() : cursor(0), sel_start(0), sel_end(0) {}
+  void set_cursor(size_t pos) {cursor = pos; clear_selection();}
+  void insert_cp(uint32_t cp);
+  void backspace();
 
-    void set_cursor(size_t pos) {cursor = pos; clear_selection();}
+  //void cut_all();
+  void cut_selection(irm_sysdf* psysdf);
+  void copy_all(irm_sysdf* psysdf);
+  void paste(irm_sysdf* psysdf);
+  void select_all() { sel_start = 0; sel_end = text.size(); cursor = sel_end; }
 
-    void insert_cp(uint32_t cp);
-    void backspace();
+  void undo();
+  void redo();
 
-    //void cut_all();
-    void cut_selection(irm_sysdf* psysdf);
-    void copy_all(irm_sysdf* psysdf);
-    void paste(irm_sysdf* psysdf);
-    void select_all() { sel_start = 0; sel_end = text.size(); cursor = sel_end; }
+  void move_cursor_left();
+  void move_cursor_right();
+  void move_cursor_up();
+  void move_cursor_down();
 
-    void undo();
-    void redo();
+  void delete_forward();
 
-    void move_cursor_left();
-    void move_cursor_right();
-    void move_cursor_up();
-    void move_cursor_down();
+  void clear_selection() { sel_start = sel_end = cursor; }
+  bool has_selection() const { return sel_start != sel_end; }
 
-    void delete_forward();
-
-    void clear_selection() { sel_start = sel_end = cursor; }
-    bool has_selection() const { return sel_start != sel_end; }
-
-    const std::string& str() const { return text; }
-    size_t pos() const { return cursor; }
-    size_t sel_start, sel_end;
+  const std::string& str() const { return text; }
+  size_t pos() const { return cursor; }
+  size_t sel_start, sel_end;
 
 private:
   void save_undo();
