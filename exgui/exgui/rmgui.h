@@ -201,14 +201,19 @@ _type rm_sign(_type v)
 class rm_bbox
 {
 public:
-  rm_vec2 min, max;
-  rm_bbox() {}
+  union {
+    struct { rm_vec2 min, max; };
+    float array[4];
+  };
+  
+  rm_bbox() : min(0.f, 0.f), max(0.f, 0.f) {}
   rm_bbox(rm_vec2 &_max) : max(_max) {}
+  rm_bbox(rm_vec2 _min, rm_vec2 _max) : min(_min), max(_max) {}
   ~rm_bbox() {}
 
-  inline bool inside(rm_vec2& pt) {
-    return min <= pt && pt <= max;
-  }
+  inline bool  inside(rm_vec2& pt) { return min <= pt && pt <= max; }
+  inline float get_width() const { rm_abs(max.x-min.x); }
+  inline float get_height() const { rm_abs(max.y-min.y); }
 
   inline void init(rm_vec2& pos, rm_vec2& size) {
     min.x = pos.x;
@@ -480,6 +485,10 @@ public:
     *this = nvgTransRGBA(*this, alpha);//TODO: K.D. optimize stack costs!!
     return *this;
   }
+  inline rm_color negative() const {
+    return rm_color(1.f-r, 1.f-g, 1.f-b, 1.f);
+  }
+  rm_color() { r=0.f, g=0.f, b=0.f, a=1.f; }
   rm_color(uint8_t _r, uint8_t _g, uint8_t _b) { from_RGB(_r, _g, _b); }
   rm_color(uint8_t _r, uint8_t _g, uint8_t _b, uint8_t _a) { *this = nvgRGBA(_r, _g, _b, _a); }
   rm_color(float _r, float _g, float _b) { *this = nvgRGBf(_r, _g, _b); }

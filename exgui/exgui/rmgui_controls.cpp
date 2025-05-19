@@ -1461,7 +1461,191 @@ bool rm_tabcontrol_ex::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY
   return false;
 }
 
-rm_tabcontrol_ex::rm_tabcontrol_ex(rm_widget* p_parent, int x, int y, int width, int height, uint32_t tab_flags) : 
-  rm_widget(x, y, width, height, p_parent, "ui_kdtabcontrol", EXGUI_FLAG_DEFAULT)
+void rm_tabcontrol_ex::hide_all_except(size_t row, size_t tabidx)
 {
+  tab*       ptab;
+  rm_widget* ppage;
+  bool       page_state;
+  for (size_t rowi = 0; rowi < get_num_rows(); rowi++) {
+    tab_row& rowref = get_tab_row(rowi);
+    for (size_t tabi = 0; tabi < rowref.get_num_tabs(); tabi++) {
+      ptab = rowref.get_tab(tabidx);
+      ppage = ptab->get_widget();
+      assert(ppage && "ppage was nullptr");
+      page_state = rowi == row && tabi == tabidx;
+      ppage->set_enabled(page_state);
+      ppage->show(page_state);
+    }
+  }
+}
+
+void rm_tabcontrol_ex::get_text_bounds(rm_vec2& dstsize, const char* ptabname)
+{
+  rm_bbox text_bounds;
+  assert(m_pstyle && "m_pstyle was nullptr!");
+  assert(m_proot && "m_proot was nullptr!");
+  /* get text size */
+  NVGcontext* pctx = m_proot->get_context();
+  assert(pctx && "pctx was nullptr!");
+  nvgSave(pctx);
+  nvgFontFaceId(pctx, get_font());
+  nvgTextBounds(pctx, 0.f, 0.f, ptabname, nullptr, text_bounds.array);
+  nvgRestore(pctx);
+
+  /* clamp height */
+  dstsize.x = text_bounds.get_width();
+  dstsize.y = rm_min(text_bounds.get_height(), m_pstyle->get_tab_height());
+}
+
+size_t rm_tabcontrol_ex::find_free_row_or_create(const char* ptabname)
+{
+  rm_vec2 size;
+  get_text_bounds(size, ptabname);
+
+  /* find tab with available space */
+  //constexpr float minimum_size_to_downwidth = 10.f; /*< this constant defines the minimum allowable deviation of the remaining size to reduce the width of the tab and fit it in this line  */
+  for (size_t rowi = 0; rowi < m_tab_rows.size(); rowi++) {
+    float remaining_row_width = m_size.x;
+    tab_row& row = m_tab_rows[rowi];
+    for (auto ptab : row.m_tabs) {
+      assert(ptab && "ptab was nullptr! this is abnormal!");
+      remaining_row_width -= ptab->get_size().x;
+    }
+    remaining_row_width -= size.x;
+    if (remaining_row_width >= 0.f) {
+      return rowi;
+    }
+  }
+
+  /* create new row */
+  RM_HANDLE_EXCEPTIONS(invalid_index::ROW,
+    m_tab_rows.push_back(tab_row());
+  )
+  return m_tab_rows.size()-1;
+}
+
+rm_tabcontrol_ex::rm_tabcontrol_ex(rm_widget* p_parent, 
+  int x, int y, int width, int height, 
+  uint32_t tab_flags, rm_tabcontrol_ex_style* pstyle, size_t num_rows) :
+  rm_widget(x, y, width, height, p_parent, "ui_kdtabcontrol", EXGUI_FLAG_DEFAULT, tab_flags), 
+  m_active_row(invalid_index::ROW), m_active_tab(invalid_index::TAB)
+{
+  set_style(pstyle);
+  m_tab_rows.reserve(num_rows);
+}
+
+rm_tabcontrol_ex::tab* rm_tabcontrol_ex::find_tab_in_row(size_t rowidx, const char* pname)
+{
+  tab_row& row = get_tab_row(rowidx);
+  for (auto tab : row.m_tabs) {
+    if (!strcmp(tab->get_name().c_str(), pname)) {
+      return tab;
+    }
+  }
+  return nullptr;
+}
+
+rm_tabcontrol_ex::tab* rm_tabcontrol_ex::find_tab_in_row(size_t rowidx, uint32_t tabid)
+{
+  tab_row& row = get_tab_row(rowidx);
+  for (auto tab : row.m_tabs) {
+    if (tab->get_id()==tabid) {
+      return tab;
+    }
+  }
+  return nullptr;
+}
+
+size_t rm_tabcontrol_ex::find_tab_idx_in_row(size_t rowidx, const char* pname)
+{
+  tab_row& row = get_tab_row(rowidx);
+  for (size_t i = 0; i < row.m_tabs.size(); i++) {
+    auto& tab = row.m_tabs[i];
+    if (!strcmp(tab->get_name().c_str(), pname)) {
+      return i;
+    }
+  }
+  return invalid_index::TAB;
+}
+
+size_t rm_tabcontrol_ex::find_tab_idx_in_row(size_t rowidx, uint32_t tabid)
+{
+  tab_row& row = get_tab_row(rowidx);
+  for (size_t i = 0; i < row.m_tabs.size(); i++) {
+    auto& tab = row.m_tabs[i];
+    if (tab->get_id() == tabid) {
+      return i;
+    }
+  }
+  return invalid_index::TAB;
+}
+
+rm_tabcontrol_ex::page* rm_tabcontrol_ex::add_tab(const char* pname, 
+  uint32_t tabid,
+  void* puserptr, 
+  size_t insert_after, 
+  size_t row_index)
+{
+  if (row_index == invalid_index::ROW)
+    row_index = find_free_row_or_create(pname);
+
+  tab_row& row = get_tab_row(row_index);
+  if (insert_after != invalid_index::TAB) {
+    if (insert_after >= row.get_num_tabs())
+      insert_after = invalid_index::TAB;
+  }
+
+  row.new_tab(this, )
+
+  return nullptr;
+}
+
+size_t rm_tabcontrol_ex::add_tab(const char* pname, 
+  uint32_t tabid, 
+  rm_widget* pwidget, 
+  void* puserptr, 
+  size_t insert_after, 
+  size_t row_index)
+{
+  return size_t();
+}
+
+void rm_tabcontrol_ex::rm_tab_button::draw(NVGcontext* pctx, rm_vec2 &pos, float size, rm_tabcontrol_ex_style* pstyle)
+{
+  const rm_color &bg_color = pstyle->get_background_color();
+  const rm_color &border_color = pstyle->get_border_color();
+  rm_color background, border;
+  if (is_hovered()) {
+    background = bg_color.negative();
+    border = bg_color.negative();
+  }
+  else {
+    background = bg_color;
+    border = bg_color;
+  }
+  nvgBeginPath(pctx);
+  nvgFontFaceId(pctx, m_font);
+  nvgFillColor(pctx, background);
+  nvgStrokeColor(pctx, border);
+  nvgRect(pctx, pos.x, pos.y, size, size);
+  nvgFill(pctx);
+  nvgStroke(pctx);
+  nvgFillColor(pctx, pstyle->get_text_color());
+  nvgText(pctx, pos.x, pos.y + size / 2.f, m_icon_sym, nullptr);
+}
+
+void rm_tabcontrol_ex::page::on_draw(NVGcontext* pctx)
+{
+  const rm_tabcontrol_ex_style* pcurrstyle = get_style();
+  nvgBeginPath(pctx);
+  nvgFillColor(pctx, pcurrstyle->get_background_color());
+  nvgStrokeColor(pctx, pcurrstyle->get_border_color());
+  nvgRoundedRectVarying(pctx,
+    0.f, 0.f, m_size.x, m_size.y,
+    pcurrstyle->get_top_left(),
+    pcurrstyle->get_top_right(),
+    pcurrstyle->get_bottom_right(),
+    pcurrstyle->get_bottom_left());
+  nvgFill(pctx);
+  nvgStroke(pctx);
 }
