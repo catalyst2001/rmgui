@@ -703,36 +703,52 @@ enum rm_tabcontrol_flags {
 class rm_tabcontrol_ex_style : public rm_corners_style {
   rm_vec2  m_text_offset;
   rm_color m_text_color;
-  rm_color m_bg_color;
+  union {
+    struct {
+      rm_color m_bg_color;
+      rm_color m_selected_color;
+    };
+    rm_color m_hover_colors[2];
+  };
   rm_color m_border_color;
-  rm_color m_selected_color;
   rm_vec2  m_tab_up_offsets;
   float    m_font_size;
   bool     m_is_horizontal;
   float    m_tab_height;
+  float    m_tab_corners_radius;
+  float    m_tab_buttons_size;
+  float    m_tab_buttons_spacing;
 public:
   rm_tabcontrol_ex_style() :
     m_text_offset(0.f, 0.f),
-    m_text_color(nvgRGB(0, 0, 0)),
-    m_bg_color(nvgRGB(255, 255, 255)),
-    m_border_color(nvgRGB(0, 0, 0)),
-    m_selected_color(nvgRGB(240, 240, 240)),
+    m_text_color(0, 0, 0),
+    m_bg_color(255, 255, 255),
+    m_border_color(0, 0, 0),
+    m_selected_color(240, 240, 240),
     m_font_size(15.f),
     m_is_horizontal(true),
-    m_tab_height(30.f) {
+    m_tab_height(30.f),
+    m_tab_corners_radius(4.f),
+    m_tab_buttons_size(10.f),
+    m_tab_buttons_spacing(5.f)
+  {
   }
   inline bool            is_horizontal() const { return m_is_horizontal; }
   inline void            set_horizontal(bool enabled) { m_is_horizontal = enabled; }
 
   /* selectors  */
-  inline const rm_vec2& get_text_offsets() const { return m_text_offset; }
-  inline const rm_vec2& get_tab_up_offsets() const { return m_tab_up_offsets; }
-  inline const float    get_tab_height() const { return m_tab_height; }
+  inline const rm_vec2&  get_text_offsets() const { return m_text_offset; }
+  inline const rm_vec2&  get_tab_up_offsets() const { return m_tab_up_offsets; }
+  inline const float     get_tab_height() const { return m_tab_height; }
   inline const rm_color& get_text_color() const { return m_text_color; }
   inline const rm_color& get_background_color() const { return m_bg_color; }
   inline const rm_color& get_border_color() const { return m_border_color; }
   inline const rm_color& get_selected_color() const { return m_selected_color; }
   inline float           get_font_size() const { return m_font_size; }
+  inline float           get_tab_corners_radius() const { return m_tab_corners_radius; }
+  inline rm_color& get_state_color(bool bhovered) { return m_hover_colors[(int)bhovered]; }
+  inline float           get_tab_buttons_size() const { return m_tab_buttons_size; }
+  inline float           get_tab_buttons_spacing() const { return m_tab_buttons_spacing; }
 
   /* modifiers */
   inline void set_text_offsets(rm_vec2 offset) { m_text_offset = offset; }
@@ -743,9 +759,23 @@ public:
   inline void set_border_color(rm_color clr) { m_border_color = clr; }
   inline void set_selected_color(rm_color clr) { m_selected_color = clr; }
   inline void set_font_size(float fsize) { m_font_size = fsize; }
+  inline void set_tab_corners_radius(float radius) { m_tab_corners_radius = radius; }
+  inline void set_tab_buttons_size(float size) { m_tab_buttons_size = size; }
+  inline void set_tab_buttons_spacing(float spacing) { m_tab_buttons_spacing = spacing; }
 };
 
-class rm_tabcontrol_ex : public rm_widget, public rm_styled<rm_tabcontrol_ex_style>
+class rm_tab_drawer
+{
+protected:
+  static void draw_tab_path(NVGcontext* pctx,
+    rm_vec2 pos,
+    rm_vec2 size,
+    rm_vec2 up_offsets,
+    float r);
+};
+
+class rm_tabcontrol_ex : public rm_widget,
+  public rm_styled<rm_tabcontrol_ex_style>, rm_tab_drawer
 {
 public:
   enum invalid_index : size_t {
@@ -781,7 +811,7 @@ public:
     friend class rm_tabcontrol_ex;
     void on_draw(NVGcontext* pctx) override;
   protected:
-    page(rm_tabcontrol_ex *ptabcontrol, rm_vec2 &pos, rm_vec2 &size) :
+    page(rm_tabcontrol_ex *ptabcontrol, rm_vec2 pos, rm_vec2 size) :
       rm_widget(pos.x, pos.y, size.x, size.y, ptabcontrol, "ui_tabcontrolex_page") {
       set_style(ptabcontrol->get_style());
     }
@@ -798,6 +828,8 @@ public:
     rm_widget*        m_pwidget; /*< widget associated with tab */
     rm_tabcontrol_ex* m_powner; /*< owner tabcontrol */
     std::vector<rm_tab_button> m_buttons;
+
+    void width_recompute();
   public:
     enum {
       FNONE = 0, /*< no flags */
@@ -817,23 +849,20 @@ public:
       uint32_t tabid,
       rm_widget *pwidget = nullptr,
       void *puserptr = nullptr,
-      uint32_t flags = FNONE) : m_tabid(tabid), m_flags(flags), m_width(width), m_name(pname),
+      uint32_t flags = FNONE) : m_tabid(tabid), m_flags(flags), m_width(width),
       m_puserptr(puserptr), m_pwidget(pwidget), m_powner(ptabcontrol) {
+      set_name(pname);
     }
-    inline rm_tab_button* add_button(rm_font font, uint32_t id, const char* putf8str) {
-      RM_HANDLE_EXCEPTIONS(nullptr, 
-        m_buttons.push_back({ font, id , putf8str });
-      )
-      return &m_buttons[m_buttons.size() - 1];
-    }
+    rm_tab_button* add_button(rm_font font, uint32_t id, const char* putf8str);
     inline uint32_t get_flags() const { return m_flags; }
     inline float get_width() { return m_width; }
     inline uint32_t get_id() const { return m_tabid; }
-    inline std::string& get_name() { return m_name; }
+    inline const std::string& get_name() const { return m_name; }
     inline void* get_userptr() { return m_puserptr; }
-    inline rm_widget* get_widget() { return m_pwidget; }
+    inline rm_widget* get_page_widget() { return m_pwidget; }
     inline rm_tabcontrol_ex* get_owner() { return m_powner; }
     inline bool is_other_widget() const { return m_flags & FOTHER_WIDGET; }
+    void   set_name(const char* pname);
   };
 
   class tab_row {
@@ -873,7 +902,6 @@ private:
     assert(m_pstyle && "m_pstyle was nullptr!");
     return static_cast<float>(m_pstyle->get_tab_height() * get_num_rows());
   }
-  tab* add_tab_ex();
 public:
   rm_tabcontrol_ex(rm_widget* p_parent, int x, int y, int width, int height, uint32_t tab_flags, rm_tabcontrol_ex_style *pstyle, size_t num_rows=1);
   static inline bool is_valid_tab(size_t tabid) { return tabid != invalid_index::TAB; }
@@ -889,6 +917,8 @@ public:
   size_t find_tab_idx_in_row(size_t rowidx, const char* pname);
   size_t find_tab_idx_in_row(size_t rowidx, uint32_t tabid);
 
+  bool add_child(rm_widget* p_child) = delete;
+
   tab *add_tab(const char *pname,
     uint32_t tabid,
     float width=1.f,
@@ -896,10 +926,10 @@ public:
     size_t insert_after= invalid_index::TAB,
     size_t row_index = invalid_index::ROW);
 
-  tab *add_tab(const char *pname,
+  tab *add_tab_widget(const char *pname,
     uint32_t tabid,
-    float width = 1.f,
     rm_widget* pwidget,
+    float width = 1.f,
     void* puserptr = nullptr,
     size_t insert_after = invalid_index::TAB,
     size_t row_index = invalid_index::ROW);

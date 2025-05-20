@@ -5,8 +5,9 @@
 
 void rm_widget::move_recursive(rm_widget* pwidget, float newx, float newy)
 {
-  pwidget->m_absolute.x += newx;
-  pwidget->m_absolute.y += newy;
+  //TODO: K.D. check this compute
+  pwidget->m_absolute.x = newx - pwidget->m_absolute.x;
+  pwidget->m_absolute.y = newy - pwidget->m_absolute.y;
   for (size_t i = 0; i < pwidget->get_num_childs(); i++) {
     rm_widget* pchild = pwidget->get_child(i);
     assert(pchild && "pchild was nullptr");
@@ -75,7 +76,7 @@ void rm_widget::set_parent(rm_widget* p_parent)
   root_update();
 }
 
-void rm_widget::resize(int width, int height)
+void rm_widget::resize(float width, float height)
 {
   rm_vec2 start(width, height);
   m_size.init(width, height);

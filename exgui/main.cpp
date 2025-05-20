@@ -470,106 +470,9 @@ void test_old(rm_surface* gui)
   //rm_progress_image* progress2 = new rm_progress_image(pwindow, 50, 350 + 10 + 5, 300, 10, image_pat, 0.f, 1.f, 0.f, 5.f);
 }
 
-#define NVG_KAPPA90 0.5522847493f
-
-void draw_tab_bezier(NVGcontext* ctx,
-  rm_vec2 pos,
-  rm_vec2 size,
-  rm_vec2 up_offsets,
-  float r)
-{
-  float xBL = pos.x;
-  float yBL = pos.y + size.y;
-  float xBR = pos.x + size.x;
-  float yBR = pos.y + size.y;
-  float xTR = pos.x + size.x + up_offsets.y;
-  float yTR = pos.y;
-  float xTL = pos.x + up_offsets.x;
-  float yTL = pos.y;
-  const float k = r * (4.0f * (std::sqrt(2.0f) - 1.0f) / 3.0f);
-
-  nvgBeginPath(ctx);
-  nvgMoveTo(ctx, xBL, yBL);
-  nvgLineTo(ctx, xBR, yBR);
-  nvgLineTo(ctx, xTR, yTR + r);
-  // (xTR - r, yTR)
-  nvgBezierTo(ctx,
-    xTR, yTR + r - k, // ctrl1
-    xTR - r + k, yTR, // ctrl2
-    xTR - r, yTR); // end
-
-  // (xTL + r, yTL)
-  nvgLineTo(ctx, xTL + r, yTL);
-  // (xTL, yTL + r)
-  nvgBezierTo(ctx,
-    xTL + r - k, yTL, // ctrl1
-    xTL, yTL + r - k, // ctrl2
-    xTL, yTL + r); // end
-  nvgLineTo(ctx, xBL, yBL);
-  nvgClosePath(ctx);
-}
-
-void draw_tab(NVGcontext* pctx, rm_vec2 pos, rm_vec2 size, rm_vec2 up_offsets, float r)
-{
-  float x0 = pos.x + up_offsets.x;  
-  float x1 = pos.x;   
-  float x2 = pos.x + size.x;              
-  float x3 = pos.x + size.x + up_offsets.y;
-  float y0 = pos.y;                      
-  float y1 = pos.y + size.y;           
-
-  nvgBeginPath(pctx);
-  nvgMoveTo(pctx, x0 + r, y0);
-  nvgLineTo(pctx, x3 - r, y0);
-  nvgArcTo(pctx, x3, y0,
-    x3, y0 + r,
-    r);
-  nvgLineTo(pctx, x2, y1);
-  nvgLineTo(pctx, x1, y1);
-  nvgLineTo(pctx, x0, y0 + r);
-  nvgArcTo(pctx, x0, y0,
-    x0 + r, y0,
-    r);
-  nvgClosePath(pctx);
-}
-
-
-#include <nanovg.h>
-
-void draw_tab_path(NVGcontext* pctx,
-  rm_vec2 pos,
-  rm_vec2 size,
-  rm_vec2 up_offsets,
-  float r)
-{
-  float xBL = pos.x;
-  float yBL = pos.y + size.y;
-  float xBR = pos.x + size.x;
-  float yBR = pos.y + size.y;
-  float xTR = pos.x + size.x + up_offsets.y;
-  float yTR = pos.y;
-  float xTL = pos.x + up_offsets.x;
-  float yTL = pos.y;
-
-  nvgBeginPath(pctx);
-  nvgMoveTo(pctx, xBL, yBL);
-  nvgLineTo(pctx, xBR, yBR);
-  nvgArcTo(pctx,
-    xTR, yTR,
-    xTL, yTL,
-    r);
-  nvgArcTo(pctx,
-    xTL, yTL,
-    xBL, yBL,
-    r);
-  nvgClosePath(pctx);
-}
-
-
-
 void example_widgets(rm_surface* gui)
 {
-  static class debug_widget : public rm_widget {
+  static class debug_widget : public rm_widget, rm_tab_drawer {
   public:
     debug_widget(rm_widget *pparent) : rm_widget(20, 20, 800, 800, pparent, "debug_widget") {}
     void on_draw(NVGcontext* pctx) override {
@@ -580,8 +483,14 @@ void example_widgets(rm_surface* gui)
       nvgFill(pctx);
       nvgStroke(pctx);
     }
-  } dbg_widget(gui);
+  };// dbg_widget(gui);
 
+
+  static rm_tabcontrol_ex_style tabstyle;
+  using tc = rm_tabcontrol_ex;
+  rm_tabcontrol_ex* ptabctl = new rm_tabcontrol_ex(gui, 10, 10, 800, 600, TCF_NONE, &tabstyle);
+  tc::tab* ptab1 = ptabctl->add_tab("Main page", 0, 10);
+  ptab1->get_page_widget();
 
 }
 

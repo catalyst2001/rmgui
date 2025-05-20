@@ -212,8 +212,8 @@ public:
   ~rm_bbox() {}
 
   inline bool  inside(rm_vec2& pt) { return min <= pt && pt <= max; }
-  inline float get_width() const { rm_abs(max.x-min.x); }
-  inline float get_height() const { rm_abs(max.y-min.y); }
+  inline float get_width() const { return rm_abs(max.x-min.x); }
+  inline float get_height() const { return rm_abs(max.y-min.y); }
 
   inline void init(rm_vec2& pos, rm_vec2& size) {
     min.x = pos.x;
@@ -491,8 +491,6 @@ public:
   rm_color() { r=0.f, g=0.f, b=0.f, a=1.f; }
   rm_color(uint8_t _r, uint8_t _g, uint8_t _b) { from_RGB(_r, _g, _b); }
   rm_color(uint8_t _r, uint8_t _g, uint8_t _b, uint8_t _a) { *this = nvgRGBA(_r, _g, _b, _a); }
-  rm_color(float _r, float _g, float _b) { *this = nvgRGBf(_r, _g, _b); }
-  rm_color(float _r, float _g, float _b, float _a) { *this = nvgRGBAf(_r, _g, _b, _a); }
 };
 
 class rm_widget;
@@ -789,11 +787,11 @@ public:
   inline void           set_zindex(int zidx) { m_zindex = zidx; }
   inline int            get_zindex() const { return m_zindex; }
 
-  void resize(int width, int height);
+  void resize(float width, float height);
+  inline void resize(rm_vec2 newsize) { resize(newsize.x, newsize.y); }
 
-  void move(int newx, int newy)  {
-    move_recursive(this, newx, newy);
-  }
+  void move(int newx, int newy) { move_recursive(this, newx, newy); }
+  void move(rm_vec2 newpos) { move_recursive(this, newpos.x, newpos.y); }
 
   rm_vec2 cursor_to_local(const rm_vec2& cursor_pos) {
     return rm_vec2(cursor_pos.x - m_absolute.x, cursor_pos.y - m_absolute.y);
