@@ -748,6 +748,11 @@ public:
 class rm_tabcontrol_ex : public rm_widget, public rm_styled<rm_tabcontrol_ex_style>
 {
 public:
+  enum invalid_index : size_t {
+    TAB = (size_t)-1, /*< invalid tab index value */
+    ROW = (size_t)-1 /*< invalid tab row index value */
+  };
+
   class rm_tab_button {
     rm_font  m_font;
     uint32_t m_id;
@@ -786,7 +791,7 @@ public:
     friend class rm_tabcontrol_ex;
     uint32_t          m_tabid; /*< unique tab id */
     uint32_t          m_flags; /*< tab flags */
-    rm_vec2           m_size;
+    float             m_width;
     rm_vec2           m_textsize;
     std::string       m_name;
     void*             m_puserptr;
@@ -801,17 +806,18 @@ public:
 
     tab() : m_tabid(0),
       m_flags(FNONE),
+      m_width(10.f),
       m_puserptr(nullptr),
       m_pwidget(nullptr),
       m_powner(nullptr) {
     }
     tab(rm_tabcontrol_ex *ptabcontrol,
-      rm_vec2 &size,
+      float width,
       const char *pname,
       uint32_t tabid,
       rm_widget *pwidget = nullptr,
       void *puserptr = nullptr,
-      uint32_t flags = FNONE) : m_tabid(tabid), m_flags(flags), m_size(size), m_name(pname),
+      uint32_t flags = FNONE) : m_tabid(tabid), m_flags(flags), m_width(width), m_name(pname),
       m_puserptr(puserptr), m_pwidget(pwidget), m_powner(ptabcontrol) {
     }
     inline rm_tab_button* add_button(rm_font font, uint32_t id, const char* putf8str) {
@@ -821,7 +827,7 @@ public:
       return &m_buttons[m_buttons.size() - 1];
     }
     inline uint32_t get_flags() const { return m_flags; }
-    inline rm_vec2& get_size() { return m_size; }
+    inline float get_width() { return m_width; }
     inline uint32_t get_id() const { return m_tabid; }
     inline std::string& get_name() { return m_name; }
     inline void* get_userptr() { return m_puserptr; }
@@ -833,14 +839,16 @@ public:
   class tab_row {
     friend class rm_tabcontrol_ex;
     std::vector<tab*> m_tabs; /*< tabs ptrs on this row */
-    inline tab* new_tab(rm_tabcontrol_ex *pcontrol, rm_vec2 size, const char * pname, uint32_t tabid, rm_widget *ppage_widget, void *puserptr, uint32_t flags) {
-      tab* ptab = new (std::nothrow)tab(pcontrol, size, pname, tabid, ppage_widget, puserptr, flags);
-      if (!ptab)
-        return nullptr;
 
-      m_tabs.push_back(ptab);
-      return ptab;
-    }
+    tab* new_tab(rm_tabcontrol_ex* pcontrol,
+      const char* pname,
+      uint32_t tabid,
+      float width,
+      rm_widget* ppage_widget,
+      size_t insert_after,
+      void* puserptr,
+      uint32_t flags);
+
   public:
     tab_row() {}
     inline size_t get_num_tabs() const { return m_tabs.size(); }
@@ -861,11 +869,12 @@ private:
   void   hide_all_except(size_t row, size_t tabidx);
   void   get_text_bounds(rm_vec2 &dstsize, const char * ptabname);
   size_t find_free_row_or_create(const char *ptabname);
+  inline float get_rows_total_height() {
+    assert(m_pstyle && "m_pstyle was nullptr!");
+    return static_cast<float>(m_pstyle->get_tab_height() * get_num_rows());
+  }
+  tab* add_tab_ex();
 public:
-  enum invalid_index : size_t {
-    TAB = (size_t)-1, /*< invalid tab index value */
-    ROW = (size_t)-1 /*< invalid tab row index value */
-  };
   rm_tabcontrol_ex(rm_widget* p_parent, int x, int y, int width, int height, uint32_t tab_flags, rm_tabcontrol_ex_style *pstyle, size_t num_rows=1);
   static inline bool is_valid_tab(size_t tabid) { return tabid != invalid_index::TAB; }
   inline size_t get_active_tab() const { return m_active_tab; }
@@ -880,14 +889,16 @@ public:
   size_t find_tab_idx_in_row(size_t rowidx, const char* pname);
   size_t find_tab_idx_in_row(size_t rowidx, uint32_t tabid);
 
-  page *add_tab(const char *pname,
+  tab *add_tab(const char *pname,
     uint32_t tabid,
+    float width=1.f,
     void *puserptr = nullptr,
     size_t insert_after= invalid_index::TAB,
     size_t row_index = invalid_index::ROW);
 
-  size_t add_tab(const char *pname,
+  tab *add_tab(const char *pname,
     uint32_t tabid,
+    float width = 1.f,
     rm_widget* pwidget,
     void* puserptr = nullptr,
     size_t insert_after = invalid_index::TAB,

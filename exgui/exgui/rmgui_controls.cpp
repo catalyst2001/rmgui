@@ -1454,6 +1454,9 @@ rm_number_input::rm_number_input(rm_widget* p_parent, int x, int y, int width, i
 
 void rm_tabcontrol_ex::on_draw(NVGcontext* pctx)
 {
+  
+
+
 }
 
 bool rm_tabcontrol_ex::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
@@ -1509,7 +1512,7 @@ size_t rm_tabcontrol_ex::find_free_row_or_create(const char* ptabname)
     tab_row& row = m_tab_rows[rowi];
     for (auto ptab : row.m_tabs) {
       assert(ptab && "ptab was nullptr! this is abnormal!");
-      remaining_row_width -= ptab->get_size().x;
+      remaining_row_width -= ptab->get_width();
     }
     remaining_row_width -= size.x;
     if (remaining_row_width >= 0.f) {
@@ -1580,28 +1583,35 @@ size_t rm_tabcontrol_ex::find_tab_idx_in_row(size_t rowidx, uint32_t tabid)
   return invalid_index::TAB;
 }
 
-rm_tabcontrol_ex::page* rm_tabcontrol_ex::add_tab(const char* pname, 
+rm_tabcontrol_ex::tab* rm_tabcontrol_ex::add_tab(const char* pname,
   uint32_t tabid,
+  float width,
   void* puserptr, 
   size_t insert_after, 
   size_t row_index)
 {
+  //K.D. the brain floats........
+  tab* ptab;
   if (row_index == invalid_index::ROW)
     row_index = find_free_row_or_create(pname);
 
   tab_row& row = get_tab_row(row_index);
-  if (insert_after != invalid_index::TAB) {
-    if (insert_after >= row.get_num_tabs())
-      insert_after = invalid_index::TAB;
-  }
+  ptab = row.new_tab(this, pname, tabid, width, nullptr, insert_after, puserptr, tab::FNONE);
+  if (!ptab)
+    return nullptr;
 
-  row.new_tab(this, )
+  float rows_height = get_rows_total_height();
+  rm_vec2 pos(0.f, rows_height), size(m_size.x, m_size.y - rows_height);
+  ptab->m_pwidget = new (std::nothrow)page(this, pos, size);
+  if (!ptab->m_pwidget)
+    return nullptr;
 
-  return nullptr;
+  return ptab;
 }
 
-size_t rm_tabcontrol_ex::add_tab(const char* pname, 
+rm_tabcontrol_ex::tab* rm_tabcontrol_ex::add_tab(const char* pname,
   uint32_t tabid, 
+  float width,
   rm_widget* pwidget, 
   void* puserptr, 
   size_t insert_after, 
@@ -1610,7 +1620,8 @@ size_t rm_tabcontrol_ex::add_tab(const char* pname,
   return size_t();
 }
 
-void rm_tabcontrol_ex::rm_tab_button::draw(NVGcontext* pctx, rm_vec2 &pos, float size, rm_tabcontrol_ex_style* pstyle)
+void rm_tabcontrol_ex::rm_tab_button::draw(NVGcontext* pctx, rm_vec2 &pos,
+  float size, rm_tabcontrol_ex_style* pstyle)
 {
   const rm_color &bg_color = pstyle->get_background_color();
   const rm_color &border_color = pstyle->get_border_color();
@@ -1648,4 +1659,37 @@ void rm_tabcontrol_ex::page::on_draw(NVGcontext* pctx)
     pcurrstyle->get_bottom_left());
   nvgFill(pctx);
   nvgStroke(pctx);
+}
+
+rm_tabcontrol_ex::tab* rm_tabcontrol_ex::tab_row::new_tab(
+  rm_tabcontrol_ex* pcontrol,
+  const char* pname,
+  uint32_t tabid,
+  float width,
+  rm_widget* ppage_widget,
+  size_t insert_after,
+  void* puserptr, uint32_t flags)
+{
+  tab* ptab = new (std::nothrow)tab(pcontrol, width,
+    pname, tabid, ppage_widget, puserptr, flags);
+  if (!ptab)
+    return nullptr;
+
+  /* insert tab to container */
+  if (insert_after == invalid_index::TAB || insert_after >= m_tabs.size()) {
+    /* insert back by default if tab index not set */
+    m_tabs.push_back(ptab);
+  }
+  else {
+    /* try to insert at 'insert_after' */
+    try {
+      m_tabs.emplace(m_tabs.begin() + insert_after, ptab);
+    }
+    catch (...) {
+      assert("std::vector<_Ty>::emplace(...) raised exception");
+      delete ptab;
+      return nullptr;
+    }
+  }
+  return ptab;
 }
