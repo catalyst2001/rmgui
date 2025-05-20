@@ -768,10 +768,18 @@ class rm_tab_drawer
 {
 protected:
   static void draw_tab_path(NVGcontext* pctx,
-    rm_vec2 pos,
-    rm_vec2 size,
+    float x, float y,
+    float w, float h,
     rm_vec2 up_offsets,
     float r);
+  static void draw_tab_edge(NVGcontext* pctx,
+    rm_vec2 pos,
+    rm_vec2& size,
+    rm_vec2 up_offsets,
+    float r,
+    const rm_corners_style* pcstyle,
+    const rm_color& suncolor,
+    const rm_color& shadowcolor);
 };
 
 class rm_tabcontrol_ex : public rm_widget,
@@ -912,6 +920,7 @@ public:
     assert(idx < m_tab_rows.size() && "row index out of bounds");
     return m_tab_rows[idx];
   }
+  bool   set_num_rows(size_t newsize);
   tab*   find_tab_in_row(size_t rowidx, const char *pname);
   tab*   find_tab_in_row(size_t rowidx, uint32_t tabid);
   size_t find_tab_idx_in_row(size_t rowidx, const char* pname);

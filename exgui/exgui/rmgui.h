@@ -614,6 +614,9 @@ public:
   static void draw_shadow(NVGcontext* pctx, rm_vec2& pos, rm_vec2& size, 
     const NVGcolor &shadow_color, float shadow_size, float corner_radius);
 
+  static void draw_edge(NVGcontext* pctx, rm_vec2 pos, rm_vec2& size,
+    const rm_corners_style *pcstyle, const rm_color& suncolor, const rm_color& shadowcolor);
+
   static inline const NVGcolor &get_transparent() {
     static const NVGcolor g_transparent_color = nvgRGBA(0, 0, 0, 0);
     return g_transparent_color;

@@ -476,7 +476,7 @@ void example_widgets(rm_surface* gui)
   public:
     debug_widget(rm_widget *pparent) : rm_widget(20, 20, 800, 800, pparent, "debug_widget") {}
     void on_draw(NVGcontext* pctx) override {
-      draw_tab_path(pctx, rm_vec2(0.f, 0.f), rm_vec2(100.f, 20.f), rm_vec2(0.f, 0.f), 4.f);
+      draw_tab_path(pctx, 0.f, 0.f, 100.f, 20.f, rm_vec2(0.f, 0.f), 4.f);
       nvgFillColor(pctx, nvgRGB(93, 93, 95));
       nvgStrokeWidth(pctx, 1.f);
       nvgStrokeColor(pctx, nvgRGB(102, 102, 104));
@@ -488,9 +488,25 @@ void example_widgets(rm_surface* gui)
 
   static rm_tabcontrol_ex_style tabstyle;
   using tc = rm_tabcontrol_ex;
+  tabstyle.set_text_color({ 255, 255, 255 });
+  tabstyle.set_background_color({66, 66, 68});
+  tabstyle.set_selected_color({93, 93, 95});
+  tabstyle.set_text_offsets({ 10.f, 0.f });
+  tabstyle.set_border_color({ 91, 91, 91 });
+  tabstyle.set_all_corners_radius(0.f);
+  tabstyle.set_tab_height(25.f);
+  tabstyle.set_tab_corners_radius(2.f);
+  tabstyle.set_tab_up_offsets({ 0.f, 0.f });
+
   rm_tabcontrol_ex* ptabctl = new rm_tabcontrol_ex(gui, 10, 10, 800, 600, TCF_NONE, &tabstyle);
-  tc::tab* ptab1 = ptabctl->add_tab("Main page", 0, 10);
-  ptab1->get_page_widget();
+  tc::tab* ptab01 = ptabctl->add_tab("Main page", 0, 10);
+  tc::tab* ptab02 = ptabctl->add_tab("Page 2", 1, 10);
+  tc::tab* ptab11 = ptabctl->add_tab("Main page asdasda", 0, 10);
+  tc::tab* ptab12 = ptabctl->add_tab("Page 2 asdasdasd", 1, 10);
+  ptab01->get_page_widget();
+
+
+  ptabctl->select_tab(0, 0);
 
 }
 
@@ -513,7 +529,7 @@ int main() {
   }
 
   g_gui = new rm_surface(vg, winWidth, winHeight, &instance);
-  rm_font default_font = g_gui->load_font("Gogh_Regular.ttf", "default");
+  rm_font default_font = g_gui->load_font("ARIALNI.TTF", "default");
   if (!default_font.is_valid()) {
     printf("can't load font!\n");
   }

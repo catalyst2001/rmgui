@@ -1456,6 +1456,8 @@ void rm_tabcontrol_ex::on_draw(NVGcontext* pctx)
 {
   rm_vec2 pos(0.f, 0.f), size;
   float tab_height = m_pstyle->get_tab_height();
+  rm_vec2 tab_up_offsets = m_pstyle->get_tab_up_offsets();
+  bool b_is_selected = false;
   /* draw tab rows */
   for (size_t rowi = 0; rowi < get_num_rows(); rowi++) {
     auto& row = get_tab_row(rowi);
@@ -1465,18 +1467,41 @@ void rm_tabcontrol_ex::on_draw(NVGcontext* pctx)
       tab* ptab = row.get_tab(tabi);
       size.x = ptab->get_width();
       size.y = tab_height;
-      draw_tab_path(pctx, pos, size, m_pstyle->get_tab_up_offsets(), m_pstyle->get_tab_corners_radius());
+      b_is_selected = m_active_row == rowi && m_active_tab == tabi;
+      /* draw tab background */
+      draw_tab_path(pctx, pos.x, pos.y, size.x, size.y,
+        m_pstyle->get_tab_up_offsets(), m_pstyle->get_tab_corners_radius());
       //if m_active_row==rowi && m_active_tab==tabi - it is selected tab
-      nvgFillColor(pctx, m_pstyle->get_state_color(m_active_row==rowi && m_active_tab==tabi)); //set state color and set to drawings tab
-      nvgStrokeWidth(pctx, 1.f);
-      nvgStrokeColor(pctx, nvgRGB(102, 102, 104));
+      nvgFillColor(pctx, m_pstyle->get_state_color(b_is_selected)); //set state color and set to drawings tab
       nvgFill(pctx);
-      nvgStroke(pctx);
 
+      /* draw tab edge */
+      rm_color shadow_clr(42, 42, 42);
+      rm_color sun_clr(100, 100, 100);
+      draw_tab_edge(pctx, pos, size, m_pstyle->get_tab_up_offsets(), 
+        m_pstyle->get_tab_corners_radius(), m_pstyle, sun_clr, shadow_clr);
+
+      /* draw tab buttons */
+      float button_size = m_pstyle->get_tab_buttons_size();
+      for (size_t j = 0; j < ptab->m_buttons.size(); j++) {
+        rm_vec2 pos(ptab->m_textsize.x + m_pstyle->get_text_offsets().x, tab_height / 2.f);
+        rm_tab_button& btn = ptab->m_buttons[j];
+        btn.draw(pctx, pos, button_size, m_pstyle);
+      }
+
+      /* draw tab name */
+      nvgFontFaceId(pctx, get_font());
       nvgFillColor(pctx, m_pstyle->get_text_color());
       nvgTextAlign(pctx, NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
-      nvgText(pctx, pos.x, pos.y + size.y/2.f, ptab->get_name().c_str(), nullptr);
-      pos.x += size.x;
+      float xoffset = m_pstyle->get_text_offsets().x;
+      if (xoffset < tab_up_offsets.x)
+        xoffset = tab_up_offsets.x;
+
+      nvgText(pctx, pos.x + xoffset, pos.y + size.y/2.f, ptab->get_name().c_str(), nullptr);
+      //if (b_is_selected)
+      //  nvgIntersectScissor(pctx, pos.x, pos.y + size.y, size.x, size.y);
+
+      pos.x += size.x + 2.f;
     }
   }
 }
@@ -1556,7 +1581,15 @@ rm_tabcontrol_ex::rm_tabcontrol_ex(rm_widget* p_parent,
   m_active_row(invalid_index::ROW), m_active_tab(invalid_index::TAB)
 {
   set_style(pstyle);
-  m_tab_rows.reserve(num_rows);
+  set_num_rows(num_rows);
+}
+
+bool rm_tabcontrol_ex::set_num_rows(size_t newsize)
+{
+  RM_HANDLE_EXCEPTIONS(false,
+    m_tab_rows.resize(newsize);
+  )
+  return true;
 }
 
 rm_tabcontrol_ex::tab* rm_tabcontrol_ex::find_tab_in_row(size_t rowidx, const char* pname)
@@ -1645,6 +1678,22 @@ rm_tabcontrol_ex::tab* rm_tabcontrol_ex::add_tab_widget(const char* pname,
   return ptab;
 }
 
+bool rm_tabcontrol_ex::select_tab(size_t rowidx, size_t tabidx)
+{
+  size_t temp_row_select;
+  if (rowidx > get_num_rows())
+    return false;
+
+  temp_row_select = rowidx;
+  tab_row& row = get_tab_row(temp_row_select);
+  if (tabidx > row.get_num_tabs())
+    return false;
+
+  m_active_row = temp_row_select;
+  m_active_tab = tabidx;
+  return true;
+}
+
 void rm_tabcontrol_ex::rm_tab_button::draw(NVGcontext* pctx, rm_vec2 &pos,
   float size, rm_tabcontrol_ex_style* pstyle)
 {
@@ -1684,6 +1733,10 @@ void rm_tabcontrol_ex::page::on_draw(NVGcontext* pctx)
     pcurrstyle->get_bottom_left());
   nvgFill(pctx);
   nvgStroke(pctx);
+
+  rm_color shadow_clr(42, 42, 42);
+  rm_color sun_clr(100, 100, 100);
+  rm_utl::draw_edge(pctx, { 0.f, 0.f }, m_size, pcurrstyle, sun_clr, shadow_clr);
 }
 
 rm_tabcontrol_ex::tab* rm_tabcontrol_ex::tab_row::new_tab(
@@ -1719,8 +1772,13 @@ rm_tabcontrol_ex::tab* rm_tabcontrol_ex::tab_row::new_tab(
   return ptab;
 }
 
-void rm_tab_drawer::draw_tab_path(NVGcontext* pctx, rm_vec2 pos, rm_vec2 size, rm_vec2 up_offsets, float r)
+void rm_tab_drawer::draw_tab_path(NVGcontext* pctx, 
+  float x, float y,
+  float w, float h,
+  rm_vec2 up_offsets, float r)
 {
+  rm_vec2 pos(x, y);
+  rm_vec2 size(w, h);
   float xBL = pos.x;
   float yBL = pos.y + size.y;
   float xBR = pos.x + size.x;
@@ -1744,11 +1802,27 @@ void rm_tab_drawer::draw_tab_path(NVGcontext* pctx, rm_vec2 pos, rm_vec2 size, r
   nvgClosePath(pctx);
 }
 
+void rm_tab_drawer::draw_tab_edge(NVGcontext* pctx, rm_vec2 pos, rm_vec2& size, rm_vec2 up_offsets,
+  float r, const rm_corners_style* pcstyle, const rm_color& suncolor, const rm_color& shadowcolor)
+{
+  /* light */
+  draw_tab_path(pctx, pos.x, pos.y + 1.f, size.x, size.y, up_offsets, r);
+  nvgStrokeColor(pctx, suncolor);
+  nvgStrokeWidth(pctx, 1.f);
+  nvgStroke(pctx);
+
+  /* light */
+  draw_tab_path(pctx, pos.x, pos.y, size.x, size.y, up_offsets, r);
+  nvgStrokeColor(pctx, shadowcolor);
+  nvgStroke(pctx);
+}
+
 void rm_tabcontrol_ex::tab::width_recompute()
 {
   float buttons_total_width;
   float text_region_width;
   float total_width;
+  float tab_up_offsets;
   rm_tabcontrol_ex_style* pstyle;
   assert(m_powner && "m_powner was nullptr");
   assert(m_powner->get_style() && "m_powner->get_style() returned nullptr");
@@ -1758,7 +1832,8 @@ void rm_tabcontrol_ex::tab::width_recompute()
   buttons_total_width = pstyle->get_tab_buttons_spacing() +
     (pstyle->get_tab_buttons_size() + pstyle->get_tab_buttons_spacing()) * float(m_buttons.size());
   text_region_width = pstyle->get_text_offsets().x * 2.f + m_textsize.x; //NOTE: K.D. "txtoffs * 2.f" - for left and right text spacing
-  total_width = text_region_width + buttons_total_width;
+  tab_up_offsets = rm_abs(pstyle->get_tab_up_offsets().x) + rm_abs(pstyle->get_tab_up_offsets().y);
+  total_width = text_region_width + buttons_total_width + tab_up_offsets;
   /* update m_width only for greater sizes */
   if (total_width > m_width)
     m_width = total_width;

@@ -850,3 +850,29 @@ void rm_utl::draw_shadow(NVGcontext* pctx, rm_vec2& pos, rm_vec2& size,
   nvgFill(pctx);
   nvgRestore(pctx);
 }
+
+void rm_utl::draw_edge(NVGcontext* pctx, rm_vec2 pos, rm_vec2& size,
+  const rm_corners_style* pcstyle, const rm_color& suncolor, const rm_color& shadowcolor)
+{
+  /* light */
+  nvgBeginPath(pctx);
+  nvgStrokeColor(pctx, suncolor);
+  nvgRoundedRectVarying(pctx,
+    pos.x, pos.y + 1.f, size.x, size.y,
+    pcstyle->get_top_left(),
+    pcstyle->get_top_right(),
+    pcstyle->get_bottom_right(),
+    pcstyle->get_bottom_left());
+  nvgStroke(pctx);
+
+  /* light */
+  nvgBeginPath(pctx);
+  nvgStrokeColor(pctx, shadowcolor);
+  nvgRoundedRectVarying(pctx,
+    pos.x, pos.y, size.x, size.y,
+    pcstyle->get_top_left(),
+    pcstyle->get_top_right(),
+    pcstyle->get_bottom_right(),
+    pcstyle->get_bottom_left());
+  nvgStroke(pctx);
+}
