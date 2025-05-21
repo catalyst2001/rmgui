@@ -769,7 +769,7 @@ public:
 
   /* parent */
   inline rm_widget  *get_parent() { return m_pparent; }
-  void                  set_parent(rm_widget* p_parent);
+  void               set_parent(rm_widget* p_parent);
 
   /* flags */
   inline rmgui_flags_elem get_elem_flags() { return m_elem_flags; }
@@ -783,12 +783,12 @@ public:
   inline irm_sysdf  *get_sysdf() { return m_psysdf; }
 
   /* font */
-  inline void           set_font(rm_font font) { m_font = font; }
-  inline rm_font        get_font() { return m_font; }
+  inline void        set_font(rm_font font) { m_font = font; }
+  inline rm_font     get_font() { return m_font; }
 
   /* layers */
-  inline void           set_zindex(int zidx) { m_zindex = zidx; }
-  inline int            get_zindex() const { return m_zindex; }
+  inline void        set_zindex(int zidx) { m_zindex = zidx; }
+  inline int         get_zindex() const { return m_zindex; }
 
   void resize(float width, float height);
   inline void resize(rm_vec2 newsize) { resize(newsize.x, newsize.y); }

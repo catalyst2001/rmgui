@@ -498,13 +498,15 @@ void example_widgets(rm_surface* gui)
   tabstyle.set_tab_corners_radius(2.f);
   tabstyle.set_tab_up_offsets({ 0.f, 0.f });
 
-  rm_tabcontrol_ex* ptabctl = new rm_tabcontrol_ex(gui, 10, 10, 800, 600, TCF_NONE, &tabstyle);
+  rm_tabcontrol_ex* ptabctl = new rm_tabcontrol_ex(gui, 10, 10, 800, 600, TCF_NONE, TC_DEFAULT, &tabstyle);
   tc::tab* ptab01 = ptabctl->add_tab("Main page", 0, 10);
   tc::tab* ptab02 = ptabctl->add_tab("Page 2", 1, 10);
   tc::tab* ptab11 = ptabctl->add_tab("Main page asdasda", 0, 10);
   tc::tab* ptab12 = ptabctl->add_tab("Page 2 asdasdasd", 1, 10);
-  ptab01->get_page_widget();
+  
 
+  static rm_checkbox_style checkstyle;
+  rm_checkbox *pcb = new rm_checkbox(ptab12->get_page_widget(), 10, 100, 200, &checkstyle, "Checkbox on page 0");
 
   ptabctl->select_tab(0, 0);
 

@@ -562,6 +562,7 @@ rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkb
 {
   set_style(pstyle);
   set_callback(pcallback);
+  assert(m_proot && "m_proot was nullptr! solve this later");
   m_icon_font = m_proot->find_font("fontawesome");
   assert(m_icon_font.is_valid() && "'fontawesome' not loaded");
 }
@@ -1501,13 +1502,20 @@ void rm_tabcontrol_ex::on_draw(NVGcontext* pctx)
       //if (b_is_selected)
       //  nvgIntersectScissor(pctx, pos.x, pos.y + size.y, size.x, size.y);
 
-      pos.x += size.x + 2.f;
+      pos.x += size.x + ktab_spacing;
     }
   }
 }
 
 bool rm_tabcontrol_ex::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
 {
+  tab* ptab;
+  rm_vec2 mouse = cursor_to_local(cursor_pos);
+  printf("mousepos: %f %f\n", mouse.x, mouse.y);
+  ptab = get_tab_at_cursor(mouse);
+  if (ptab) {
+    printf("TAB FOUND!\n");
+  }
   return true;
 }
 
@@ -1574,14 +1582,50 @@ size_t rm_tabcontrol_ex::find_free_row_or_create(const char* ptabname)
   return m_tab_rows.size()-1;
 }
 
-rm_tabcontrol_ex::rm_tabcontrol_ex(rm_widget* p_parent, 
+rm_tabcontrol_ex::tab* rm_tabcontrol_ex::get_tab_at_cursor(rm_vec2& local_cursor)
+{
+  rm_vec2 pos, size;
+  float   tab_height;
+  //float   rows_height;
+  assert(m_pstyle && "m_pstyle was nullptr!");
+  tab_height = m_pstyle->get_tab_height();
+  /* for horizontal tabs */
+  if (is_horizontal()) {
+    for (size_t i = 0; i < get_num_rows(); i++) {
+      tab_row& row = get_tab_row(i);
+      pos.init(0.f, float(i * tab_height));
+      size.init(m_size.x, tab_height);
+      /* check for cursor inside in each row */
+      if (rm_bbox(pos, size).inside(local_cursor)) {
+        /* find tab */
+        rm_vec2 tabpos(0.f, pos.y);
+        for (size_t j = 0; j < row.get_num_tabs(); j++) {
+          tab* ptab = row.get_tab(j);
+          assert(ptab && "ptab was nullptr!");
+          if (rm_bbox(tabpos, { tabpos.x + ptab->get_width(), tabpos.y + tab_height }).inside(local_cursor)) {
+            /* tab found */
+            return ptab;
+          }
+          tabpos.x += ptab->get_width() + ktab_spacing;
+        }
+      }
+    }
+  }
+
+  /* for vertical tabs */
+  return nullptr; //TODO: K.D. IMPL THIS
+}
+
+rm_tabcontrol_ex::rm_tabcontrol_ex(rm_widget* p_parent,
   int x, int y, int width, int height, 
-  uint32_t tab_flags, rm_tabcontrol_ex_style* pstyle, size_t num_rows) :
+  uint32_t tab_flags, uint32_t tab_type, rm_tabcontrol_ex_style* pstyle, size_t num_rows) :
   rm_widget(x, y, width, height, p_parent, "ui_kdtabcontrol", EXGUI_FLAG_DEFAULT, tab_flags), 
   m_active_row(invalid_index::ROW), m_active_tab(invalid_index::TAB)
 {
+  assert(is_valid_type(tab_type) && "tab type is invalid!");
   set_style(pstyle);
   set_num_rows(num_rows);
+  m_type = tab_type;
 }
 
 bool rm_tabcontrol_ex::set_num_rows(size_t newsize)
@@ -1675,22 +1719,24 @@ rm_tabcontrol_ex::tab* rm_tabcontrol_ex::add_tab_widget(const char* pname,
   pwidget->move({ 0.f, rows_height });
   pwidget->resize({ m_size.x, m_size.y - rows_height });
   ptab->m_pwidget = pwidget;
+  select_tab(0, 0);
   return ptab;
 }
 
 bool rm_tabcontrol_ex::select_tab(size_t rowidx, size_t tabidx)
 {
   size_t temp_row_select;
-  if (rowidx > get_num_rows())
+  if (rowidx >= get_num_rows())
     return false;
 
   temp_row_select = rowidx;
   tab_row& row = get_tab_row(temp_row_select);
-  if (tabidx > row.get_num_tabs())
+  if (tabidx >= row.get_num_tabs())
     return false;
 
   m_active_row = temp_row_select;
   m_active_tab = tabidx;
+  hide_all_except(m_active_row, m_active_tab);
   return true;
 }
 

@@ -700,6 +700,14 @@ enum rm_tabcontrol_flags {
   TCF_ROWS_OVERFLOW=1<<2
 };
 
+enum rm_tabcontrol_type {
+  TC_TOP = 0,
+  TC_LEFT,
+  TC_RIGHT,
+  TC_BOTTOM,
+  TC_DEFAULT = TC_TOP
+};
+
 class rm_tabcontrol_ex_style : public rm_corners_style {
   rm_vec2  m_text_offset;
   rm_color m_text_color;
@@ -894,10 +902,14 @@ public:
       return m_tabs[tabidx];
     }
   };
+
+  static constexpr float ktab_spacing = 2.f;
+
 private:
   size_t m_active_row; /*< active row index (INVALID_ROW if tab not selected) */
   size_t m_active_tab; /*< active tab index (INVALID_TAB if tab not selected) */
   std::vector<tab_row> m_tab_rows; /*< tab rows */
+  uint32_t m_type; /*< tab control type */
 
   void on_draw(NVGcontext* pctx) override;
   bool on_mouse(EXGUI_MOUSE_EVENT event, 
@@ -910,12 +922,22 @@ private:
     assert(m_pstyle && "m_pstyle was nullptr!");
     return static_cast<float>(m_pstyle->get_tab_height() * get_num_rows());
   }
+  inline static bool is_valid_type(uint32_t type) {
+    return type == TC_TOP || type == TC_BOTTOM || type == TC_LEFT || type == TC_RIGHT;
+  }
+  tab     *get_tab_at_cursor(rm_vec2& local_cursor);
 public:
-  rm_tabcontrol_ex(rm_widget* p_parent, int x, int y, int width, int height, uint32_t tab_flags, rm_tabcontrol_ex_style *pstyle, size_t num_rows=1);
+  rm_tabcontrol_ex(rm_widget* p_parent, int x, int y, int width, int height, uint32_t tab_flags, 
+    uint32_t tab_type, rm_tabcontrol_ex_style *pstyle, size_t num_rows=1);
   static inline bool is_valid_tab(size_t tabid) { return tabid != invalid_index::TAB; }
   inline size_t get_active_tab() const { return m_active_tab; }
   inline size_t get_active_row() const { return m_active_row; }
   inline size_t get_num_rows() const { return m_tab_rows.size(); }
+  inline uint32_t get_type() const { return m_type; }
+  inline bool   is_horizontal() const { return m_type == TC_TOP || m_type == TC_BOTTOM; }
+  inline bool   is_vertical() const { return m_type == TC_LEFT || m_type == TC_RIGHT; }
+  inline bool   is_left() const { return m_type == TC_LEFT; }
+  inline bool   is_top() const { return m_type == TC_TOP; }
   inline tab_row& get_tab_row(size_t idx) {
     assert(idx < m_tab_rows.size() && "row index out of bounds");
     return m_tab_rows[idx];
