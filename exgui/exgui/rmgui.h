@@ -262,96 +262,104 @@ public:
 };
 
 /* virtual keys */
-enum EXGUI_KEY : uint32_t {
-  EXGUI_KEY_NONE = 0,
-  EXGUI_KEY_A,
-  EXGUI_KEY_B,
-  EXGUI_KEY_C,
-  EXGUI_KEY_D,
-  EXGUI_KEY_E,
-  EXGUI_KEY_F,
-  EXGUI_KEY_G,
-  EXGUI_KEY_H,
-  EXGUI_KEY_I,
-  EXGUI_KEY_J,
-  EXGUI_KEY_K,
-  EXGUI_KEY_L,
-  EXGUI_KEY_M,
-  EXGUI_KEY_N,
-  EXGUI_KEY_O,
-  EXGUI_KEY_P,
-  EXGUI_KEY_Q,
-  EXGUI_KEY_R,
-  EXGUI_KEY_S,
-  EXGUI_KEY_T,
-  EXGUI_KEY_U,
-  EXGUI_KEY_V,
-  EXGUI_KEY_W,
-  EXGUI_KEY_X,
-  EXGUI_KEY_Y,
-  EXGUI_KEY_Z,
-  EXGUI_KEY_0,
-  EXGUI_KEY_1,
-  EXGUI_KEY_2,
-  EXGUI_KEY_3,
-  EXGUI_KEY_4,
-  EXGUI_KEY_5,
-  EXGUI_KEY_6,
-  EXGUI_KEY_7,
-  EXGUI_KEY_8,
-  EXGUI_KEY_9,
-  EXGUI_KEY_ESCAPE,
-  EXGUI_KEY_ENTER,
-  EXGUI_KEY_TAB,
-  EXGUI_KEY_BACKSPACE,
-  EXGUI_KEY_INSERT,
-  EXGUI_KEY_DELETE,
-  EXGUI_KEY_RIGHT,
-  EXGUI_KEY_LEFT,
-  EXGUI_KEY_DOWN,
-  EXGUI_KEY_UP,
-  EXGUI_KEY_PAGE_UP,
-  EXGUI_KEY_PAGE_DOWN,
-  EXGUI_KEY_HOME,
-  EXGUI_KEY_END,
-  EXGUI_KEY_CAPS_LOCK,
-  EXGUI_KEY_SCROLL_LOCK,
-  EXGUI_KEY_NUM_LOCK,
-  EXGUI_KEY_PRINT_SCREEN,
-  EXGUI_KEY_PAUSE,
-  EXGUI_KEY_CONTROL,
-  EXGUI_KEY_LCTRL,
-  EXGUI_KEY_RCTRL,
-  EXGUI_KEY_F1,
-  EXGUI_KEY_F2,
-  EXGUI_KEY_F3,
-  EXGUI_KEY_F4,
-  EXGUI_KEY_F5,
-  EXGUI_KEY_F6,
-  EXGUI_KEY_F7,
-  EXGUI_KEY_F8,
-  EXGUI_KEY_F9,
-  EXGUI_KEY_F10,
-  EXGUI_KEY_F11,
-  EXGUI_KEY_F12
+enum RM_KEY : uint32_t {
+  RM_KEY_NONE = 0,
+  RM_KEY_A,
+  RM_KEY_B,
+  RM_KEY_C,
+  RM_KEY_D,
+  RM_KEY_E,
+  RM_KEY_F,
+  RM_KEY_G,
+  RM_KEY_H,
+  RM_KEY_I,
+  RM_KEY_J,
+  RM_KEY_K,
+  RM_KEY_L,
+  RM_KEY_M,
+  RM_KEY_N,
+  RM_KEY_O,
+  RM_KEY_P,
+  RM_KEY_Q,
+  RM_KEY_R,
+  RM_KEY_S,
+  RM_KEY_T,
+  RM_KEY_U,
+  RM_KEY_V,
+  RM_KEY_W,
+  RM_KEY_X,
+  RM_KEY_Y,
+  RM_KEY_Z,
+  RM_KEY_0,
+  RM_KEY_1,
+  RM_KEY_2,
+  RM_KEY_3,
+  RM_KEY_4,
+  RM_KEY_5,
+  RM_KEY_6,
+  RM_KEY_7,
+  RM_KEY_8,
+  RM_KEY_9,
+  RM_KEY_ESCAPE,
+  RM_KEY_ENTER,
+  RM_KEY_TAB,
+  RM_KEY_BACKSPACE,
+  RM_KEY_INSERT,
+  RM_KEY_DELETE,
+  RM_KEY_RIGHT,
+  RM_KEY_LEFT,
+  RM_KEY_DOWN,
+  RM_KEY_UP,
+  RM_KEY_PAGE_UP,
+  RM_KEY_PAGE_DOWN,
+  RM_KEY_HOME,
+  RM_KEY_END,
+  RM_KEY_CAPS_LOCK,
+  RM_KEY_SCROLL_LOCK,
+  RM_KEY_NUM_LOCK,
+  RM_KEY_PRINT_SCREEN,
+  RM_KEY_PAUSE,
+  RM_KEY_CONTROL,
+  RM_KEY_LCTRL,
+  RM_KEY_RCTRL,
+  RM_KEY_F1,
+  RM_KEY_F2,
+  RM_KEY_F3,
+  RM_KEY_F4,
+  RM_KEY_F5,
+  RM_KEY_F6,
+  RM_KEY_F7,
+  RM_KEY_F8,
+  RM_KEY_F9,
+  RM_KEY_F10,
+  RM_KEY_F11,
+  RM_KEY_F12,
+  RM_KEY_LMOUSE,
+  RM_KEY_MMOUSE,
+  RM_KEY_RMOUSE,
+  RM_KEY_XMOUSE1,
+  RM_KEY_XMOUSE2,
+  RM_KEY_XMOUSE3,
+  RM_KEY_XMOUSE4,
+  RM_KEY_XMOUSE5,
 };
 
 /* key state */
-enum EXGUI_KEY_STATE : uint32_t {
+enum RM_KEY_STATE : uint32_t {
   DOWN = 0,
   UP,
   REPEAT
 };
 
 /* mouse events */
-enum EXGUI_MOUSE_EVENT : uint32_t {
-  EXGUI_MOUSE_EVENT_MOVE = 0,
-  EXGUI_MOUSE_EVENT_CLICK,
-  EXGUI_MOUSE_EVENT_DOUBLE_CLICK
+enum RM_MOUSE_EVENT : uint32_t {
+  RM_MOUSE_EVENT_MOVE = 0,
+  RM_MOUSE_EVENT_CLICK,
+  RM_MOUSE_EVENT_DOUBLE_CLICK
 };
 
 /* node event */
-enum EXGUI_EVENT : uint32_t {
+enum RM_EVENT : uint32_t {
   PARENT_CHANGED = 0,
   PARENT_RESIZE,
   PARENT_CHILD_ADDED,
@@ -359,26 +367,26 @@ enum EXGUI_EVENT : uint32_t {
 };
 
 /* Node notify and state flags */
-#define EXGUI_FLAG_NONE          (0)
-#define EXGUI_FLAG_VISIBLE       (1 << 0)
-#define EXGUI_FLAG_ACTIVE        (1 << 1)
-#define EXGUI_FLAG_NOTIFY_CHILDS (1 << 2)
-#define EXGUI_FLAG_HAS_SYM       (1 << 3)
-#define EXGUI_FLAG_HAS_KEYBD     (1 << 4)
-#define EXGUI_FLAG_HAS_MOUSE     (1 << 5)
-#define EXGUI_FLAG_HAS_CHILDS    (1 << 6)
+#define RM_FLAG_NONE          (0)
+#define RM_FLAG_VISIBLE       (1 << 0)
+#define RM_FLAG_ACTIVE        (1 << 1)
+#define RM_FLAG_NOTIFY_CHILDS (1 << 2)
+#define RM_FLAG_HAS_SYM       (1 << 3)
+#define RM_FLAG_HAS_KEYBD     (1 << 4)
+#define RM_FLAG_HAS_MOUSE     (1 << 5)
+#define RM_FLAG_HAS_CHILDS    (1 << 6)
 
 /* special state flags */
-#define EXGUI_FLAG_HOVERED       (1 << 7)
-#define EXGUI_FLAG_FOCUSED       (1 << 8)
-#define EXGUI_FLAG_DRAGGED       (1 << 9)
+#define RM_FLAG_HOVERED       (1 << 7)
+#define RM_FLAG_FOCUSED       (1 << 8)
+#define RM_FLAG_DRAGGED       (1 << 9)
 
-#define EXGUI_FLAG_GLOBAL        (1 << 10)
-#define EXGUI_FLAG_DISABLE_SCISSOR (1 << 11)
-#define EXGUI_FLAG_HIGHEST_PRIORITY      (1 << 12)
+#define RM_FLAG_GLOBAL        (1 << 10)
+#define RM_FLAG_DISABLE_SCISSOR (1 << 11)
+#define RM_FLAG_HIGHEST_PRIORITY      (1 << 12)
 
 /* default flags for each widget */
-#define EXGUI_FLAG_DEFAULT       (EXGUI_FLAG_VISIBLE|EXGUI_FLAG_ACTIVE|EXGUI_FLAG_NOTIFY_CHILDS|EXGUI_FLAG_HAS_SYM|EXGUI_FLAG_HAS_KEYBD|EXGUI_FLAG_HAS_MOUSE|EXGUI_FLAG_HAS_CHILDS)
+#define RM_FLAG_DEFAULT       (RM_FLAG_VISIBLE|RM_FLAG_ACTIVE|RM_FLAG_NOTIFY_CHILDS|RM_FLAG_HAS_SYM|RM_FLAG_HAS_KEYBD|RM_FLAG_HAS_MOUSE|RM_FLAG_HAS_CHILDS)
 
 /* flags base class */
 class rmgui_flags
@@ -410,20 +418,20 @@ class rmgui_flags_elem : public rmgui_flags
   /* allow rmgui_root class modify flags */
   friend class rm_surface;
 public:
-  rmgui_flags_elem() : rmgui_flags(EXGUI_FLAG_DEFAULT) {}
+  rmgui_flags_elem() : rmgui_flags(RM_FLAG_DEFAULT) {}
   ~rmgui_flags_elem() {}
 
-  inline bool has_visible() { return is_set(EXGUI_FLAG_VISIBLE); }
-  inline bool has_active() { return is_set(EXGUI_FLAG_ACTIVE); }
-  inline bool has_notify_childs() { return is_set(EXGUI_FLAG_NOTIFY_CHILDS); }
-  inline bool has_symbols_input() { return is_set(EXGUI_FLAG_HAS_SYM); }
-  inline bool has_keybd() { return is_set(EXGUI_FLAG_HAS_KEYBD); }
-  inline bool has_mouse() { return is_set(EXGUI_FLAG_HAS_MOUSE); }
-  inline bool has_childs() { return is_set(EXGUI_FLAG_HAS_CHILDS); }
+  inline bool has_visible() { return is_set(RM_FLAG_VISIBLE); }
+  inline bool has_active() { return is_set(RM_FLAG_ACTIVE); }
+  inline bool has_notify_childs() { return is_set(RM_FLAG_NOTIFY_CHILDS); }
+  inline bool has_symbols_input() { return is_set(RM_FLAG_HAS_SYM); }
+  inline bool has_keybd() { return is_set(RM_FLAG_HAS_KEYBD); }
+  inline bool has_mouse() { return is_set(RM_FLAG_HAS_MOUSE); }
+  inline bool has_childs() { return is_set(RM_FLAG_HAS_CHILDS); }
 
   /* state flags */
-  inline bool is_hovered() { return is_set(EXGUI_FLAG_HOVERED); }
-  inline bool is_focused() { return is_set(EXGUI_FLAG_FOCUSED); }
+  inline bool is_hovered() { return is_set(RM_FLAG_HOVERED); }
+  inline bool is_focused() { return is_set(RM_FLAG_FOCUSED); }
 
   uint32_t operator=(uint32_t f) {
     m_flags = f;
@@ -432,10 +440,10 @@ public:
 };
 
 /* clipboard data types */
-enum EXGUI_CB_DATA_TYPE : uint32_t {
-  EXGUI_CLIPBOARD_DATA_TYPE_NONE = 0,
-  EXGUI_CLIPBOARD_DATA_TYPE_BIN,
-  EXGUI_CLIPBOARD_DATA_TYPE_TEXT
+enum RM_CB_DATA_TYPE : uint32_t {
+  RM_CLIPBOARD_DATA_TYPE_NONE = 0,
+  RM_CLIPBOARD_DATA_TYPE_BIN,
+  RM_CLIPBOARD_DATA_TYPE_TEXT
 };
 
 /**
@@ -449,8 +457,8 @@ public:
   virtual void               set_cursor_pos(int x, int h) = 0;
   virtual uint32_t           num_monitors() = 0;
   virtual void               get_monitor_info(uint32_t monitor_idx, uint32_t *p_dst_DPI, uint32_t *p_w, uint32_t *p_h) = 0;
-  virtual bool               get_clipboard_data_info(EXGUI_CB_DATA_TYPE &dst_data, size_t &dst_size) = 0;
-  virtual const uint8_t     *get_clipboard_data_ex(EXGUI_CB_DATA_TYPE &dst, size_t &size) =0;
+  virtual bool               get_clipboard_data_info(RM_CB_DATA_TYPE &dst_data, size_t &dst_size) = 0;
+  virtual const uint8_t     *get_clipboard_data_ex(RM_CB_DATA_TYPE &dst, size_t &size) =0;
   virtual void               set_clipboard_data_ex(const uint8_t* p_src, size_t size) = 0;
   virtual float              get_time() = 0;
 };
@@ -502,9 +510,9 @@ class irmgui_widget
 {
 public:
   //virtual     ~irmgui_widget() = 0;
-  virtual bool on_event(EXGUI_EVENT event, rm_widget *p_from) = 0;
+  virtual bool on_event(RM_EVENT event, rm_widget *p_from) = 0;
   virtual void on_draw(NVGcontext* pctx) = 0;
-  virtual void on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state) = 0;
+  virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) = 0;
 
   /**
   * @brief Text input handler
@@ -515,28 +523,28 @@ public:
 
   /**
   * @brief Mouse event handler
-  * @param event - received mouse event (EXGUI_MOUSE_EVENT_MOVE or EXGUI_MOUSE_EVENT_CLICK)
+  * @param event - received mouse event (RM_MOUSE_EVENT_MOVE or RM_MOUSE_EVENT_CLICK)
   * @param vk - received virtual key
   * @param state - received key state (DOWN, UP or REPEAT)
   * @param cursor_pos - received current cursor pos
   * @return To block further propagation of the event, return false. If ture is returned, the event is propagated to the following elements.
   */
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) = 0;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) = 0;
 };
 
-enum EXGUI_CORNER : uint32_t {
+enum RM_CORNER : uint32_t {
   LEFT_TOP = 0,
   RIGHT_TOP,
   RIGHT_BOTTOM,
   LEFT_BOTTOM,
 
-  EXGUI_NUM_CORNERS
+  RM_NUM_CORNERS
 };
 
 class rm_corners_style
 {
 protected:
-  float m_corner_radius[EXGUI_NUM_CORNERS];
+  float m_corner_radius[RM_NUM_CORNERS];
 public:
   rm_corners_style() {
     m_corner_radius[LEFT_TOP] = 0.f;
@@ -557,8 +565,8 @@ public:
     m_corner_radius[RIGHT_BOTTOM] = 
     m_corner_radius[LEFT_BOTTOM] = radius;
   }
-  inline void  set_corner_radius(EXGUI_CORNER corner, float radius) { m_corner_radius[corner] = radius; }
-  inline float get_corner_radius(EXGUI_CORNER corner) { return m_corner_radius[corner]; }
+  inline void  set_corner_radius(RM_CORNER corner, float radius) { m_corner_radius[corner] = radius; }
+  inline float get_corner_radius(RM_CORNER corner) { return m_corner_radius[corner]; }
 };
 
 /**
@@ -638,7 +646,7 @@ class rm_widget : protected irmgui_widget
 
 protected:
   /* irmgui_element empty impls */
-  virtual bool on_event(EXGUI_EVENT event, rm_widget *p_from) {
+  virtual bool on_event(RM_EVENT event, rm_widget *p_from) {
     RM_UNUSED(event);
     RM_UNUSED(p_from);
     return true;
@@ -655,7 +663,7 @@ protected:
     nvgStroke(pctx);
 #endif
   }
-  virtual void on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state) {
+  virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) {
     RM_UNUSED(sc);
     RM_UNUSED(vk);
     RM_UNUSED(state);
@@ -663,7 +671,7 @@ protected:
   virtual void on_text_input(int sym) {
     RM_UNUSED(sym);
   }
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
     RM_UNUSED(event);
     RM_UNUSED(vk);
     RM_UNUSED(state);
@@ -718,7 +726,7 @@ public:
   }
 
   rm_widget(int x, int y, int width, int height, rm_widget *p_parent, const char *p_classname,
-    uint32_t flags = EXGUI_FLAG_DEFAULT, uint32_t uflags = 0, void *p_userptr = nullptr) : m_proot(nullptr),
+    uint32_t flags = RM_FLAG_DEFAULT, uint32_t uflags = 0, void *p_userptr = nullptr) : m_proot(nullptr),
     m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_zindex(0) {
     rm_vec2 parent_coord;
     if (m_pparent) {
@@ -756,7 +764,7 @@ public:
 
   /* visual */
   inline bool        is_visible() { return m_elem_flags.has_visible(); }
-  inline void        show(bool b_show = true) { m_elem_flags.toggle_bits(EXGUI_FLAG_VISIBLE, b_show); }
+  inline void        show(bool b_show = true) { m_elem_flags.toggle_bits(RM_FLAG_VISIBLE, b_show); }
   inline void        hide() { show(false); }
 
   /* childs */
@@ -776,7 +784,7 @@ public:
   inline uint32_t       get_user_flags() { return m_user_flags; }
 
   /* state active */
-  inline void       set_enabled(bool enabled) {m_elem_flags.toggle_bits(EXGUI_FLAG_ACTIVE, enabled);}
+  inline void       set_enabled(bool enabled) {m_elem_flags.toggle_bits(RM_FLAG_ACTIVE, enabled);}
   inline const bool is_enabled() {return m_elem_flags.has_active();}
 
   /* system dependend functions interface */
@@ -810,13 +818,13 @@ class rm_surface : public rm_widget, rm_object_accrssor
   /* event notifier functions */
   static void event_dispatcher(rm_widget *p_elem);
   static void keybd_dispatcher(rm_widget *p_elem, int sc, 
-    EXGUI_KEY vk, EXGUI_KEY_STATE state);
+    RM_KEY vk, RM_KEY_STATE state);
 #if 0
   static void text_input_dispatcher(rmgui_widget *p_elem, int sym);
 #endif
   bool mouse_dispatcher(rm_widget *p_elem,
-    EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, 
-    EXGUI_KEY_STATE state, rm_vec2 &cursor_pos);
+    RM_MOUSE_EVENT event, RM_KEY vk, 
+    RM_KEY_STATE state, rm_vec2 &cursor_pos);
   void draw_recursive(rm_widget* p_elem, float dt);
 
 public:
@@ -825,9 +833,9 @@ public:
 
   /* main events */
   void draw(float dt);
-  void keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state);
+  void keybd(int sc, RM_KEY vk, RM_KEY_STATE state);
   void textinput(int sym);
-  void mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, int x, int y);
+  void mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, int x, int y);
 
   NVGcontext* get_context() { return m_pctx; }
 
@@ -995,10 +1003,10 @@ class rm_window : public rm_widget, public rm_styled<rm_window_style>
 
   /* paint window background */
   virtual void on_draw(NVGcontext* pctx);
-  virtual bool on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos);
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos);
 
 public:
-  rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags = EXGUI_FLAG_DEFAULT, uint32_t uflags = 0, void* p_userptr = nullptr);
+  rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags = RM_FLAG_DEFAULT, uint32_t uflags = 0, void* p_userptr = nullptr);
   ~rm_window();
 };
 

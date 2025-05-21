@@ -15,98 +15,98 @@
 static rm_surface* g_gui = nullptr;
 
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
-  g_gui->mouse(EXGUI_MOUSE_EVENT_MOVE, EXGUI_KEY_NONE, DOWN, (int)xpos, (int)ypos);
+  g_gui->mouse(RM_MOUSE_EVENT_MOVE, RM_KEY_NONE, DOWN, (int)xpos, (int)ypos);
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
   if (button == GLFW_MOUSE_BUTTON_LEFT) {
     double xpos, ypos;
     glfwGetCursorPos(window, &xpos, &ypos);
-    EXGUI_KEY_STATE state = (action == GLFW_PRESS ? DOWN : UP);
-    g_gui->mouse(EXGUI_MOUSE_EVENT_CLICK, EXGUI_KEY_NONE, state, (int)xpos, (int)ypos);
+    RM_KEY_STATE state = (action == GLFW_PRESS ? DOWN : UP);
+    g_gui->mouse(RM_MOUSE_EVENT_CLICK, RM_KEY_NONE, state, (int)xpos, (int)ypos);
   }
 }
 // FIXME: d2 move to utils 
-EXGUI_KEY translate_glfw_key(int k) {
+RM_KEY translate_glfw_key(int k) {
   switch (k) {
-  case GLFW_KEY_A: return EXGUI_KEY_A;
-  case GLFW_KEY_B: return EXGUI_KEY_B;
-  case GLFW_KEY_C: return EXGUI_KEY_C;
-  case GLFW_KEY_D: return EXGUI_KEY_D;
-  case GLFW_KEY_E: return EXGUI_KEY_E;
-  case GLFW_KEY_F: return EXGUI_KEY_F;
-  case GLFW_KEY_G: return EXGUI_KEY_G;
-  case GLFW_KEY_H: return EXGUI_KEY_H;
-  case GLFW_KEY_I: return EXGUI_KEY_I;
-  case GLFW_KEY_J: return EXGUI_KEY_J;
-  case GLFW_KEY_K: return EXGUI_KEY_K;
-  case GLFW_KEY_L: return EXGUI_KEY_L;
-  case GLFW_KEY_M: return EXGUI_KEY_M;
-  case GLFW_KEY_N: return EXGUI_KEY_N;
-  case GLFW_KEY_O: return EXGUI_KEY_O;
-  case GLFW_KEY_P: return EXGUI_KEY_P;
-  case GLFW_KEY_Q: return EXGUI_KEY_Q;
-  case GLFW_KEY_R: return EXGUI_KEY_R;
-  case GLFW_KEY_S: return EXGUI_KEY_S;
-  case GLFW_KEY_T: return EXGUI_KEY_T;
-  case GLFW_KEY_U: return EXGUI_KEY_U;
-  case GLFW_KEY_V: return EXGUI_KEY_V;
-  case GLFW_KEY_W: return EXGUI_KEY_W;
-  case GLFW_KEY_X: return EXGUI_KEY_X;
-  case GLFW_KEY_Y: return EXGUI_KEY_Y;
-  case GLFW_KEY_Z: return EXGUI_KEY_Z;
+  case GLFW_KEY_A: return RM_KEY_A;
+  case GLFW_KEY_B: return RM_KEY_B;
+  case GLFW_KEY_C: return RM_KEY_C;
+  case GLFW_KEY_D: return RM_KEY_D;
+  case GLFW_KEY_E: return RM_KEY_E;
+  case GLFW_KEY_F: return RM_KEY_F;
+  case GLFW_KEY_G: return RM_KEY_G;
+  case GLFW_KEY_H: return RM_KEY_H;
+  case GLFW_KEY_I: return RM_KEY_I;
+  case GLFW_KEY_J: return RM_KEY_J;
+  case GLFW_KEY_K: return RM_KEY_K;
+  case GLFW_KEY_L: return RM_KEY_L;
+  case GLFW_KEY_M: return RM_KEY_M;
+  case GLFW_KEY_N: return RM_KEY_N;
+  case GLFW_KEY_O: return RM_KEY_O;
+  case GLFW_KEY_P: return RM_KEY_P;
+  case GLFW_KEY_Q: return RM_KEY_Q;
+  case GLFW_KEY_R: return RM_KEY_R;
+  case GLFW_KEY_S: return RM_KEY_S;
+  case GLFW_KEY_T: return RM_KEY_T;
+  case GLFW_KEY_U: return RM_KEY_U;
+  case GLFW_KEY_V: return RM_KEY_V;
+  case GLFW_KEY_W: return RM_KEY_W;
+  case GLFW_KEY_X: return RM_KEY_X;
+  case GLFW_KEY_Y: return RM_KEY_Y;
+  case GLFW_KEY_Z: return RM_KEY_Z;
 
-  case GLFW_KEY_0: return EXGUI_KEY_0;
-  case GLFW_KEY_1: return EXGUI_KEY_1;
-  case GLFW_KEY_2: return EXGUI_KEY_2;
-  case GLFW_KEY_3: return EXGUI_KEY_3;
-  case GLFW_KEY_4: return EXGUI_KEY_4;
-  case GLFW_KEY_5: return EXGUI_KEY_5;
-  case GLFW_KEY_6: return EXGUI_KEY_6;
-  case GLFW_KEY_7: return EXGUI_KEY_7;
-  case GLFW_KEY_8: return EXGUI_KEY_8;
-  case GLFW_KEY_9: return EXGUI_KEY_9;
+  case GLFW_KEY_0: return RM_KEY_0;
+  case GLFW_KEY_1: return RM_KEY_1;
+  case GLFW_KEY_2: return RM_KEY_2;
+  case GLFW_KEY_3: return RM_KEY_3;
+  case GLFW_KEY_4: return RM_KEY_4;
+  case GLFW_KEY_5: return RM_KEY_5;
+  case GLFW_KEY_6: return RM_KEY_6;
+  case GLFW_KEY_7: return RM_KEY_7;
+  case GLFW_KEY_8: return RM_KEY_8;
+  case GLFW_KEY_9: return RM_KEY_9;
 
-  case GLFW_KEY_ESCAPE:       return EXGUI_KEY_ESCAPE;
-  case GLFW_KEY_ENTER:        return EXGUI_KEY_ENTER;
-  case GLFW_KEY_TAB:          return EXGUI_KEY_TAB;
-  case GLFW_KEY_BACKSPACE:    return EXGUI_KEY_BACKSPACE;
-  case GLFW_KEY_INSERT:       return EXGUI_KEY_INSERT;
-  case GLFW_KEY_DELETE:       return EXGUI_KEY_DELETE;
-  case GLFW_KEY_RIGHT:        return EXGUI_KEY_RIGHT;
-  case GLFW_KEY_LEFT:         return EXGUI_KEY_LEFT;
-  case GLFW_KEY_DOWN:         return EXGUI_KEY_DOWN;
-  case GLFW_KEY_UP:           return EXGUI_KEY_UP;
-  case GLFW_KEY_PAGE_UP:      return EXGUI_KEY_PAGE_UP;
-  case GLFW_KEY_PAGE_DOWN:    return EXGUI_KEY_PAGE_DOWN;
-  case GLFW_KEY_HOME:         return EXGUI_KEY_HOME;
-  case GLFW_KEY_END:          return EXGUI_KEY_END;
+  case GLFW_KEY_ESCAPE:       return RM_KEY_ESCAPE;
+  case GLFW_KEY_ENTER:        return RM_KEY_ENTER;
+  case GLFW_KEY_TAB:          return RM_KEY_TAB;
+  case GLFW_KEY_BACKSPACE:    return RM_KEY_BACKSPACE;
+  case GLFW_KEY_INSERT:       return RM_KEY_INSERT;
+  case GLFW_KEY_DELETE:       return RM_KEY_DELETE;
+  case GLFW_KEY_RIGHT:        return RM_KEY_RIGHT;
+  case GLFW_KEY_LEFT:         return RM_KEY_LEFT;
+  case GLFW_KEY_DOWN:         return RM_KEY_DOWN;
+  case GLFW_KEY_UP:           return RM_KEY_UP;
+  case GLFW_KEY_PAGE_UP:      return RM_KEY_PAGE_UP;
+  case GLFW_KEY_PAGE_DOWN:    return RM_KEY_PAGE_DOWN;
+  case GLFW_KEY_HOME:         return RM_KEY_HOME;
+  case GLFW_KEY_END:          return RM_KEY_END;
 
-  case GLFW_KEY_CAPS_LOCK:    return EXGUI_KEY_CAPS_LOCK;
-  case GLFW_KEY_SCROLL_LOCK:  return EXGUI_KEY_SCROLL_LOCK;
-  case GLFW_KEY_NUM_LOCK:     return EXGUI_KEY_NUM_LOCK;
-  case GLFW_KEY_PRINT_SCREEN: return EXGUI_KEY_PRINT_SCREEN;
-  case GLFW_KEY_PAUSE:        return EXGUI_KEY_PAUSE;
+  case GLFW_KEY_CAPS_LOCK:    return RM_KEY_CAPS_LOCK;
+  case GLFW_KEY_SCROLL_LOCK:  return RM_KEY_SCROLL_LOCK;
+  case GLFW_KEY_NUM_LOCK:     return RM_KEY_NUM_LOCK;
+  case GLFW_KEY_PRINT_SCREEN: return RM_KEY_PRINT_SCREEN;
+  case GLFW_KEY_PAUSE:        return RM_KEY_PAUSE;
 
-  case GLFW_KEY_F1:  return EXGUI_KEY_F1;
-  case GLFW_KEY_F2:  return EXGUI_KEY_F2;
-  case GLFW_KEY_F3:  return EXGUI_KEY_F3;
-  case GLFW_KEY_F4:  return EXGUI_KEY_F4;
-  case GLFW_KEY_F5:  return EXGUI_KEY_F5;
-  case GLFW_KEY_F6:  return EXGUI_KEY_F6;
-  case GLFW_KEY_F7:  return EXGUI_KEY_F7;
-  case GLFW_KEY_F8:  return EXGUI_KEY_F8;
-  case GLFW_KEY_F9:  return EXGUI_KEY_F9;
-  case GLFW_KEY_F10: return EXGUI_KEY_F10;
-  case GLFW_KEY_F11: return EXGUI_KEY_F11;
-  case GLFW_KEY_F12: return EXGUI_KEY_F12;
+  case GLFW_KEY_F1:  return RM_KEY_F1;
+  case GLFW_KEY_F2:  return RM_KEY_F2;
+  case GLFW_KEY_F3:  return RM_KEY_F3;
+  case GLFW_KEY_F4:  return RM_KEY_F4;
+  case GLFW_KEY_F5:  return RM_KEY_F5;
+  case GLFW_KEY_F6:  return RM_KEY_F6;
+  case GLFW_KEY_F7:  return RM_KEY_F7;
+  case GLFW_KEY_F8:  return RM_KEY_F8;
+  case GLFW_KEY_F9:  return RM_KEY_F9;
+  case GLFW_KEY_F10: return RM_KEY_F10;
+  case GLFW_KEY_F11: return RM_KEY_F11;
+  case GLFW_KEY_F12: return RM_KEY_F12;
 
 
-  case GLFW_KEY_LEFT_CONTROL:  return EXGUI_KEY_LCTRL;
-  case GLFW_KEY_RIGHT_CONTROL: return EXGUI_KEY_RCTRL;
+  case GLFW_KEY_LEFT_CONTROL:  return RM_KEY_LCTRL;
+  case GLFW_KEY_RIGHT_CONTROL: return RM_KEY_RCTRL;
 
   default:
-    return EXGUI_KEY_NONE;
+    return RM_KEY_NONE;
   }
 }
 
@@ -115,8 +115,8 @@ void char_callback(GLFWwindow* window, unsigned int codepoint) {
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-  EXGUI_KEY vk = translate_glfw_key(key);
-  EXGUI_KEY_STATE state = (action == GLFW_PRESS ? DOWN : action == GLFW_RELEASE ? UP : REPEAT);
+  RM_KEY vk = translate_glfw_key(key);
+  RM_KEY_STATE state = (action == GLFW_PRESS ? DOWN : action == GLFW_RELEASE ? UP : REPEAT);
   g_gui->keybd(scancode, vk, state);
 }
 
@@ -155,12 +155,12 @@ public:
   }
 
   virtual void get_monitor_info(uint32_t monitor_idx, uint32_t* p_dst_DPI, uint32_t* p_w, uint32_t* p_h) {}
-  virtual bool get_clipboard_data_info(EXGUI_CB_DATA_TYPE& dst_data, size_t& dst_size) {
+  virtual bool get_clipboard_data_info(RM_CB_DATA_TYPE& dst_data, size_t& dst_size) {
     return false;
   }
 
-  virtual const uint8_t* get_clipboard_data_ex(EXGUI_CB_DATA_TYPE& dst, size_t& size) {
-    dst = EXGUI_CLIPBOARD_DATA_TYPE_TEXT;
+  virtual const uint8_t* get_clipboard_data_ex(RM_CB_DATA_TYPE& dst, size_t& size) {
+    dst = RM_CLIPBOARD_DATA_TYPE_TEXT;
     const char *pstring = glfwGetClipboardString(nullptr);
     size = strlen(pstring);
     return (uint8_t*)pstring;
@@ -506,8 +506,11 @@ void example_widgets(rm_surface* gui)
   
 
   static rm_checkbox_style checkstyle;
-  rm_checkbox *pcb = new rm_checkbox(ptab12->get_page_widget(), 10, 100, 200, &checkstyle, "Checkbox on page 0");
-
+  rm_checkbox *pcb = new rm_checkbox(ptab12->get_page_widget(), 10, 100, 200, &checkstyle, "Checkbox on page 0",
+    [](rm_checkbox* pcheckbox) {
+      printf("checkbox is %s\n", pcheckbox->is_checked() ? "checked" : "unchecked");
+      return true;
+    });
   ptabctl->select_tab(0, 0);
 
 }

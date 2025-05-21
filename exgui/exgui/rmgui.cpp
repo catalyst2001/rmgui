@@ -33,7 +33,7 @@ bool rm_widget::add_child(rm_widget* p_child)
   p_child->grab_globals_from(this);
 
   /* need events handling highest priority? */
-  if (p_child->get_elem_flags().is_set(EXGUI_FLAG_HIGHEST_PRIORITY)) {
+  if (p_child->get_elem_flags().is_set(RM_FLAG_HIGHEST_PRIORITY)) {
     /* add child first in list */
     m_childs.insert(m_childs.begin(), p_child);
   }
@@ -88,7 +88,7 @@ void rm_surface::event_dispatcher(rm_widget* p_elem)
   RM_UNUSED(p_elem);
 }
 
-void rm_surface::keybd_dispatcher(rm_widget* p_elem, int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
+void rm_surface::keybd_dispatcher(rm_widget* p_elem, int sc, RM_KEY vk, RM_KEY_STATE state)
 {
   p_elem->on_keybd(sc, vk, state);
   /* element has childs? */
@@ -119,18 +119,18 @@ void rmgui_surface::text_input_dispatcher(rmgui_widget* p_elem, int sym)
 #endif
 
 bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
-  EXGUI_MOUSE_EVENT event,
-  EXGUI_KEY vk,
-  EXGUI_KEY_STATE state,
+  RM_MOUSE_EVENT event,
+  RM_KEY vk,
+  RM_KEY_STATE state,
   rm_vec2& cursor_pos)
 {
   bool b_call_next = true;
   bool b_cursor_inside = p_elem->get_bbox().inside(cursor_pos);
-  bool b_global_receive_events = p_elem->get_elem_flags().is_set(EXGUI_FLAG_GLOBAL);
+  bool b_global_receive_events = p_elem->get_elem_flags().is_set(RM_FLAG_GLOBAL);
   if (b_cursor_inside || b_global_receive_events) {
 
     b_call_next = p_elem->on_mouse(event, vk, state, cursor_pos);
-    if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && p_elem != this) {
+    if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && p_elem != this) {
       if (!(b_global_receive_events && !b_cursor_inside)) {
         m_pfocus = p_elem;
         printf("updated focus to element %s\n", p_elem->get_classname());
@@ -138,7 +138,7 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
     }
   }
 
-  p_elem->m_elem_flags.toggle_bits(EXGUI_FLAG_HOVERED, b_cursor_inside);
+  p_elem->m_elem_flags.toggle_bits(RM_FLAG_HOVERED, b_cursor_inside);
   if (!b_call_next)
     return false; //this event was break by p_elem
     
@@ -173,7 +173,7 @@ void rm_surface::draw_recursive(rm_widget* pwidget, float dt)
   nvgSave(m_pctx);
 
   /* disabled scissoring? */
-  if (!pwidget->get_elem_flags().is_set(EXGUI_FLAG_DISABLE_SCISSOR))
+  if (!pwidget->get_elem_flags().is_set(RM_FLAG_DISABLE_SCISSOR))
     nvgScissor(m_pctx, abs_pos.x, abs_pos.y, size.x, size.y);
 
   nvgTranslate(m_pctx, abs_pos.x + content.x, abs_pos.y + content.y);
@@ -233,7 +233,7 @@ void rm_surface::draw(float dt)
   nvgEndFrame(m_pctx);
 }
 
-void rm_surface::keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
+void rm_surface::keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 {
   keybd_dispatcher(this, sc, vk, state);
 }
@@ -247,7 +247,7 @@ void rm_surface::textinput(int sym)
     m_pfocus->on_text_input(sym);
 }
 
-void rm_surface::mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, int x, int y)
+void rm_surface::mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, int x, int y)
 {
   rm_vec2 mouse_pos(x, y);
   mouse_dispatcher(this, event, vk, state, mouse_pos);
@@ -312,7 +312,8 @@ rm_surface::rm_surface(NVGcontext* pctx, int width, int height, irm_sysdf* p_sys
   m_pctx = pctx;
   m_pfocus = nullptr;
   m_delta_time = 0.f;
-  load_font_from_memory(fontawesomewebfont, FONT_SIZE, "fontawesome");
+  rm_font font = load_font_from_memory(fontawesomewebfont, FONT_SIZE, "fontawesome");
+  assert(font.is_valid() && "font is invalid");
 }
 
 rm_surface::~rm_surface()
@@ -339,7 +340,7 @@ void rm_window::on_draw(NVGcontext* pctx)
   nvgFill(pctx);
 }
 
-bool rm_window::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
+bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
 {
   //move(
   //  cursor_pos.x - m_absolute.x,
@@ -457,7 +458,7 @@ void rmgui_textbuffer::copy_all(irm_sysdf* psysdf)
 void rmgui_textbuffer::paste(irm_sysdf* psysdf)
 {
   size_t clipboard_data_size;
-  EXGUI_CB_DATA_TYPE clipboard_dtype;
+  RM_CB_DATA_TYPE clipboard_dtype;
   const char* pclipboard_text = nullptr;
   if (has_selection()) 
     delete_selection();
@@ -467,7 +468,7 @@ void rmgui_textbuffer::paste(irm_sysdf* psysdf)
     return;
 
   /* skip binary data*/
-  if (!clipboard_data_size || clipboard_dtype != EXGUI_CLIPBOARD_DATA_TYPE_TEXT)
+  if (!clipboard_data_size || clipboard_dtype != RM_CLIPBOARD_DATA_TYPE_TEXT)
     return;
 
   save_undo(); 

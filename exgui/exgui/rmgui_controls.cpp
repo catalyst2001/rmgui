@@ -101,8 +101,8 @@ void rm_image_button::on_draw(NVGcontext* pctx) {
   rm_widget::on_draw(pctx);
 }
 
-bool rm_image_button::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
+bool rm_image_button::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
+  if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
     std::cout << "Image Button clicked!" << std::endl;
     return false;
   }
@@ -137,8 +137,8 @@ void rm_button::on_draw(NVGcontext* pctx) {
   rm_widget::on_draw(pctx);
 }
 
-bool rm_button::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
+bool rm_button::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
+  if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
     std::cout << "Button \"" << m_text << "\" clicked!" << std::endl;
     return false;
   }
@@ -163,7 +163,7 @@ void rm_label::on_draw(NVGcontext* pctx) {
 
 rm_text_input::rm_text_input(rm_widget* p_parent, int x, int y, int width, int height,
   rm_text_input_style* pstyle, uint32_t flags, float blink_cursor_interval)
-  : rm_widget(x, y, width, height, p_parent, "ui_text_input", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL), m_active(false), m_ctrl_pressed(false), m_dragging(false), 
+  : rm_widget(x, y, width, height, p_parent, "ui_text_input", RM_FLAG_DEFAULT|RM_FLAG_GLOBAL), m_active(false), m_ctrl_pressed(false), m_dragging(false), 
   m_scroll_offset(0.f), m_last_click_time(0.0), m_last_click_pos({ 0,0 }), m_asc(0.f), m_line_h(0.f){
   set_style(pstyle);
   m_blink_state = false;
@@ -340,37 +340,37 @@ void rm_text_input::on_draw(NVGcontext* pctx) {
   rm_widget::on_draw(pctx);
 }
 
-void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
+void rm_text_input::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 {
   if (!m_active) {
     return;
   }
 
-  if (vk == EXGUI_KEY_LCTRL || vk == EXGUI_KEY_RCTRL) {
-    m_ctrl_pressed = (state != EXGUI_KEY_STATE::UP);
+  if (vk == RM_KEY_LCTRL || vk == RM_KEY_RCTRL) {
+    m_ctrl_pressed = (state != RM_KEY_STATE::UP);
     return;
   }
 
-  if ((state == EXGUI_KEY_STATE::DOWN || state == EXGUI_KEY_STATE::REPEAT)) {
+  if ((state == RM_KEY_STATE::DOWN || state == RM_KEY_STATE::REPEAT)) {
     if (!m_ctrl_pressed) {
       bool handled = true;
       switch (vk) {
-      case EXGUI_KEY_BACKSPACE:
+      case RM_KEY_BACKSPACE:
         m_buffer.backspace();
         break;
-      case EXGUI_KEY_DELETE:
+      case RM_KEY_DELETE:
         m_buffer.delete_forward();
         break;
-      case EXGUI_KEY_LEFT:
+      case RM_KEY_LEFT:
         m_buffer.move_cursor_left();
         break;
-      case EXGUI_KEY_RIGHT:
+      case RM_KEY_RIGHT:
         m_buffer.move_cursor_right();
         break;
-      case EXGUI_KEY_UP:
+      case RM_KEY_UP:
         m_buffer.move_cursor_up();
         break;
-      case EXGUI_KEY_DOWN:
+      case RM_KEY_DOWN:
         m_buffer.move_cursor_down();
         break;
       default:
@@ -384,20 +384,20 @@ void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
     }
     else {
       switch (vk) {
-      case EXGUI_KEY_Z:
+      case RM_KEY_Z:
         m_buffer.undo(); 
         break;
-      case EXGUI_KEY_Y:
+      case RM_KEY_Y:
         m_buffer.redo(); 
         break;
       }
     }
   }
 
-  if (state != EXGUI_KEY_STATE::DOWN)
+  if (state != RM_KEY_STATE::DOWN)
     return;
 
-  if (m_ctrl_pressed && vk == EXGUI_KEY_A) {
+  if (m_ctrl_pressed && vk == RM_KEY_A) {
     m_buffer.select_all();
     m_timer.reset(m_psysdf);
     m_blink_state = false;
@@ -406,15 +406,15 @@ void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
 
   if (m_ctrl_pressed) {
     switch (vk) {
-    case EXGUI_KEY_C:
+    case RM_KEY_C:
       m_buffer.copy_all(m_psysdf); 
       break;
 
-    case EXGUI_KEY_V:
+    case RM_KEY_V:
       m_buffer.paste(m_psysdf);
       break;
 
-    case EXGUI_KEY_X: 
+    case RM_KEY_X: 
       if (m_buffer.has_selection())
       m_buffer.cut_selection(m_psysdf);
       break;
@@ -428,7 +428,7 @@ void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
     return;
   }
 
-  if (vk == EXGUI_KEY_ENTER && (m_flags & RMGUI_TEXT_INPUT_MULTILINE)) {
+  if (vk == RM_KEY_ENTER && (m_flags & RMGUI_TEXT_INPUT_MULTILINE)) {
     m_buffer.insert_cp('\n');
     m_timer.reset(m_psysdf);
     m_blink_state = false;
@@ -436,7 +436,7 @@ void rm_text_input::on_keybd(int sc, EXGUI_KEY vk, EXGUI_KEY_STATE state)
   }
 }
 
-bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
+bool rm_text_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
   bool inside = m_bbox.inside(cursor_pos);
   float offset = m_pstyle->get_text_offset();
   float text_draw_x = m_absolute.x + 5.f + offset;
@@ -445,7 +445,7 @@ bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
   const double now = m_psysdf->get_time();
   bool multiline = (m_flags & RMGUI_TEXT_INPUT_MULTILINE);
 
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == EXGUI_KEY_STATE::DOWN) {
+  if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::DOWN) {
     if (inside) {
       float dx = cursor_pos.x - m_last_click_pos.x;
       float dy = cursor_pos.y - m_last_click_pos.y;
@@ -476,14 +476,14 @@ bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
     }
   }
 
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == EXGUI_KEY_STATE::DOWN) {
+  if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::DOWN) {
     m_buffer.select_all();
     m_timer.reset(m_psysdf);
     m_blink_state = false;
     return true;
   }
 
-  if (event == EXGUI_MOUSE_EVENT_MOVE && state == EXGUI_KEY_STATE::DOWN && m_dragging) {
+  if (event == RM_MOUSE_EVENT_MOVE && state == RM_KEY_STATE::DOWN && m_dragging) {
     size_t idx = multiline ? hit_test_index(local_x + m_scroll_offset, local_y) : hit_test_index(local_x);
     m_buffer.sel_end = idx;
     if (!multiline) {
@@ -492,7 +492,7 @@ bool rm_text_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
     return true;
   }
 
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == EXGUI_KEY_STATE::UP) {
+  if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::UP) {
     if (m_dragging) {
       if (m_buffer.sel_start == m_buffer.sel_end)
         m_buffer.clear_selection();
@@ -594,7 +594,7 @@ void rm_checkbox::on_draw(NVGcontext* pctx) {
     nvgFontFaceId(pctx, m_icon_font);
     nvgFontSize(pctx, 16.f);
     nvgTextAlign(pctx, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-    nvgFillColor(pctx, m_pstyle->get_text_color());
+    nvgFillColor(pctx, m_pstyle->get_mark_color());
     xo = m_size.y / 2.f;
     yo = m_size.y / 2.f;
     nvgText(pctx, xo, yo, ICON_FA_CHECK, nullptr);
@@ -610,8 +610,8 @@ void rm_checkbox::on_draw(NVGcontext* pctx) {
   rm_widget::on_draw(pctx);
 }
 
-bool rm_checkbox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(cursor_pos)) {
+bool rm_checkbox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
+  if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(cursor_pos)) {
     m_checked = !m_checked;
     if (is_valid_callback())
       get_callback()(this);
@@ -622,7 +622,7 @@ bool rm_checkbox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STAT
 }
 
 rm_combobox::rm_combobox(rm_widget* p_parent, int x, int y, int width, int height, rm_combobox_cb pcallback)
-  : rm_widget(x, y, width, height, p_parent, "ui_combobox", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL|EXGUI_FLAG_DISABLE_SCISSOR|EXGUI_FLAG_HIGHEST_PRIORITY), m_selected(0), m_expanded(false)
+  : rm_widget(x, y, width, height, p_parent, "ui_combobox", RM_FLAG_DEFAULT|RM_FLAG_GLOBAL|RM_FLAG_DISABLE_SCISSOR|RM_FLAG_HIGHEST_PRIORITY), m_selected(0), m_expanded(false)
 {
   set_callback(pcallback);
   set_zindex(999); //topmost
@@ -706,9 +706,9 @@ void rm_combobox::on_draw(NVGcontext* pctx) {
   rm_widget::on_draw(pctx);
 }
 
-bool rm_combobox::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
+bool rm_combobox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
   m_cursor = cursor_pos;
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN) {
+  if (event == RM_MOUSE_EVENT_CLICK && state == DOWN) {
     if (m_bbox.inside(cursor_pos)) {
       if (m_expanded) {
         m_expanded = false;
@@ -763,7 +763,7 @@ void rm_slider::compute_inner_and_thumb()
 }
 
 rm_slider::rm_slider(rm_widget* p_parent, int x, int y, int width, int height, float min, float max, float initial, rm_slider_callback pcallback)
-  : rm_widget(x, y, width, height, p_parent, "ui_slider", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL), 
+  : rm_widget(x, y, width, height, p_parent, "ui_slider", RM_FLAG_DEFAULT|RM_FLAG_GLOBAL), 
   m_min(min), m_max(max), m_value(initial), m_dragging(false), m_pcallback(pcallback)
 {
   compute_inner_and_thumb();
@@ -791,17 +791,17 @@ void rm_slider::on_draw(NVGcontext* pctx) {
   rm_widget::on_draw(pctx);
 }
 
-bool rm_slider::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
+bool rm_slider::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
+  if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
     m_dragging = true;
     compute_value(cursor_pos);
     return false;
   }
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == UP) {
+  if (event == RM_MOUSE_EVENT_CLICK && state == UP) {
     m_dragging = false;
     return false;
   }
-  if (m_dragging && event == EXGUI_MOUSE_EVENT_MOVE) {
+  if (m_dragging && event == RM_MOUSE_EVENT_MOVE) {
     compute_value(cursor_pos);
     return false;
   }
@@ -846,7 +846,7 @@ void rm_progress_base::on_draw(NVGcontext* pctx)
   rm_widget::on_draw(pctx);
 }
 
-bool rm_progress_base::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
+bool rm_progress_base::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
 {
   return true;
 }
@@ -1057,13 +1057,13 @@ void rm_scrollbar::on_draw(NVGcontext* pctx)
   rm_widget::on_draw(pctx);
 }
 
-bool rm_scrollbar::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
+bool rm_scrollbar::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
 {
   return true;
 }
 
 rm_scrollbar::rm_scrollbar(rm_widget* p_parent, RM_ORIENT orient, rm_scroll_style* p_style, float inital_pos) :
-  rm_widget(0, 0, 0, 0, p_parent, "ui_scrollbar", EXGUI_FLAG_DEFAULT|EXGUI_FLAG_GLOBAL), m_position(inital_pos)
+  rm_widget(0, 0, 0, 0, p_parent, "ui_scrollbar", RM_FLAG_DEFAULT|RM_FLAG_GLOBAL), m_position(inital_pos)
 {
   set_style(p_style);
   set_orient(orient);
@@ -1077,7 +1077,7 @@ rm_scrollbar::~rm_scrollbar()
 rm_tabcontrol::rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height,
   rm_tabcontrol_cb cb)
   : rm_widget(x, y, width, height, p_parent, "ui_tabcontrol",
-    EXGUI_FLAG_DEFAULT, 0, nullptr),
+    RM_FLAG_DEFAULT, 0, nullptr),
   m_selected(0)
 {
   set_callback(cb);
@@ -1092,7 +1092,7 @@ rm_widget* rm_tabcontrol::add_tab(const char* pname, void* puserdata)
     int(widget_pos.x), int(widget_pos.y), int(widget_size.x), int(widget_size.y),
     this,
     "ui_tabpage",
-    EXGUI_FLAG_DEFAULT,
+    RM_FLAG_DEFAULT,
     0, nullptr
   );
 
@@ -1179,7 +1179,7 @@ void rm_tabcontrol::on_draw(NVGcontext* pctx) {
   }
 }
 
-bool rm_tabcontrol::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos) {
+bool rm_tabcontrol::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
   int     idx;
   rm_vec2 tabcontrol_size;
   get_tabcontrol_size(tabcontrol_size);
@@ -1189,7 +1189,7 @@ bool rm_tabcontrol::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_ST
   rm_vec2 sz;
   get_one_tab_size(sz);
   float axis = m_pstyle->is_horizontal() ? local_mouse_pos.x : local_mouse_pos.y;
-  if (num_tabs && event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
+  if (num_tabs && event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
     idx = int(axis / (m_pstyle->is_horizontal() ? sz.x : sz.y));
     if (idx >= 0 && idx < int(num_tabs)) {
       set_selected_index(idx);
@@ -1312,12 +1312,12 @@ float rm_treeview::draw_node(NVGcontext* pctx, rm_tree_node* node, float x, floa
   return y;
 }
 
-bool rm_treeview::on_mouse(EXGUI_MOUSE_EVENT event,
-  EXGUI_KEY vk,
-  EXGUI_KEY_STATE state,
+bool rm_treeview::on_mouse(RM_MOUSE_EVENT event,
+  RM_KEY vk,
+  RM_KEY_STATE state,
   rm_vec2& cursor_pos)
 {
-  if (event == EXGUI_MOUSE_EVENT_CLICK && state == DOWN)
+  if (event == RM_MOUSE_EVENT_CLICK && state == DOWN)
   {
     rm_tree_node* hitNode = nullptr;
     float y = m_absolute.y;
@@ -1402,13 +1402,13 @@ void rm_output_text::on_draw(NVGcontext* pctx)
   }
 }
 
-bool rm_output_text::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
+bool rm_output_text::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
 {
   return true;
 }
 
 rm_output_text::rm_output_text(rm_widget* p_parent, int x, int y, int width, int height, float line_height, size_t num_lines) :
-  rm_widget(x, y, width, height, p_parent, "ui_outputtext", EXGUI_FLAG_DEFAULT), m_linesbuf(num_lines, 512, num_lines), m_line_height(line_height)
+  rm_widget(x, y, width, height, p_parent, "ui_outputtext", RM_FLAG_DEFAULT), m_linesbuf(num_lines, 512, num_lines), m_line_height(line_height)
 {
   m_textbuf.resize(8096);
 }
@@ -1434,21 +1434,21 @@ void rm_number_input::on_draw(NVGcontext* pctx)
   
 }
 
-bool rm_number_input::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
+bool rm_number_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
 {
   return false;
 }
 
 rm_number_input::rm_number_input(rm_widget* p_parent, int x, int y, int width, int height, 
   input_type type, float value, float step, float minval, float maxval) :
-  rm_widget(x, y, width, height, p_parent, "ui_outputtext", EXGUI_FLAG_DEFAULT),
+  rm_widget(x, y, width, height, p_parent, "ui_outputtext", RM_FLAG_DEFAULT),
   m_type(type), m_value(value), m_step(step), m_minval(minval), m_maxval(maxval)
 {
 }
 
 rm_number_input::rm_number_input(rm_widget* p_parent, int x, int y, int width, int height, 
   input_type type, int value, int step, int minval, int maxval) :
-  rm_widget(x, y, width, height, p_parent, "ui_outputtext", EXGUI_FLAG_DEFAULT),
+  rm_widget(x, y, width, height, p_parent, "ui_outputtext", RM_FLAG_DEFAULT),
   m_type(type), m_value(value), m_step(step), m_minval(minval), m_maxval(maxval)
 {
 }
@@ -1507,14 +1507,20 @@ void rm_tabcontrol_ex::on_draw(NVGcontext* pctx)
   }
 }
 
-bool rm_tabcontrol_ex::on_mouse(EXGUI_MOUSE_EVENT event, EXGUI_KEY vk, EXGUI_KEY_STATE state, rm_vec2& cursor_pos)
+bool rm_tabcontrol_ex::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
 {
   tab* ptab;
+  size_t row, tab;
   rm_vec2 mouse = cursor_to_local(cursor_pos);
-  printf("mousepos: %f %f\n", mouse.x, mouse.y);
-  ptab = get_tab_at_cursor(mouse);
+  //printf("mousepos: %f %f\n", mouse.x, mouse.y);
+  ptab = get_tab_at_cursor(row, tab, mouse);
   if (ptab) {
-    printf("TAB FOUND!\n");
+    if (event == RM_MOUSE_EVENT_CLICK && state == DOWN) {
+      select_tab(row, tab);
+      return false;
+    }
+
+    //printf("TAB FOUND!\n");
   }
   return true;
 }
@@ -1527,7 +1533,7 @@ void rm_tabcontrol_ex::hide_all_except(size_t row, size_t tabidx)
   for (size_t rowi = 0; rowi < get_num_rows(); rowi++) {
     tab_row& rowref = get_tab_row(rowi);
     for (size_t tabi = 0; tabi < rowref.get_num_tabs(); tabi++) {
-      ptab = rowref.get_tab(tabidx);
+      ptab = rowref.get_tab(tabi);
       ppage = ptab->get_page_widget();
       assert(ppage && "ppage was nullptr");
       page_state = rowi == row && tabi == tabidx;
@@ -1582,12 +1588,13 @@ size_t rm_tabcontrol_ex::find_free_row_or_create(const char* ptabname)
   return m_tab_rows.size()-1;
 }
 
-rm_tabcontrol_ex::tab* rm_tabcontrol_ex::get_tab_at_cursor(rm_vec2& local_cursor)
+rm_tabcontrol_ex::tab* rm_tabcontrol_ex::get_tab_at_cursor(size_t& dstrow, 
+  size_t& dsttab, rm_vec2& local_cursor)
 {
+  assert(m_pstyle && "m_pstyle was nullptr!");
   rm_vec2 pos, size;
   float   tab_height;
   //float   rows_height;
-  assert(m_pstyle && "m_pstyle was nullptr!");
   tab_height = m_pstyle->get_tab_height();
   /* for horizontal tabs */
   if (is_horizontal()) {
@@ -1603,6 +1610,8 @@ rm_tabcontrol_ex::tab* rm_tabcontrol_ex::get_tab_at_cursor(rm_vec2& local_cursor
           tab* ptab = row.get_tab(j);
           assert(ptab && "ptab was nullptr!");
           if (rm_bbox(tabpos, { tabpos.x + ptab->get_width(), tabpos.y + tab_height }).inside(local_cursor)) {
+            dstrow = i;
+            dsttab = j;
             /* tab found */
             return ptab;
           }
@@ -1619,7 +1628,7 @@ rm_tabcontrol_ex::tab* rm_tabcontrol_ex::get_tab_at_cursor(rm_vec2& local_cursor
 rm_tabcontrol_ex::rm_tabcontrol_ex(rm_widget* p_parent,
   int x, int y, int width, int height, 
   uint32_t tab_flags, uint32_t tab_type, rm_tabcontrol_ex_style* pstyle, size_t num_rows) :
-  rm_widget(x, y, width, height, p_parent, "ui_kdtabcontrol", EXGUI_FLAG_DEFAULT, tab_flags), 
+  rm_widget(x, y, width, height, p_parent, "ui_kdtabcontrol", RM_FLAG_DEFAULT, tab_flags),
   m_active_row(invalid_index::ROW), m_active_tab(invalid_index::TAB)
 {
   assert(is_valid_type(tab_type) && "tab type is invalid!");
@@ -1899,4 +1908,42 @@ void rm_tabcontrol_ex::tab::set_name(const char* pname)
   assert(pname && "pname was nullptr!");
   m_name.assign(pname);
   width_recompute();
+}
+
+rm_menu* rm_menu::create_submenu(const char* pname, uint32_t id, uint32_t flags)
+{
+  return nullptr;
+}
+
+size_t rm_menu::get_num_submenus()
+{
+  return size_t();
+}
+
+rm_menu* rm_menu::get_submenu(size_t idx)
+{
+  return nullptr;
+}
+
+void rm_menu::add_item(const char* pitemname, uint32_t id)
+{
+}
+
+void rm_menu::add_separator()
+{
+}
+
+void rm_menu::on_draw(NVGcontext* pctx)
+{
+
+}
+
+bool rm_menu::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
+{
+  return false;
+}
+
+rm_menu::rm_menu(rm_widget* p_parent, int x, int y, int width, int height) :
+  rm_widget(x, y, width, height, p_parent, "ui_menu")
+{
 }
