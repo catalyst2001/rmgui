@@ -1933,6 +1933,44 @@ void rm_menu::add_separator()
 {
 }
 
+/**
+ detect_my_level()
+ @brief Determines the level of the current menu, hierarchically relative to the parent widget.
+ There are only two menu levels.
+ The zero-level menu is the menu that is drawn across the entire top border of the window, allowing for the addition of submenus.
+ All higher levels are drawn in the same way.
+ These menus can have separators, child submenus, and other things that will not be structurally different higher up in the hierarchy.
+ @param pparent - address of parent widget
+
+*/
+uint32_t rm_menu::detect_my_level(rm_widget* pparent)
+{
+  rm_widget* ppmenu;
+  uint32_t   hierarchy_depth;
+  assert(pparent && "pparent was nullptr!");
+  static constexpr const char* g_pmenuclass = "ui_menu";
+  if (!pparent->classname_is(g_pmenuclass)) {
+    assert(!pparent->find_child(g_pmenuclass) && "ui_menu already exists in pparent! check your code or assign hierarchy");
+    /* I'm the only one, i will root menu! */
+    return 0;
+  }
+
+  /* check menus hierarchy depth */
+  hierarchy_depth = 0;
+  while (1) {
+    if (!pparent)
+      return hierarchy_depth;
+
+    /* get menu parent */
+    pparent = pparent->get_parent();
+    if (pparent)
+      pparent = pparent->find_child(g_pmenuclass);
+
+    hierarchy_depth++;
+  }
+  return hierarchy_depth;
+}
+
 void rm_menu::on_draw(NVGcontext* pctx)
 {
 
@@ -1946,4 +1984,9 @@ bool rm_menu::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_v
 rm_menu::rm_menu(rm_widget* p_parent, int x, int y, int width, int height) :
   rm_widget(x, y, width, height, p_parent, "ui_menu")
 {
+  /* detect menu level from parent */
+  assert(p_parent && "p_parent was nullptr!");
+
+
+
 }

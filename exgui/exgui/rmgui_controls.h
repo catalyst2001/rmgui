@@ -980,9 +980,11 @@ using rm_menu_fn = void (*)(rm_menu *pmenu, uint32_t menuid, uint32_t id);
 
 class rm_menu : public rm_widget, public rm_styled<rm_tabcontrol_ex_style>, rm_callback<rm_menu_fn>
 {
+  uint32_t    m_level;
   std::string m_text;
-  bool        m_open_menu;
 private:
+  static uint32_t detect_my_level(rm_widget* pparent);
+
   void on_draw(NVGcontext* pctx) override;
   bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
 public:
@@ -996,6 +998,7 @@ public:
   rm_widget* find_child_by_classname(const char* pclassname) const = delete;
 
   /* main methods */
+  inline uint32_t get_menu_level() const { return m_level; }
   rm_menu* create_submenu(const char *pname, uint32_t menuid, uint32_t flags);
   size_t   get_num_submenus();
   rm_menu* get_submenu(size_t idx);

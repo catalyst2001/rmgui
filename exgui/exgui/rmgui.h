@@ -751,6 +751,7 @@ public:
 
   inline const char *get_classname() { return m_szclass; }
   inline void       *get_userptr() { return m_puserptr; }
+  inline bool        classname_is(const char* pname) { return !strcmp(m_szclass, pname); }
 
   template<class _dst_type>
   inline _dst_type  *get_userptr() { return reinterpret_cast<_dst_type*>(m_puserptr); }
@@ -773,7 +774,7 @@ public:
   inline rm_widget** get_all_childs() { return m_childs.data(); }
   bool               add_child(rm_widget* p_child);
   bool               remove_child(rm_widget* p_child);
-  rm_widget         *find_child_by_classname(const char* pclassname) const;
+  rm_widget         *find_child(const char* pclassname) const;
 
   /* parent */
   inline rm_widget  *get_parent() { return m_pparent; }

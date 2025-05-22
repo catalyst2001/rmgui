@@ -65,8 +65,14 @@ bool rm_widget::remove_child(rm_widget* p_child)
   return true;
 }
 
-rm_widget* rm_widget::find_child_by_classname(const char* pclassname) const
+rm_widget* rm_widget::find_child(const char* pclassname) const
 {
+  for (auto pchild : m_childs) {
+    assert(pchild && "pchild was nullptr!");
+    if (pchild->classname_is(pclassname)) {
+      return pchild;
+    }
+  }
   return nullptr;
 }
 
