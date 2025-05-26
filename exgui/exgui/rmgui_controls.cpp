@@ -439,9 +439,9 @@ void rm_text_input::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 bool rm_text_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
   bool inside = m_bbox.inside(cursor_pos);
   float offset = m_pstyle->get_text_offset();
-  float text_draw_x = m_absolute.x + 5.f + offset;
+  float text_draw_x = m_pos_of_parent.x + 5.f + offset;
   float local_x = cursor_pos.x - text_draw_x;
-  float local_y = cursor_pos.y - m_absolute.y;
+  float local_y = cursor_pos.y - m_pos_of_parent.y;
   const double now = m_psysdf->get_time();
   bool multiline = (m_flags & RMGUI_TEXT_INPUT_MULTILINE);
 
@@ -692,7 +692,7 @@ void rm_combobox::on_draw(NVGcontext* pctx) {
       rm_combo_item& item = m_items[i];
       float itemY = m_size.y * (1.f + i);
       rm_bbox bbox;
-      rm_vec2 item_pos(m_absolute.x, m_absolute.y + itemY);
+      rm_vec2 item_pos(m_pos_of_parent.x, m_pos_of_parent.y + itemY);
       bbox.init(item_pos, m_size);
       nvgBeginPath(pctx);
       nvgRect(pctx, 0.f, itemY, m_size.x, m_size.y);
@@ -719,7 +719,7 @@ bool rm_combobox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, 
     }
 
     if (m_expanded) {
-      float itemYStart = m_absolute.y + m_size.y;
+      float itemYStart = m_pos_of_parent.y + m_size.y;
       float itemHeight = m_size.y;
       int index = (int)((cursor_pos.y - itemYStart) / itemHeight);
       if (index >= 0 && index < (int)m_items.size()) {
@@ -741,7 +741,7 @@ bool rm_combobox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, 
 
 void rm_slider::compute_value(rm_vec2& cursor_pos)
 {
-  float localX = cursor_pos.x - (m_absolute.x + m_thumb_size);
+  float localX = cursor_pos.x - (m_pos_of_parent.x + m_thumb_size);
   float fraction = localX / m_inner_rect.width;
   fraction = std::max(0.f, std::min(1.f, fraction));
   m_value = m_min + fraction * (m_max - m_min);
@@ -1042,11 +1042,11 @@ void rm_scrollbar::adjust_position()
   rm_vec2& parent_size = m_pparent->get_size();
   if (get_orient() == RM_ORIENT_HORZ) {
     m_size.init(parent_size.x, m_pstyle->get_thumb_size());
-    m_absolute.init(m_absolute.x, m_absolute.y + parent_size.y - m_pstyle->get_thumb_size());
+    m_pos_of_parent.init(m_pos_of_parent.x, m_pos_of_parent.y + parent_size.y - m_pstyle->get_thumb_size());
   }
   else {
     m_size.init(m_pstyle->get_thumb_size(), parent_size.y);
-    m_absolute.init(m_absolute.x + parent_size.x - m_pstyle->get_thumb_size(), m_absolute.y);
+    m_pos_of_parent.init(m_pos_of_parent.x + parent_size.x - m_pstyle->get_thumb_size(), m_pos_of_parent.y);
   }
 }
 
@@ -1183,7 +1183,7 @@ bool rm_tabcontrol::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state
   int     idx;
   rm_vec2 tabcontrol_size;
   get_tabcontrol_size(tabcontrol_size);
-  m_bbox.init(m_absolute, tabcontrol_size);
+  m_bbox.init(m_pos_of_parent, tabcontrol_size);
   rm_vec2 local_mouse_pos = cursor_to_local(cursor_pos);
   size_t num_tabs = m_tabs.size();
   rm_vec2 sz;
@@ -1320,10 +1320,10 @@ bool rm_treeview::on_mouse(RM_MOUSE_EVENT event,
   if (event == RM_MOUSE_EVENT_CLICK && state == DOWN)
   {
     rm_tree_node* hitNode = nullptr;
-    float y = m_absolute.y;
+    float y = m_pos_of_parent.y;
     if (hit_test(cursor_pos,
       nullptr,
-      m_absolute.x,
+      m_pos_of_parent.x,
       y,
       hitNode)
       && hitNode)
@@ -1470,7 +1470,7 @@ void rm_tabcontrol_ex::on_draw(NVGcontext* pctx)
       size.y = tab_height;
       b_is_selected = m_active_row == rowi && m_active_tab == tabi;
       /* draw tab background */
-      draw_tab_path(pctx, pos.x, pos.y, size.x, size.y,
+      tab_path(pctx, pos.x, pos.y, size.x, size.y,
         m_pstyle->get_tab_up_offsets(), m_pstyle->get_tab_corners_radius());
       //if m_active_row==rowi && m_active_tab==tabi - it is selected tab
       nvgFillColor(pctx, m_pstyle->get_state_color(b_is_selected)); //set state color and set to drawings tab
@@ -1505,6 +1505,7 @@ void rm_tabcontrol_ex::on_draw(NVGcontext* pctx)
       pos.x += size.x + ktab_spacing;
     }
   }
+  rm_widget::on_draw(pctx);
 }
 
 bool rm_tabcontrol_ex::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
@@ -1792,6 +1793,7 @@ void rm_tabcontrol_ex::page::on_draw(NVGcontext* pctx)
   rm_color shadow_clr(42, 42, 42);
   rm_color sun_clr(100, 100, 100);
   rm_utl::draw_edge(pctx, { 0.f, 0.f }, m_size, pcurrstyle, sun_clr, shadow_clr);
+  rm_widget::on_draw(pctx);
 }
 
 rm_tabcontrol_ex::tab* rm_tabcontrol_ex::tab_row::new_tab(
@@ -1827,7 +1829,7 @@ rm_tabcontrol_ex::tab* rm_tabcontrol_ex::tab_row::new_tab(
   return ptab;
 }
 
-void rm_tab_drawer::draw_tab_path(NVGcontext* pctx, 
+void rm_tab_drawer::tab_path(NVGcontext* pctx, 
   float x, float y,
   float w, float h,
   rm_vec2 up_offsets, float r)
@@ -1861,13 +1863,13 @@ void rm_tab_drawer::draw_tab_edge(NVGcontext* pctx, rm_vec2 pos, rm_vec2& size, 
   float r, const rm_corners_style* pcstyle, const rm_color& suncolor, const rm_color& shadowcolor)
 {
   /* light */
-  draw_tab_path(pctx, pos.x, pos.y + 1.f, size.x, size.y, up_offsets, r);
+  tab_path(pctx, pos.x, pos.y + 1.f, size.x, size.y, up_offsets, r);
   nvgStrokeColor(pctx, suncolor);
   nvgStrokeWidth(pctx, 1.f);
   nvgStroke(pctx);
 
   /* light */
-  draw_tab_path(pctx, pos.x, pos.y, size.x, size.y, up_offsets, r);
+  tab_path(pctx, pos.x, pos.y, size.x, size.y, up_offsets, r);
   nvgStrokeColor(pctx, shadowcolor);
   nvgStroke(pctx);
 }
@@ -1910,27 +1912,36 @@ void rm_tabcontrol_ex::tab::set_name(const char* pname)
   width_recompute();
 }
 
-rm_menu* rm_menu::create_submenu(const char* pname, uint32_t id, uint32_t flags)
+rm_menu* rm_menu::create_submenu(const char* pname,
+  uint32_t menuid,
+  uint32_t itemid,
+  uint32_t flags)
 {
-  return nullptr;
+  rm_menu* pmenu = new (std::nothrow)rm_menu(this, 0, pname);
+  if (!pmenu)
+    return nullptr;
+
+  pmenu->m_flags = MF_NONE;
+  /* noname == menu separator */
+  if (!pname)
+    pmenu->m_flags |= MF_SEPARATOR;
+
+  if (m_pparent->classname_is("ui_menu")) {
+    m_max_text_width = recompute_text_width();
+    resize(m_max_text_width, m_size.y);
+  }
+  return pmenu;
 }
 
 size_t rm_menu::get_num_submenus()
 {
-  return size_t();
+  return rm_widget::get_num_childs();
 }
 
 rm_menu* rm_menu::get_submenu(size_t idx)
 {
-  return nullptr;
-}
-
-void rm_menu::add_item(const char* pitemname, uint32_t id)
-{
-}
-
-void rm_menu::add_separator()
-{
+  //FIXME: K.D. it is possible that it will not work properly
+  return reinterpret_cast<rm_menu*>(rm_widget::get_child(idx));
 }
 
 /**
@@ -1941,52 +1952,297 @@ void rm_menu::add_separator()
  All higher levels are drawn in the same way.
  These menus can have separators, child submenus, and other things that will not be structurally different higher up in the hierarchy.
  @param pparent - address of parent widget
-
+ @return Level of hierarchy depth
 */
 uint32_t rm_menu::detect_my_level(rm_widget* pparent)
 {
-  rm_widget* ppmenu;
-  uint32_t   hierarchy_depth;
+  uint32_t   depth = 0;
+  rm_widget* pwidget = pparent;
   assert(pparent && "pparent was nullptr!");
-  static constexpr const char* g_pmenuclass = "ui_menu";
-  if (!pparent->classname_is(g_pmenuclass)) {
-    assert(!pparent->find_child(g_pmenuclass) && "ui_menu already exists in pparent! check your code or assign hierarchy");
-    /* I'm the only one, i will root menu! */
+  static constexpr const char* MENU_CLASS = "ui_menu";
+  if (!pparent->classname_is(MENU_CLASS)) {
+    assert(pparent->find_child(MENU_CLASS) == this && "ui_menu already exists in pparent! check your code or assign hierarchy");
     return 0;
   }
 
-  /* check menus hierarchy depth */
-  hierarchy_depth = 0;
-  while (1) {
-    if (!pparent)
-      return hierarchy_depth;
-
-    /* get menu parent */
-    pparent = pparent->get_parent();
-    if (pparent)
-      pparent = pparent->find_child(g_pmenuclass);
-
-    hierarchy_depth++;
+  while (pwidget && pwidget->classname_is(MENU_CLASS)) {
+    depth++;
+    pwidget = pwidget->get_parent();
   }
-  return hierarchy_depth;
+  return depth;
 }
 
 void rm_menu::on_draw(NVGcontext* pctx)
 {
+  rm_vec2  pos;
+  float    item_width;
+  float    half_height = m_size.y / 2.f;
+  size_t   num_submenus = get_num_submenus();
+  rm_menu* pmenu_item;
+  /* draw menu in top of window */
+  pos.init(0.f, 0.f);
+  if (!m_level) {
+    static rm_color menu_background(70, 70, 70);
+    static rm_color menu_hover(100, 100, 100);
 
+    /* draw background */
+    nvgBeginPath(pctx);
+    nvgRect(pctx, 0.f, 0.f, m_size.x, m_size.y);
+    nvgFillColor(pctx, menu_background);
+    nvgFill(pctx);
+    nvgFontFaceId(pctx, get_font());
+    nvgTextAlign(pctx, NVG_ALIGN_MIDDLE);
+    constexpr float padding = 10.f;
+    for (size_t i = 0; i < num_submenus; i++) {
+      pmenu_item = get_submenu(i);
+      assert(pmenu_item && "pmenu_item was nullptr!");
+      item_width = padding + pmenu_item->m_text_width;
+      if (pmenu_item->is_navigated()) {
+        nvgBeginPath(pctx);
+        nvgFillColor(pctx, rm_color(180, 180, 180));
+        nvgRect(pctx, pos.x, pos.y, item_width, m_size.y);
+        nvgFill(pctx);
+      }
+
+      nvgFillColor(pctx, rm_color(255, 255, 255));
+      nvgText(pctx,
+        pos.x + padding,
+        pos.y + half_height,
+        pmenu_item->m_text.c_str(),
+        nullptr);
+      pos.x += item_width;
+    }
+  }
+  else {
+    static bool b = false;
+    if (!b) {
+      b = true;
+      move({ 600, 200 });
+    }
+
+    /* draw popup menu */
+    nvgBeginPath(pctx);
+    nvgFillColor(pctx, rm_color(120, 120, 120));
+    nvgStrokeColor(pctx, rm_color(150, 150, 150));
+    nvgRect(pctx, 0.f, 0.f, m_size.x, m_size.y);
+    nvgFill(pctx);
+    nvgStroke(pctx);
+    pos.init(0.f, 0.f);
+    for (size_t i = 0; i < num_submenus; i++) {
+      pmenu_item = get_submenu(i);
+      assert(pmenu_item && "pmenu_item was nullptr!");
+      if (pmenu_item->is_navigated()) {
+        nvgBeginPath(pctx);
+        nvgFillColor(pctx, rm_color(150, 150, 150));
+        nvgRect(pctx, pos.x, pos.y, m_size.x, m_size.y);
+        nvgFill(pctx);
+      }
+
+      nvgFontFaceId(pctx, get_font());
+      nvgTextAlign(pctx, NVG_ALIGN_MIDDLE);
+      nvgFillColor(pctx, rm_color(255, 255, 255));
+      nvgText(pctx, pos.x, pos.y + half_height, m_text.c_str(), nullptr);
+      pos.y += 25.f;
+    }
+  }
+  rm_widget::on_draw(pctx);
 }
 
 bool rm_menu::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
 {
-  return false;
+  /* handle root */
+  rm_vec2 local = cursor_to_local(cursor_pos);
+  if (!m_level) {
+
+    return true;
+  }
+
+  /* handle popup */
+  return true;
 }
 
-rm_menu::rm_menu(rm_widget* p_parent, int x, int y, int width, int height) :
-  rm_widget(x, y, width, height, p_parent, "ui_menu")
+bool rm_menu::add_submenu(rm_menu* pmenu)
+{
+  m_max_text_width = rm_max(m_max_text_width, pmenu->m_text_width);
+  return rm_widget::add_child(pmenu);
+}
+
+float rm_menu::recompute_text_width()
+{
+  float width = 0.f;
+  for (size_t i = 0; i < get_num_submenus(); i++) {
+    rm_menu* pmenu = get_submenu(i);
+    width = rm_max(width, pmenu->m_text_width);
+  }
+  return width;
+}
+
+rm_menu::rm_menu(rm_widget* p_parent, int height, const char* pname) :
+  rm_widget(0.f, 0.f, 0.f, height, p_parent, "ui_menu"), m_text(pname ? pname : ""), m_max_text_width(0.f), m_proot_menu(nullptr)
 {
   /* detect menu level from parent */
   assert(p_parent && "p_parent was nullptr!");
+  assert(m_proot && "m_proot was nullptr!");
+  m_level = detect_my_level(p_parent);
+  m_text_width = m_proot->get_text_width(m_text.c_str(), get_font());
+  if (!m_level) {
+    m_elem_flags.set_bit(RM_FLAG_DISABLE_SCISSOR);
+    m_proot_menu = this;
+    printf("PRE last pos: %f %f   last size: %f %f\n", m_pos_of_parent.x, m_pos_of_parent.y, m_size.x, m_size.y);
+    move({ 0.f, 0.f });
+    resize({ p_parent->get_size().x, float(height) });
+    printf("POST last pos: %f %f   last size: %f %f\n", m_pos_of_parent.x, m_pos_of_parent.y, m_size.x, m_size.y);
+    return;
+  }
+  else {
+    /* */
 
+  }
+}
 
+std::map<const rm_widget*, std::vector<rm_radiobutton*>> rm_radiobutton::s_groups; // NOTE: d2 mb need refactoring this..
 
+rm_radiobutton::rm_radiobutton(rm_widget* parent, int x, int y, int width, int height,
+  rm_radiobutton_style* pstyle, const std::string& label, rm_radiobutton_cb cb) :
+  rm_widget(x, y, width, height, parent, "ui_radiobutton"),
+  m_label(label), m_checked(false), m_allow_uncheck(false) {
+  set_style(pstyle);
+  assert(pstyle && "pstyle must not be null");
+  auto& grp = s_groups[parent];
+  grp.push_back(this);
+  if (grp.size() == 1)
+    m_checked = true;
+}
+
+rm_radiobutton::~rm_radiobutton() {
+  // HACKHACK: d2: REMOVE ALL GROUPS IF PARENT IS DELETED!!!!!!!!!
+  /* clear from group if needed? */
+}
+
+void rm_radiobutton::select_default(rm_widget* parent, int index) {
+  auto it = s_groups.find(parent);
+
+  if (it == s_groups.end())
+    return;
+
+  auto& grp = it->second;
+  for (size_t i = 0; i < grp.size(); ++i)
+    grp[i]->m_checked = (i == (size_t)index);
+}
+
+void rm_radiobutton::select_by_label(rm_widget* parent, const std::string& label) {
+  auto it = s_groups.find(parent);
+
+  if (it == s_groups.end())
+    return;
+
+  for (auto* rb : it->second)
+    rb->m_checked = (rb->m_label == label);
+}
+
+void rm_radiobutton::on_draw(NVGcontext* pctx) {
+  rm_radiobutton_style& style = *get_style();
+  float w = (float)m_size.x;
+  float h = (float)m_size.y;
+  float circle_radius = style.get_circle_radius();
+
+  NVGpaint pg = nvgBoxGradient(pctx, 0.5f, 0.5f,
+    w - 1.0f, h - 1.0f,
+    style.get_avg_radius(), // FIXME: d2 if all the angles are the same
+    style.get_blur(),
+    style.get_bg_inner(),
+    nvgRGBA(0, 0, 0, 0)
+  );
+  
+  rm_utl::draw_shadow(pctx, rm_vec2(0.f, 0.f), m_size, rm_vec2(0.f, 1.0f), style.get_shadow_offset(), style.get_shadow_color(), style.get_shadow_size(), style.get_avg_radius());
+
+  nvgBeginPath(pctx);
+  nvgRoundedRectVarying(pctx,
+    0.5f, 0.5f, w - 1.0f, h - 1.0f,
+    style.get_corner_radius(LEFT_TOP),
+    style.get_corner_radius(RIGHT_TOP),
+    style.get_corner_radius(RIGHT_BOTTOM),
+    style.get_corner_radius(LEFT_BOTTOM));
+  nvgFillPaint(pctx, pg);
+  nvgFill(pctx);
+
+  float cy = h * 0.5f;
+  float cx = circle_radius + 5.f;
+
+  if (m_checked) {
+    float w_o = style.get_border_width_outer();
+    float w_i = style.get_border_width_inner();
+
+    float r_o = circle_radius - w_o * 0.5f;
+    nvgBeginPath(pctx);
+    nvgCircle(pctx, cx, cy, r_o);
+    nvgStrokeWidth(pctx, w_o);
+    nvgStrokeColor(pctx, style.get_border_active_outer());
+    nvgStroke(pctx);
+
+    float r_i = r_o - w_o * 0.5f - w_i * 0.5f;
+    nvgBeginPath(pctx);
+    nvgCircle(pctx, cx, cy, r_i);
+    nvgStrokeWidth(pctx, w_i);
+    nvgStrokeColor(pctx, style.get_border_active_inner());
+    nvgStroke(pctx);
+
+    float r_fill = r_i - w_i * 0.5f;
+    nvgBeginPath(pctx);
+    nvgCircle(pctx, cx, cy, r_fill);
+    nvgFillColor(pctx, style.get_mark_color());
+    nvgFill(pctx);
+  }
+  else {
+    float w_n = style.get_border_width_inactive();
+    float r_n = circle_radius - w_n * 0.5f;
+    nvgBeginPath(pctx);
+    nvgCircle(pctx, cx, cy, r_n);
+    nvgStrokeWidth(pctx, w_n);
+    nvgStrokeColor(pctx, style.get_border_inactive());
+    nvgStroke(pctx);
+  }
+  float circle_right = cx + circle_radius + style.get_border_width_outer();
+  float bounds[4];
+
+  nvgFontFaceId(pctx, get_font());
+  nvgFontSize(pctx, style.get_font_size());
+  nvgTextAlign(pctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  nvgTextBounds(pctx, 0, 0, m_label.c_str(), nullptr, bounds);
+
+  float textWidth = bounds[2] - bounds[0];
+  float avail = w - circle_right;
+  float tx = circle_right + (avail - textWidth) / 2.0f;
+  rm_vec2 offs = style.get_text_offset();
+  tx += offs.x;
+  float ty = cy + offs.y;
+
+  nvgFillColor(pctx, style.get_text_color());
+  nvgText(pctx, tx, ty, m_label.c_str(), nullptr);
+
+  rm_widget::on_draw(pctx);
+}
+
+bool rm_radiobutton::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& pos)
+{
+  if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(pos)) {
+    if (m_checked) {
+      if (m_allow_uncheck) {
+        m_checked = false;
+      }
+      else {
+        return false;
+      }
+    }
+    else {
+      auto& grp = s_groups[m_pparent];
+      for (auto* rb : grp)
+        rb->m_checked = false;
+      m_checked = true;
+    }
+    if (is_valid_callback())
+      get_callback()(this);
+    return false;
+  }
+  return true;
 }

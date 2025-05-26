@@ -4,6 +4,7 @@
 #include <vector>
 #include <functional>
 #include <type_traits>
+#include <map>
 
 class rmgui_image {
 public:
@@ -776,7 +777,7 @@ public:
 class rm_tab_drawer
 {
 protected:
-  static void draw_tab_path(NVGcontext* pctx,
+  static void tab_path(NVGcontext* pctx,
     float x, float y,
     float w, float h,
     rm_vec2 up_offsets,
@@ -980,15 +981,30 @@ using rm_menu_fn = void (*)(rm_menu *pmenu, uint32_t menuid, uint32_t id);
 
 class rm_menu : public rm_widget, public rm_styled<rm_tabcontrol_ex_style>, rm_callback<rm_menu_fn>
 {
+  enum {
+    MF_NONE = 0,
+    MF_SEPARATOR = 1 << 0,
+    MF_NAVIGATED = 1 << 1
+  };
+protected:
+  uint32_t    m_flags;
+  uint32_t    m_itemid;
+  uint32_t    m_menuid;
   uint32_t    m_level;
   std::string m_text;
+  float       m_text_width;
+  float       m_max_text_width;
+  rm_menu    *m_proot_menu;
 private:
-  static uint32_t detect_my_level(rm_widget* pparent);
+  uint32_t detect_my_level(rm_widget* pparent);
+  void     on_draw(NVGcontext* pctx) override;
+  bool     on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
 
-  void on_draw(NVGcontext* pctx) override;
-  bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
+  inline bool is_navigated() const { return m_flags & MF_NAVIGATED; }
+  bool  add_submenu(rm_menu* pmenu);
+  float recompute_text_width();
 public:
-  rm_menu(rm_widget* p_parent, int x, int y, int width, int height);
+  rm_menu(rm_widget* p_parent, int height, const char *pname);
   /* delete methods */
   inline size_t get_num_childs() = delete;
   inline rm_widget* get_child(size_t idx) = delete;
@@ -999,9 +1015,123 @@ public:
 
   /* main methods */
   inline uint32_t get_menu_level() const { return m_level; }
-  rm_menu* create_submenu(const char *pname, uint32_t menuid, uint32_t flags);
+  inline uint32_t get_menu_id() const { return m_menuid; }
+  inline uint32_t get_item_id() const { return m_itemid; }
+  rm_menu* create_submenu(const char *pname,
+    uint32_t menuid,
+    uint32_t itemid,
+    uint32_t flags=0);
   size_t   get_num_submenus();
   rm_menu* get_submenu(size_t idx);
-  void     add_item(const char *pitemname, uint32_t id);
-  void     add_separator();
+
+  inline bool add_item(const char* pitemname, uint32_t id) {
+    return create_submenu(pitemname, get_menu_id(), id) != nullptr;
+  }
+  inline bool add_separator() {
+    return create_submenu(nullptr, get_menu_id(), 0) != nullptr;
+  }
+};
+
+/**
+ * RADIOBUTTON STYLE
+ */
+class rm_radiobutton_style : public rm_corners_style {
+  rm_vec2   m_text_offset;
+  NVGcolor  m_bg_inner;
+  float     m_blur;
+  NVGcolor  m_text_color;
+  NVGcolor  m_border_active_outer;
+  NVGcolor  m_border_active_inner;
+  float     m_border_width_outer;
+  float     m_border_width_inner;
+  NVGcolor  m_border_inactive;
+  float     m_border_width_inactive;
+  NVGcolor  m_mark_color;
+  int       m_circle_radius;
+  float     m_font_size;
+  float     m_shadow_offset;
+  float     m_shadow_size;
+  NVGcolor  m_shadow_color;
+
+public:
+  rm_radiobutton_style() : m_text_offset(0.f, 0.f), m_bg_inner(nvgRGBA(0, 0, 0, 60)),
+    m_blur(0.f), m_text_color(nvgRGB(255, 255, 255)),
+    m_border_active_outer(nvgRGB(0, 122, 255)),
+    m_border_active_inner(nvgRGB(102, 204, 255)), m_border_width_outer(2.f),
+    m_border_width_inner(1.f),
+    m_border_inactive(nvgRGBA(255, 255, 255, 192)),
+    m_border_width_inactive(2.f),
+    m_mark_color(nvgRGB(255, 255, 255)), m_circle_radius(8), m_font_size(18.f),
+    m_shadow_offset(5.f), m_shadow_size(6.f),
+    m_shadow_color(nvgRGBA(0, 0, 0, 63.75f)) {}
+
+  /* selectors */
+  inline const rm_vec2& get_text_offset()       const { return m_text_offset; }
+  inline NVGcolor       get_bg_inner()          const { return m_bg_inner; }
+  inline float          get_blur()              const { return m_blur; }
+  inline NVGcolor       get_text_color()        const { return m_text_color; }
+  inline NVGcolor       get_border_active_outer() const { return m_border_active_outer; }
+  inline NVGcolor       get_border_active_inner() const { return m_border_active_inner; }
+  inline float          get_border_width_outer()  const { return m_border_width_outer; }
+  inline float          get_border_width_inner()  const { return m_border_width_inner; }
+  inline NVGcolor       get_border_inactive()   const { return m_border_inactive; }
+  inline float          get_border_width_inactive() const { return m_border_width_inactive; }
+  inline NVGcolor       get_mark_color()        const { return m_mark_color; }
+  inline int            get_circle_radius()     const { return m_circle_radius; }
+  inline float          get_font_size()         const { return m_font_size; }
+  inline float          get_shadow_offset() const { return m_shadow_offset; }
+  inline float          get_shadow_size()   const { return m_shadow_size; }
+  inline NVGcolor       get_shadow_color()  const { return m_shadow_color; }
+
+  /* modificators */
+  inline void set_text_offset(const rm_vec2& v) { m_text_offset = v; }
+  inline void set_bg_inner(NVGcolor c) { m_bg_inner = c; }
+  inline void set_blur(float b) { m_blur = b; }
+  inline void set_text_color(NVGcolor c) { m_text_color = c; }
+  inline void set_border_active_outer(NVGcolor c) { m_border_active_outer = c; }
+  inline void set_border_active_inner(NVGcolor c) { m_border_active_inner = c; }
+  inline void set_border_width_outer(float w) { m_border_width_outer = w; }
+  inline void set_border_width_inner(float w) { m_border_width_inner = w; }
+  inline void set_border_inactive(NVGcolor c) { m_border_inactive = c; }
+  inline void set_border_width_inactive(float w) { m_border_width_inactive = w; }
+  inline void set_mark_color(NVGcolor c) { m_mark_color = c; }
+  inline void set_circle_radius(int r) { m_circle_radius = r; }
+  inline void set_font_size(float s) { m_font_size = s; }
+  inline void set_shadow_offset(float offset) { m_shadow_offset = offset; }
+  inline void set_shadow_size(float size) { m_shadow_size = size; }
+  inline void set_shadow_color(NVGcolor c) { m_shadow_color = c; }
+};
+
+class rm_radiobutton;
+using rm_radiobutton_cb = bool(*)(rm_radiobutton*);
+
+class rm_radiobutton : public rm_widget, public rm_styled<rm_radiobutton_style>, public rm_callback<rm_radiobutton_cb>
+{
+  std::string m_label;
+  bool        m_checked;
+  bool        m_allow_uncheck;
+  static std::map<const rm_widget*, std::vector<rm_radiobutton*>> s_groups;
+
+public:
+  rm_radiobutton(rm_widget* parent, int x, int y, int width, int height,
+    rm_radiobutton_style* style,
+    const std::string& label,
+    rm_radiobutton_cb cb = nullptr);
+
+  virtual ~rm_radiobutton();
+
+  inline bool is_checked() const { return m_checked; }
+  inline void set_checked(bool v) { m_checked = v; }
+  inline void set_allow_uncheck(bool v) { m_allow_uncheck = v; }
+
+  static void select_default(rm_widget* parent, int index);
+  static void select_by_label(rm_widget* parent, const std::string& label);
+
+  inline const char* get_label() const { return m_label.c_str(); }
+  inline void        set_label(const char* s) { m_label = s; }
+
+  inline static std::map<const rm_widget*, std::vector<rm_radiobutton*>> get_groups() { return s_groups; }
+
+  virtual void on_draw(NVGcontext* pctx) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& pos) override;
 };

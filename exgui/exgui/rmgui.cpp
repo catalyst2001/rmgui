@@ -3,16 +3,25 @@
 
 #include "rmgui.h"
 
-void rm_widget::move_recursive(rm_widget* pwidget, float newx, float newy)
+void rm_widget::move_relative(rm_widget* pwidget, rm_vec2 deltapos)
 {
-  //TODO: K.D. check this compute
-  pwidget->m_absolute.x = newx - pwidget->m_absolute.x;
-  pwidget->m_absolute.y = newy - pwidget->m_absolute.y;
   for (size_t i = 0; i < pwidget->get_num_childs(); i++) {
     rm_widget* pchild = pwidget->get_child(i);
     assert(pchild && "pchild was nullptr");
-    move_recursive(pchild, newx, newy);
+    pchild->m_pos_of_parent += deltapos;
+    move_relative(pchild, deltapos);
   }
+}
+
+void rm_widget::move_to(rm_widget* proot_widget, rm_vec2 newpos)
+{
+  assert(proot_widget && "proot_widget was nullptr");
+  /* compute delta for moving childs */
+  rm_vec2 delta = newpos - proot_widget->m_pos_of_parent;
+  /* set pos of parent to root node */
+  proot_widget->m_pos_of_parent = delta;
+  /* relative move childs */
+  move_relative(proot_widget, delta);
 }
 
 bool rm_widget::add_child(rm_widget* p_child)
@@ -59,7 +68,7 @@ bool rm_widget::remove_child(rm_widget* p_child)
   if (it != m_childs.end()) {
     /* child found */
     m_childs.erase(it);
-    p_child->on_event(PARENT_CHANGED, this);
+    p_child->dispatch_event(PARENT_CHANGED_EVENT, this, nullptr);
     p_child->set_parent(nullptr);
   }
   return true;
@@ -84,14 +93,9 @@ void rm_widget::set_parent(rm_widget* p_parent)
 
 void rm_widget::resize(float width, float height)
 {
-  rm_vec2 start(width, height);
+  rm_vec2 start(0.f, 0.f);
   m_size.init(width, height);
   m_bbox.init(start, m_size);
-}
-
-void rm_surface::event_dispatcher(rm_widget* p_elem)
-{
-  RM_UNUSED(p_elem);
 }
 
 void rm_surface::keybd_dispatcher(rm_widget* p_elem, int sc, RM_KEY vk, RM_KEY_STATE state)
@@ -172,7 +176,7 @@ void rm_surface::draw_recursive(rm_widget* pwidget, float dt)
   if (!pwidget->get_elem_flags().has_visible())
     return; //invisible
 
-  rm_vec2& abs_pos = pwidget->get_absolute();
+  rm_vec2& abs_pos = pwidget->get_pos_of_parent();
   rm_vec2& size = pwidget->get_size();
   rm_rect& content = pwidget->get_content_area();
 
@@ -234,7 +238,7 @@ void rm_surface::draw_recursive(rm_widget* pwidget, float dt)
 void rm_surface::draw(float dt)
 {
   m_delta_time = dt;
-  nvgBeginFrame(m_pctx, m_size.x, m_size.y, 1.f);
+  nvgBeginFrame(m_pctx, m_size.x, m_size.y, m_device_pixel_ratio);
   draw_recursive(this, dt);
   nvgEndFrame(m_pctx);
 }
@@ -311,6 +315,43 @@ void rm_surface::free_font(rm_font& font)
   //NOTE: K.D. nvg not free fonts
 }
 
+void rm_surface::set_device_pixel_ratio(float ratio)
+{
+  m_device_pixel_ratio = ratio;
+}
+
+float rm_surface::get_device_pixel_ratio()
+{
+  return m_device_pixel_ratio;
+}
+
+void rm_surface::get_text_bounds(rm_bbox& dst,
+  const char* ptext,
+  rm_font hfont,
+  rm_vec2 start)
+{
+  NVGcontext* pctx = get_context();
+  assert(pctx && "pctx was nullptr!");
+  nvgSave(pctx);
+  nvgFontFaceId(pctx, hfont);
+  nvgTextBounds(pctx, start.x, start.y, ptext, nullptr, dst.array);
+  nvgRestore(pctx);
+}
+
+float rm_surface::get_text_width(const char* ptext, rm_font hfont, rm_vec2 start)
+{
+  rm_bbox bbox;
+  get_text_bounds(bbox, ptext, hfont, start);
+  return bbox.get_width();
+}
+
+float rm_surface::get_text_height(const char* ptext, rm_font hfont, rm_vec2 start)
+{
+  rm_bbox bbox;
+  get_text_bounds(bbox, ptext, hfont, start);
+  return bbox.get_height();
+}
+
 rm_surface::rm_surface(NVGcontext* pctx, int width, int height, irm_sysdf* p_sysdf) : rm_widget(0, 0, width, height, nullptr, "ui_root_node")
 {
   m_psysdf = p_sysdf;
@@ -318,6 +359,7 @@ rm_surface::rm_surface(NVGcontext* pctx, int width, int height, irm_sysdf* p_sys
   m_pctx = pctx;
   m_pfocus = nullptr;
   m_delta_time = 0.f;
+  m_device_pixel_ratio = 1.f;
   rm_font font = load_font_from_memory(fontawesomewebfont, FONT_SIZE, "fontawesome");
   assert(font.is_valid() && "font is invalid");
 }
@@ -334,7 +376,7 @@ void rm_window::on_draw(NVGcontext* pctx)
 
   rm_vec2 pos(0.f, 0.f);
   NVGcolor shadow_color = nvgRGBA(0, 0, 0, 200);
-  rm_utl::draw_shadow(pctx, pos, m_size, shadow_color, 8.f, get_style()->get_corner_radius(LEFT_TOP));
+  rm_utl::draw_shadow(pctx, pos, m_size, rm_vec2(0.f, 0.f), 1.1f, shadow_color, 8.f, get_style()->get_corner_radius(LEFT_TOP));
 
   /* draw window background */
   nvgBeginPath(pctx);
@@ -837,23 +879,42 @@ void rm_utl::draw_frame(NVGcontext* pctx, rm_vec2& pos, rm_vec2& size,
   nvgRestore(pctx);
 }
 
-void rm_utl::draw_shadow(NVGcontext* pctx, rm_vec2& pos, rm_vec2& size, 
-  const NVGcolor& shadow_color, float shadow_size, float corner_radius)
-{
-  nvgSave(pctx);
-  nvgResetScissor(pctx);
-  nvgBeginPath(pctx);
-  const NVGcolor& transparent = rm_utl::get_transparent();
-  NVGpaint shadow_paint = nvgBoxGradient(pctx, pos.x, pos.y, size.x, size.y, 
-    corner_radius * 2.f, shadow_size * 2.f, shadow_color, transparent);
-  nvgRect(pctx, pos.x - shadow_size, 
-    pos.y - shadow_size, 
-    size.x + 2 * shadow_size,
-    size.y + 2 * shadow_size
+void rm_utl::draw_shadow(NVGcontext* pctx, rm_vec2 pos, rm_vec2 &size, rm_vec2 dir, float offset_scale,
+  const NVGcolor& shadow_color, float shadow_size, float corner_radius, bool draw_shadow_center){
+  float len = dir.length();
+  rm_vec2 nd = (len > 0.f) ? rm_vec2{ dir.x / len, dir.y / len } : rm_vec2{ 0, 1 };
+
+  float offx = nd.x * offset_scale;
+  float offy = nd.y * offset_scale;
+
+  NVGpaint paint = nvgBoxGradient(
+    pctx,
+    pos.x + offx,
+    pos.y + offy,
+    size.x,
+    size.y,
+    corner_radius * 2.0f,
+    shadow_size * 2.0f,
+    shadow_color,
+    rm_utl::get_transparent()
   );
-  nvgRoundedRect(pctx, pos.x, pos.y, size.x, size.y, corner_radius);
-  nvgPathWinding(pctx, NVG_HOLE);
-  nvgFillPaint(pctx, shadow_paint);
+
+  nvgSave(pctx);
+  nvgStrokeWidth(pctx, 0.f);
+  nvgResetScissor(pctx);
+
+  nvgBeginPath(pctx);
+  nvgRect(pctx,
+    pos.x - shadow_size + offx,
+    pos.y - shadow_size + offy,
+    size.x + 2 * shadow_size,
+    size.y + 2 * shadow_size);
+
+  nvgRoundedRect(pctx, pos.x+1.0f, pos.y + 1.0f, size.x - 1.0f*2.f, size.y - 1.0f * 2.f, corner_radius);
+  if (!draw_shadow_center)
+    nvgPathWinding(pctx, NVG_HOLE);
+
+  nvgFillPaint(pctx, paint);
   nvgFill(pctx);
   nvgRestore(pctx);
 }

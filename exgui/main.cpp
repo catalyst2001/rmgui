@@ -474,16 +474,26 @@ void example_widgets(rm_surface* gui)
 {
   static class debug_widget : public rm_widget, rm_tab_drawer {
   public:
-    debug_widget(rm_widget *pparent) : rm_widget(20, 20, 800, 800, pparent, "debug_widget") {}
+    debug_widget(rm_widget *pparent) : rm_widget(0, 0, 800, 800, pparent, "debug_widget") {}
     void on_draw(NVGcontext* pctx) override {
-      draw_tab_path(pctx, 0.f, 0.f, 100.f, 20.f, rm_vec2(0.f, 0.f), 4.f);
-      nvgFillColor(pctx, nvgRGB(93, 93, 95));
-      nvgStrokeWidth(pctx, 1.f);
-      nvgStrokeColor(pctx, nvgRGB(102, 102, 104));
-      nvgFill(pctx);
-      nvgStroke(pctx);
+      /*rm_vec2 pos(50.f, 50.f);
+      rm_vec2 size(100.f, 100.f);
+      rm_color shadow_color(0, 0, 0, 255);
+      rm_utl::draw_shadow(pctx, pos, size, rm_vec2(0.f, 1.0f), 3.f, shadow_color, 5.f, 5.f);*/
+
     }
-  };// dbg_widget(gui);
+  } dbg_widget(gui);
+
+  rm_menu* pmenu = new rm_menu(gui, 20, "");
+  rm_menu* psubmenu0 = pmenu->create_submenu("File", 0, 0);
+  psubmenu0->add_item("Open project", 0);
+  psubmenu0->add_item("Close project", 0);
+  psubmenu0->add_separator();
+  psubmenu0->add_item("Create project", 0);
+
+  pmenu->create_submenu("Settings", 1, 0);
+  pmenu->create_submenu("Elements", 2, 0);
+  pmenu->create_submenu("Control", 3, 0);
 
 
   static rm_tabcontrol_ex_style tabstyle;
@@ -498,7 +508,7 @@ void example_widgets(rm_surface* gui)
   tabstyle.set_tab_corners_radius(2.f);
   tabstyle.set_tab_up_offsets({ 0.f, 0.f });
 
-  rm_tabcontrol_ex* ptabctl = new rm_tabcontrol_ex(gui, 10, 10, 800, 600, TCF_NONE, TC_DEFAULT, &tabstyle);
+  rm_tabcontrol_ex* ptabctl = new rm_tabcontrol_ex(gui, 0, 25, 800, 600, TCF_NONE, TC_DEFAULT, &tabstyle);
   tc::tab* ptab01 = ptabctl->add_tab("Main page", 0, 10);
   tc::tab* ptab02 = ptabctl->add_tab("Page 2", 1, 10);
   tc::tab* ptab11 = ptabctl->add_tab("Main page asdasda", 0, 10);
@@ -512,6 +522,34 @@ void example_widgets(rm_surface* gui)
       return true;
     });
   ptabctl->select_tab(0, 0);
+
+  rm_radiobutton_style* style = new rm_radiobutton_style();
+
+  style->set_all_corners_radius(8.f);
+  style->set_border_width_inner(3.f);
+  style->set_border_width_outer(1.5f);
+  style->set_border_active_outer(nvgRGB(57, 76, 195));
+  style->set_border_active_inner(nvgRGB(40, 60, 196));
+  style->set_border_inactive(nvgRGB(255, 255, 255));
+  style->set_border_width_inactive(1.5f);
+  style->set_bg_inner(nvgRGBA(33, 36, 71, 68.85f));
+  style->set_blur(0.f);
+
+  new rm_radiobutton(ptab11->get_page_widget(), 10, 10, 150, 25, style, "Holding",
+    [](rm_radiobutton* rb) {
+      return true;
+    });
+
+  new rm_radiobutton(ptab11->get_page_widget(), 10, 70, 150, 25, style, "Always",
+    [](rm_radiobutton* rb) {
+      return true;
+    });
+
+  //rm_radiobutton* first = rm_radiobutton::get_groups()[ptab11->get_page_widget()][0];
+  //first->set_allow_uncheck(true);
+
+  rm_radiobutton::select_default(ptab11->get_page_widget(), 0);
+
 
 }
 
@@ -534,7 +572,7 @@ int main() {
   }
 
   g_gui = new rm_surface(vg, winWidth, winHeight, &instance);
-  rm_font default_font = g_gui->load_font("ARIALNI.TTF", "default");
+  rm_font default_font = g_gui->load_font("Verdana.ttf", "default");
   if (!default_font.is_valid()) {
     printf("can't load font!\n");
   }

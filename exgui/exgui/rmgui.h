@@ -118,6 +118,8 @@ public:
   inline bool operator>(rm_vec2& vec) { return x > vec.x && y > vec.y; }
   inline bool operator>=(rm_vec2& vec) { return x >= vec.x && y >= vec.y; }
   inline float operator[](int idx) { assert(idx < RM_COUNTOF(v) && "index out of bounds"); return v[idx]; }
+  inline float lengthsq() { return x * x + y * y; }
+  inline float length() { return sqrtf(lengthsq()); }
 };
 
 class rm_rect
@@ -360,10 +362,11 @@ enum RM_MOUSE_EVENT : uint32_t {
 
 /* node event */
 enum RM_EVENT : uint32_t {
-  PARENT_CHANGED = 0,
-  PARENT_RESIZE,
-  PARENT_CHILD_ADDED,
-  ROOT_RESIZE
+  PARENT_CHANGED_EVENT = 0,
+  PARENT_RESIZE_EVENT,
+  PARENT_CHILD_ADDED_EVENT,
+  ROOT_RESIZE_EVENT,
+  CUSTOM_EVENT
 };
 
 /* Node notify and state flags */
@@ -503,6 +506,17 @@ public:
 
 class rm_widget;
 
+class rm_event_data
+{
+  uint32_t m_type;
+protected:
+  rm_event_data(uint32_t data_type) : m_type(data_type) {}
+public:
+  inline uint32_t get_type() const { return m_type; }
+  template<class _dst_type>
+  _dst_type as() { return reinterpret_cast<_dst_type>(this); }
+};
+
 /**
 * GUI element abstract class
 */
@@ -510,7 +524,7 @@ class irmgui_widget
 {
 public:
   //virtual     ~irmgui_widget() = 0;
-  virtual bool on_event(RM_EVENT event, rm_widget *p_from) = 0;
+  virtual bool on_event(RM_EVENT event, rm_widget *p_from, rm_event_data *pevent_data) = 0;
   virtual void on_draw(NVGcontext* pctx) = 0;
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) = 0;
 
@@ -567,6 +581,10 @@ public:
   }
   inline void  set_corner_radius(RM_CORNER corner, float radius) { m_corner_radius[corner] = radius; }
   inline float get_corner_radius(RM_CORNER corner) { return m_corner_radius[corner]; }
+  inline float get_avg_radius() const {
+    float summ = m_corner_radius[0] + m_corner_radius[1] + m_corner_radius[2] + m_corner_radius[3];
+    return summ / 4.f;
+  }
 };
 
 /**
@@ -619,8 +637,8 @@ public:
     const rm_corners_style *pcstyle,
     float shadow_offset=1.f);
 
-  static void draw_shadow(NVGcontext* pctx, rm_vec2& pos, rm_vec2& size, 
-    const NVGcolor &shadow_color, float shadow_size, float corner_radius);
+  static void draw_shadow(NVGcontext* pctx, rm_vec2 pos, rm_vec2 &size, rm_vec2 dir, float offset_scale,
+    const NVGcolor &shadow_color, float shadow_size, float corner_radius, bool draw_shadow_center=false);
 
   static void draw_edge(NVGcontext* pctx, rm_vec2 pos, rm_vec2& size,
     const rm_corners_style *pcstyle, const rm_color& suncolor, const rm_color& shadowcolor);
@@ -646,9 +664,10 @@ class rm_widget : protected irmgui_widget
 
 protected:
   /* irmgui_element empty impls */
-  virtual bool on_event(RM_EVENT event, rm_widget *p_from) {
+  virtual bool on_event(RM_EVENT event, rm_widget *p_from, rm_event_data* pevent_data) {
     RM_UNUSED(event);
     RM_UNUSED(p_from);
+    RM_UNUSED(pevent_data);
     return true;
   }
   virtual void on_draw(NVGcontext* pctx) {
@@ -692,11 +711,9 @@ protected:
   char             m_szclass[32];
   rm_bbox          m_bbox;
   rm_vec2          m_size; //width;height
-  rm_vec2          m_absolute;
+  rm_vec2          m_pos_of_parent;
   rm_rect          m_content_area;
   int              m_zindex;
-
-  inline rm_surface* get_root() { return m_proot; }
 
   ///* rmgui_root::rebuild_draw_cache accessor class */
   //class rmgui_root_update_acessor : public rmgui_root {
@@ -710,13 +727,18 @@ protected:
 
   /* perform update root draw cache */
   inline void root_update() { /*((rmgui_surface *)m_proot)->rebuild_draw_cache();*/ }
+  static void move_relative(rm_widget *pwidget, rm_vec2 deltapos);
+  static void move_to(rm_widget* proot_widget, rm_vec2 newpos);
 
-  static void move_recursive(rm_widget *pwidget, float newx, float newy);
+  inline bool dispatch_event(RM_EVENT event, rm_widget* p_from, rm_event_data* pevent_data) {
+    return on_event(event, p_from, pevent_data);
+  }
 
 public:
   void set_classname(const char* p_clsn) {
     strncpy(m_szclass, p_clsn, sizeof(m_szclass) - 1);
   }
+  inline rm_surface* get_root() { return m_proot; }
 
   void grab_globals_from(rm_widget* p_parent) {
     /* get sysdf ifaec from parent */
@@ -730,15 +752,15 @@ public:
     m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_zindex(0) {
     rm_vec2 parent_coord;
     if (m_pparent) {
-      parent_coord = m_pparent->get_absolute();
+      parent_coord = m_pparent->get_pos_of_parent();
       m_pparent->add_child(this);
       grab_globals_from(m_pparent);
     }
     m_elem_flags = flags;
     m_user_flags = uflags;
-    m_absolute.init(x, y);
+    m_pos_of_parent.init(x, y);
     m_size.init(width, height);
-    m_bbox.init(m_absolute, m_size);
+    m_bbox.init(m_pos_of_parent, m_size);
     m_content_area.init(0.f, 0.f, m_size.x, m_size.y);
 
     /* set font from root */
@@ -759,7 +781,7 @@ public:
 
   /* rect && bbox */
   inline rm_bbox    &get_bbox() { return m_bbox; }
-  inline rm_vec2    &get_absolute() { return m_absolute; }
+  inline rm_vec2    &get_pos_of_parent() { return m_pos_of_parent; }
   inline rm_vec2    &get_size() { return m_size; }
   inline rm_rect    &get_content_area() { return m_content_area; }
 
@@ -802,11 +824,13 @@ public:
   void resize(float width, float height);
   inline void resize(rm_vec2 newsize) { resize(newsize.x, newsize.y); }
 
-  void move(int newx, int newy) { move_recursive(this, newx, newy); }
-  void move(rm_vec2 newpos) { move_recursive(this, newpos.x, newpos.y); }
+  void move(int newx, int newy) { move_to(this, { newx, newy }); }
+  void move(rm_vec2 newpos) { move_to(this, newpos); }
+  void move_rel(int dx, int dy) { move_relative(this, { dx, dy }); }
+  void move_rel(rm_vec2 diff) { move_relative(this, diff); }
 
   rm_vec2 cursor_to_local(const rm_vec2& cursor_pos) {
-    return rm_vec2(cursor_pos.x - m_absolute.x, cursor_pos.y - m_absolute.y);
+    return rm_vec2(cursor_pos.x - m_pos_of_parent.x, cursor_pos.y - m_pos_of_parent.y);
   }
 };
 
@@ -815,9 +839,9 @@ class rm_surface : public rm_widget, rm_object_accrssor
   NVGcontext *m_pctx;
   rm_widget  *m_pfocus;
   float       m_delta_time;
+  float       m_device_pixel_ratio;
 
   /* event notifier functions */
-  static void event_dispatcher(rm_widget *p_elem);
   static void keybd_dispatcher(rm_widget *p_elem, int sc, 
     RM_KEY vk, RM_KEY_STATE state);
 #if 0
@@ -853,6 +877,22 @@ public:
   rm_font  load_font(const char* pfilename, const char *pfontname);
   rm_font  find_font(const char* pfontname);
   void     free_font(rm_font& font);
+
+  /* pixel ratio */
+  void     set_device_pixel_ratio(float ratio);
+  float    get_device_pixel_ratio();
+
+  /* utility */
+  void get_text_bounds(rm_bbox& dst,
+    const char* ptext,
+    rm_font hfont,
+    rm_vec2 start = rm_vec2(0.f, 0.f));
+  float get_text_width(const char* ptext,
+    rm_font hfont,
+    rm_vec2 start = rm_vec2(0.f, 0.f));
+  float get_text_height(const char* ptext,
+    rm_font hfont,
+    rm_vec2 start = rm_vec2(0.f, 0.f));
 };
 
 class rmgui_timer
