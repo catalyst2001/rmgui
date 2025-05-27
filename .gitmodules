@@ -1,0 +1,3 @@
+[submodule "exgui/vendor"]
+	path = exgui/vendor
+	url = https://github.com/facebook/yoga.git
