@@ -101,7 +101,7 @@ void rm_image_button::on_draw(NVGcontext* pctx) {
   rm_widget::on_draw(pctx);
 }
 
-bool rm_image_button::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
+bool rm_image_button::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
   if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
     std::cout << "Image Button clicked!" << std::endl;
     return false;
@@ -137,7 +137,7 @@ void rm_button::on_draw(NVGcontext* pctx) {
   rm_widget::on_draw(pctx);
 }
 
-bool rm_button::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
+bool rm_button::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
   if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
     std::cout << "Button \"" << m_text << "\" clicked!" << std::endl;
     return false;
@@ -436,7 +436,7 @@ void rm_text_input::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
   }
 }
 
-bool rm_text_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
+bool rm_text_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
   bool inside = m_bbox.inside(cursor_pos);
   float offset = m_pstyle->get_text_offset();
   float text_draw_x = m_pos_of_parent.x + 5.f + offset;
@@ -610,7 +610,7 @@ void rm_checkbox::on_draw(NVGcontext* pctx) {
   rm_widget::on_draw(pctx);
 }
 
-bool rm_checkbox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
+bool rm_checkbox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
   if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(cursor_pos)) {
     m_checked = !m_checked;
     if (is_valid_callback())
@@ -706,7 +706,7 @@ void rm_combobox::on_draw(NVGcontext* pctx) {
   rm_widget::on_draw(pctx);
 }
 
-bool rm_combobox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
+bool rm_combobox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
   m_cursor = cursor_pos;
   if (event == RM_MOUSE_EVENT_CLICK && state == DOWN) {
     if (m_bbox.inside(cursor_pos)) {
@@ -747,7 +747,7 @@ void rm_slider::compute_value(rm_vec2& cursor_pos)
 
   float x = cursor_pos.x - pad;
   float frac = x / track_w;
-  frac = std::clamp(frac, 0.f, 1.f);
+  frac = rm_clamp(frac, 0.f, 1.f);
 
   float new_val = m_min + frac * (m_max - m_min);
   if (new_val != m_value) {
@@ -768,7 +768,8 @@ void rm_slider::compute_inner_and_thumb()
 
 rm_slider::rm_slider(rm_widget* p_parent, int x, int y, int width, int height, rm_slider_style* pstyle, float min, float max, float initial, rm_slider_callback pcallback)
   : rm_widget(x, y, width, height, p_parent, "ui_slider", RM_FLAG_DEFAULT|RM_FLAG_GLOBAL), 
-  m_min(min), m_max(max), m_value(initial), m_dragging(false), m_pcallback(pcallback){
+  m_min(min), m_max(max), m_value(initial), 
+  m_dragging(false), m_pcallback(pcallback){
   set_style(pstyle);
   compute_inner_and_thumb();
 }
@@ -817,7 +818,7 @@ void rm_slider::on_draw(NVGcontext* pctx) {
   rm_widget::on_draw(pctx);
 }
 
-bool rm_slider::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
+bool rm_slider::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
   rm_vec2 local = cursor_to_local(cursor_pos);
   if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
     m_dragging = true;
@@ -873,7 +874,7 @@ void rm_progress_base::on_draw(NVGcontext* pctx)
   rm_widget::on_draw(pctx);
 }
 
-bool rm_progress_base::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
+bool rm_progress_base::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
 {
   return true;
 }
@@ -1084,7 +1085,7 @@ void rm_scrollbar::on_draw(NVGcontext* pctx)
   rm_widget::on_draw(pctx);
 }
 
-bool rm_scrollbar::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
+bool rm_scrollbar::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
 {
   return true;
 }
@@ -1206,7 +1207,7 @@ void rm_tabcontrol::on_draw(NVGcontext* pctx) {
   }
 }
 
-bool rm_tabcontrol::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
+bool rm_tabcontrol::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
   int     idx;
   rm_vec2 tabcontrol_size;
   get_tabcontrol_size(tabcontrol_size);
@@ -1342,7 +1343,7 @@ float rm_treeview::draw_node(NVGcontext* pctx, rm_tree_node* node, float x, floa
 bool rm_treeview::on_mouse(RM_MOUSE_EVENT event,
   RM_KEY vk,
   RM_KEY_STATE state,
-  rm_vec2& cursor_pos)
+  rm_vec2& cursor_pos, rm_vec2 delta)
 {
   if (event == RM_MOUSE_EVENT_CLICK && state == DOWN)
   {
@@ -1429,7 +1430,7 @@ void rm_output_text::on_draw(NVGcontext* pctx)
   }
 }
 
-bool rm_output_text::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
+bool rm_output_text::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
 {
   return true;
 }
@@ -1461,7 +1462,7 @@ void rm_number_input::on_draw(NVGcontext* pctx)
   
 }
 
-bool rm_number_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
+bool rm_number_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
 {
   return false;
 }
@@ -1535,7 +1536,7 @@ void rm_tabcontrol_ex::on_draw(NVGcontext* pctx)
   rm_widget::on_draw(pctx);
 }
 
-bool rm_tabcontrol_ex::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
+bool rm_tabcontrol_ex::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
 {
   tab* ptab;
   size_t row, tab;
@@ -2075,7 +2076,7 @@ void rm_menu::on_draw(NVGcontext* pctx)
   rm_widget::on_draw(pctx);
 }
 
-bool rm_menu::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
+bool rm_menu::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
 {
   /* handle root */
   rm_vec2 local = cursor_to_local(cursor_pos);
@@ -2255,7 +2256,7 @@ void rm_radiobutton::on_draw(NVGcontext* pctx) {
   rm_widget::on_draw(pctx);
 }
 
-bool rm_radiobutton::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& pos)
+bool rm_radiobutton::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& pos, rm_vec2 delta)
 {
   if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(pos)) {
     if (m_checked) {
@@ -2288,7 +2289,8 @@ rm_switch::rm_switch(rm_widget* parent, int x, int y, int width,
   assert(pstyle && "pstyle must not be null");
 }
 
-void rm_switch::on_draw(NVGcontext* pctx) {
+void rm_switch::on_draw(NVGcontext* pctx) 
+{
   rm_switch_style& style = *m_pstyle;
   float w = float(m_size.x);
   float h = float(m_size.y);
@@ -2332,7 +2334,8 @@ void rm_switch::on_draw(NVGcontext* pctx) {
   rm_widget::on_draw(pctx);
 }
 
-bool rm_switch::on_mouse(RM_MOUSE_EVENT event, RM_KEY key, RM_KEY_STATE state, rm_vec2& pos) {
+bool rm_switch::on_mouse(RM_MOUSE_EVENT event, RM_KEY key, RM_KEY_STATE state, rm_vec2& pos, rm_vec2 delta)
+{
   if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(pos)) {
     m_state = !m_state;
     m_target = m_state ? 1.f : 0.f;

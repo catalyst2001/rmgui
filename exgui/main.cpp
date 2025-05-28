@@ -510,6 +510,12 @@ void example_widgets(rm_surface* gui)
 
   rm_tabcontrol_ex* ptabctl = new rm_tabcontrol_ex(gui, 0, 25, 800, 600, TCF_NONE, TC_DEFAULT, &tabstyle);
   tc::tab* ptab01 = ptabctl->add_tab("Main page", 0, 10);
+
+  static rm_window_style wstyle;
+  rm_window *pwindow = new rm_window(ptab01->get_page_widget(), 0, 0, 300, 300);
+  pwindow->set_style(&wstyle);
+
+
   tc::tab* ptab02 = ptabctl->add_tab("Page 2", 1, 10);
   tc::tab* ptab11 = ptabctl->add_tab("Main page asdasda", 0, 10);
   tc::tab* ptab12 = ptabctl->add_tab("Page 2 asdasdasd", 1, 10);

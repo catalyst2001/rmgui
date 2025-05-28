@@ -484,10 +484,13 @@ public:
     b = color.b;
     a = color.a;
   }
-  inline void from_RGB(uint8_t _r, uint8_t _g, uint8_t _b) { *this = nvgRGB(_r, _g, _b); }//TODO: K.D. optimize stack costs!!
+  inline void from_RGB(uint8_t _r, uint8_t _g, uint8_t _b) { 
+    *this = nvgRGB(_r, _g, _b); }//TODO: K.D. optimize stack costs!!
   inline void from_RGBA(uint8_t _r, uint8_t _g, uint8_t _b, uint8_t _a) { *this = nvgRGBA(_r, _g, _b, _a); }//TODO: K.D. optimize stack costs!!
-  inline void from_HSL(float h, float s, float l) { *this = nvgHSL(h, s, l); }//TODO: K.D. optimize stack costs!!
-  inline void from_HSLA(float h, float s, float l, float a) { *this = nvgHSLA(h, s, l, a); }//TODO: K.D. optimize stack costs!!
+  inline void from_HSL(float h, float s, float l) { 
+    *this = nvgHSL(h, s, l); }//TODO: K.D. optimize stack costs!!
+  inline void from_HSLA(float h, float s, float l, float a) { 
+    *this = nvgHSLA(h, s, l, a); }//TODO: K.D. optimize stack costs!!
   inline rm_color& lerp(rm_color &color, float u) {
     *this = nvgLerpRGBA(*this, color, u);//TODO: K.D. optimize stack costs!!
     return *this;
@@ -551,7 +554,7 @@ public:
   * @param cursor_pos - received current cursor pos
   * @return To block further propagation of the event, return false. If ture is returned, the event is propagated to the following elements.
   */
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) = 0;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) = 0;
 };
 
 enum RM_CORNER : uint32_t {
@@ -698,7 +701,7 @@ protected:
   virtual void on_text_input(int sym) {
     RM_UNUSED(sym);
   }
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
     RM_UNUSED(event);
     RM_UNUSED(vk);
     RM_UNUSED(state);
@@ -735,7 +738,7 @@ protected:
 
   /* perform update root draw cache */
   inline void root_update() { /*((rmgui_surface *)m_proot)->rebuild_draw_cache();*/ }
-  static void move_relative(rm_widget *pwidget, rm_vec2 deltapos);
+  static void move_childs_relative(rm_widget *pwidget, rm_vec2 deltapos);
   static void move_to(rm_widget* proot_widget, rm_vec2 newpos);
 
   inline bool dispatch_event(RM_EVENT event, rm_widget* p_from, rm_event_data* pevent_data) {
@@ -834,8 +837,7 @@ public:
 
   void move(int newx, int newy) { move_to(this, { newx, newy }); }
   void move(rm_vec2 newpos) { move_to(this, newpos); }
-  void move_rel(int dx, int dy) { move_relative(this, { dx, dy }); }
-  void move_rel(rm_vec2 diff) { move_relative(this, diff); }
+  void move_relative(rm_vec2& delta);
 
   rm_vec2 cursor_to_local(const rm_vec2& cursor_pos) {
     return rm_vec2(cursor_pos.x - m_pos_of_parent.x, cursor_pos.y - m_pos_of_parent.y);
@@ -848,6 +850,8 @@ class rm_surface : public rm_widget, rm_object_accrssor
   rm_widget  *m_pfocus;
   float       m_delta_time;
   float       m_device_pixel_ratio;
+  rm_vec2     m_last_cursor;
+  rm_vec2     m_delta_cursor;
 
   /* event notifier functions */
   static void keybd_dispatcher(rm_widget *p_elem, int sc, 
@@ -1049,13 +1053,14 @@ class rm_window : public rm_widget, public rm_styled<rm_window_style>
 {
   rm_window_style        *m_pstyle;
   std::vector<rm_widget*> m_top_widgets;
+  bool                    m_dragging;
 
   /* paint window background */
   virtual void on_draw(NVGcontext* pctx);
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos);
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta);
 
 public:
-  rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags = RM_FLAG_DEFAULT, uint32_t uflags = 0, void* p_userptr = nullptr);
+  rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags = RM_FLAG_DEFAULT|RM_FLAG_GLOBAL, uint32_t uflags = 0, void* p_userptr = nullptr);
   ~rm_window();
 };
 

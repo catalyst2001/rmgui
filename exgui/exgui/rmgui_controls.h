@@ -25,7 +25,7 @@ public:
   rm_image_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& imageFile);
   virtual ~rm_image_button();
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 };
 
 class rm_button : public rm_widget {
@@ -34,7 +34,7 @@ public:
   rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text);
   virtual ~rm_button();
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 };
 
 class rm_label : public rm_widget {
@@ -133,7 +133,7 @@ public:
   virtual void on_draw(NVGcontext* pctx) override;
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   virtual void on_text_input(int sym) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 
   // map local xy-coordinate to character index
   size_t hit_test_index(float px, float py = NAN) const;
@@ -199,7 +199,7 @@ class rm_checkbox : public rm_widget, public rm_styled<rm_checkbox_style>, publi
   rm_font        m_icon_font;
 
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
   rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style *pstyle, const std::string& label, rm_checkbox_cb pcallback=nullptr);
   virtual ~rm_checkbox();
@@ -236,7 +236,7 @@ class rm_combobox : public rm_widget, public rm_callback<rm_combobox_cb> {
   rm_vec2 m_cursor;
 
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
   const size_t kinvalid_index = ((size_t)-1);
   rm_combobox(rm_widget* p_parent, int x, int y, int width, int height, rm_combobox_cb pcallback=nullptr);
@@ -315,7 +315,7 @@ class rm_slider : public rm_widget, public rm_styled<rm_slider_style> {
   void    compute_inner_and_thumb();
 
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos);
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta);
 
 public:
   rm_slider(rm_widget* p_parent, int x, int y, int width, int height, rm_slider_style* style, float min, float max, float initial, rm_slider_callback pcallback=nullptr);
@@ -343,7 +343,7 @@ public:
   void         set_corner_round(float p) { m_round = p; }
   inline float get_corner_round() const { return m_round; }
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos);
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta);
 };
 
 /**
@@ -461,7 +461,7 @@ class rm_scrollbar : public rm_widget,
   void       adjust_position();
 
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos);
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta);
 public:
   rm_scrollbar(rm_widget* p_parent, RM_ORIENT orient, rm_scroll_style *p_style, float inital_pos=0.f);
   ~rm_scrollbar();
@@ -574,7 +574,7 @@ class rm_tabcontrol : public rm_widget, public rm_styled<rm_tabcontrol_style>, p
   int                                  m_selected;
 protected:
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 
   void update_children_active();
 
@@ -645,7 +645,7 @@ class rm_treeview : public rm_widget, public rm_callback<rm_treeview_cb> {
   float                      m_indent;
 protected:
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 
   // recursive draw helper
   float draw_node(NVGcontext* pctx, rm_tree_node* node, float x, float y);
@@ -690,7 +690,7 @@ class rm_output_text : public rm_widget
   float               m_line_height;
 protected:
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
   rm_output_text(rm_widget* p_parent, int x, int y, int width, int height, float line_height=16.f, size_t num_lines=16);
   virtual ~rm_output_text() {}
@@ -720,7 +720,7 @@ protected:
 
   void draw_buttons(NVGcontext* pctx);
   void on_draw(NVGcontext* pctx) override;
-  bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
+  bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
   rm_number_input(rm_widget* p_parent, int x, int y, int width, int height, 
     input_type type = type_float, float value = 0.f, float step = 0.1f, float minval = 0.f, float maxval = 100.f);
@@ -958,7 +958,7 @@ private:
 
   void on_draw(NVGcontext* pctx) override;
   bool on_mouse(RM_MOUSE_EVENT event, 
-    RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
+    RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 
   void   hide_all_except(size_t row, size_t tabidx);
   void   get_text_bounds(rm_vec2 &dstsize, const char * ptabname);
@@ -1040,7 +1040,7 @@ protected:
 private:
   uint32_t detect_my_level(rm_widget* pparent);
   void     on_draw(NVGcontext* pctx) override;
-  bool     on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) override;
+  bool     on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 
   inline bool is_navigated() const { return m_flags & MF_NAVIGATED; }
   bool  add_submenu(rm_menu* pmenu);
@@ -1174,7 +1174,7 @@ public:
   inline static std::map<const rm_widget*, std::vector<rm_radiobutton*>> get_groups() { return s_groups; }
 
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& pos) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& pos, rm_vec2 delta) override;
 };
 
 /**
@@ -1214,7 +1214,9 @@ public:
   /* modificators */
   inline void set_track_height(float h) { m_track_height = h;}
   inline void set_padding(float p) { m_padding = p; }
-  inline void set_anim_time(float t) { m_anim_time = t; }
+  inline void set_anim_time(float t) {
+    m_anim_time = rm_max(0.0001f, t);
+  }
   inline void set_track_on(NVGcolor c) { m_track_on = c; }
   inline void set_track_off(NVGcolor c) { m_track_off = c; }
   inline void set_knob_color(NVGcolor c) { m_knob_color = c; }
@@ -1239,7 +1241,7 @@ public:
     rm_switch_style* pstyle, bool initial = false, rm_switch_cb cb = nullptr);
 
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY key, RM_KEY_STATE state, rm_vec2& pos) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY key, RM_KEY_STATE state, rm_vec2& pos, rm_vec2 delta) override;
   
   inline void set_on(bool state, bool animation) {
     m_state = state;

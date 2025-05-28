@@ -3,13 +3,13 @@
 
 #include "rmgui.h"
 
-void rm_widget::move_relative(rm_widget* pwidget, rm_vec2 deltapos)
+void rm_widget::move_childs_relative(rm_widget* pwidget, rm_vec2 deltapos)
 {
   for (size_t i = 0; i < pwidget->get_num_childs(); i++) {
     rm_widget* pchild = pwidget->get_child(i);
     assert(pchild && "pchild was nullptr");
     pchild->m_pos_of_parent += deltapos;
-    move_relative(pchild, deltapos);
+    move_childs_relative(pchild, deltapos);
   }
 }
 
@@ -21,7 +21,13 @@ void rm_widget::move_to(rm_widget* proot_widget, rm_vec2 newpos)
   /* set pos of parent to root node */
   proot_widget->m_pos_of_parent = delta;
   /* relative move childs */
-  move_relative(proot_widget, delta);
+  move_childs_relative(proot_widget, delta);
+}
+
+void rm_widget::move_relative(rm_vec2& delta)
+{
+  m_pos_of_parent += delta;
+  m_bbox.init(m_pos_of_parent, m_size);
 }
 
 bool rm_widget::add_child(rm_widget* p_child)
@@ -138,8 +144,7 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
   bool b_cursor_inside = p_elem->get_bbox().inside(cursor_pos);
   bool b_global_receive_events = p_elem->get_elem_flags().is_set(RM_FLAG_GLOBAL);
   if (b_cursor_inside || b_global_receive_events) {
-
-    b_call_next = p_elem->on_mouse(event, vk, state, cursor_pos);
+    b_call_next = p_elem->on_mouse(event, vk, state, cursor_pos, m_delta_cursor);
     if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && p_elem != this) {
       if (!(b_global_receive_events && !b_cursor_inside)) {
         m_pfocus = p_elem;
@@ -260,7 +265,9 @@ void rm_surface::textinput(int sym)
 void rm_surface::mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, int x, int y)
 {
   rm_vec2 mouse_pos(x, y);
+  m_delta_cursor = mouse_pos - m_last_cursor;
   mouse_dispatcher(this, event, vk, state, mouse_pos);
+  m_last_cursor = mouse_pos;
 }
 
 rm_image rm_surface::load_image_from_memory(const void* psrc, size_t srclen, int flags)
@@ -375,8 +382,8 @@ void rm_window::on_draw(NVGcontext* pctx)
   int b_is_active = (int)(get_elem_flags().is_focused() || get_elem_flags().is_hovered());
 
   rm_vec2 pos(0.f, 0.f);
-  NVGcolor shadow_color = nvgRGBA(0, 0, 0, 200);
-  rm_utl::draw_shadow(pctx, pos, m_size, rm_vec2(0.f, 0.f), 1.1f, shadow_color, 8.f, get_style()->get_corner_radius(LEFT_TOP));
+  NVGcolor shadow_color = nvgRGBA(0, 0, 0, 63);
+  rm_utl::draw_shadow(pctx, pos, m_size, rm_vec2(0.f, 1.f), 5.0f, shadow_color, 8.f, get_style()->get_corner_radius(LEFT_TOP));
 
   /* draw window background */
   nvgBeginPath(pctx);
@@ -388,18 +395,36 @@ void rm_window::on_draw(NVGcontext* pctx)
   nvgFill(pctx);
 }
 
-bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos)
+bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
 {
-  //move(
-  //  cursor_pos.x - m_absolute.x,
-  //  cursor_pos.y - m_absolute.y
-  //);
+  constexpr float drag_height = 30.f;
+  rm_vec2 start(0.f, 0.f);
+  rm_vec2 local = cursor_to_local(cursor_pos);
+  if (event == RM_MOUSE_EVENT_CLICK) {
+    if (rm_bbox(start, rm_vec2(m_size.x, drag_height)).inside(local)) {
+      if (!m_dragging && state == DOWN) {
+        m_dragging = true;
+      }
+    }
+
+    if (m_dragging && state == UP) {
+      m_dragging = false;
+      return true;
+    }
+  }
+
+  if(m_dragging) {
+    printf("m_dragging = %d\n", (int)m_dragging);
+    move_relative(delta);
+  }
   return true;
 }
 
 rm_window::rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags, uint32_t uflags, void* p_userptr) :
   rm_widget(x, y, width, height, p_parent, "ui_window", flags, uflags, p_userptr)
 {
+  m_dragging = 0;
+  set_style(nullptr);
   set_zindex(-1);
 }
 
