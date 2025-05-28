@@ -459,7 +459,7 @@ void test_old(rm_surface* gui)
   //scrollbar_style.set_thumb_size(10);
   //rm_scrollbar* pscroll = new rm_scrollbar(pwindow, RM_ORIENT_VERT, &scrollbar_style);
    
-  rm_slider* slider = new rm_slider(pwindow, 50, 400, 400, 40, 0.0f, 100.0f, 50.0f,
+  rm_slider* slider = new rm_slider(pwindow, 50, 400, 400, 40, nullptr, 0.0f, 100.0f, 50.0f,
     [](rm_slider* psilder) {
       psilder->get_userptr<rm_output_text>()->printf("slider value changed: %f", psilder->get_value());
     }
@@ -523,34 +523,64 @@ void example_widgets(rm_surface* gui)
     });
   ptabctl->select_tab(0, 0);
 
-  rm_radiobutton_style* style = new rm_radiobutton_style();
+  static rm_radiobutton_style style_rb;
+  style_rb.set_all_corners_radius(8.f);
+  style_rb.set_border_width_inner(3.f);
+  style_rb.set_border_width_outer(1.5f);
+  style_rb.set_border_active_outer(nvgRGB(57, 76, 195));
+  style_rb.set_border_active_inner(nvgRGB(40, 60, 196));
+  style_rb.set_border_inactive(nvgRGB(255, 255, 255));
+  style_rb.set_border_width_inactive(1.5f);
+  style_rb.set_bg_inner(nvgRGBA(33, 36, 71, 68.85f));
+  style_rb.set_circle_radius(9.5f);
 
-  style->set_all_corners_radius(8.f);
-  style->set_border_width_inner(3.f);
-  style->set_border_width_outer(1.5f);
-  style->set_border_active_outer(nvgRGB(57, 76, 195));
-  style->set_border_active_inner(nvgRGB(40, 60, 196));
-  style->set_border_inactive(nvgRGB(255, 255, 255));
-  style->set_border_width_inactive(1.5f);
-  style->set_bg_inner(nvgRGBA(33, 36, 71, 68.85f));
-  style->set_blur(0.f);
-
-  new rm_radiobutton(ptab11->get_page_widget(), 10, 10, 150, 25, style, "Holding",
+  new rm_radiobutton(ptab11->get_page_widget(), 10, 10, 150, 25, &style_rb, "Holding",
     [](rm_radiobutton* rb) {
       return true;
     });
 
-  new rm_radiobutton(ptab11->get_page_widget(), 10, 70, 150, 25, style, "Always",
+  new rm_radiobutton(ptab11->get_page_widget(), 10, 70, 150, 25, &style_rb, "Always",
     [](rm_radiobutton* rb) {
       return true;
     });
-
   //rm_radiobutton* first = rm_radiobutton::get_groups()[ptab11->get_page_widget()][0];
   //first->set_allow_uncheck(true);
-
   rm_radiobutton::select_default(ptab11->get_page_widget(), 0);
 
 
+  static rm_switch_style style_switch;
+  style_switch.set_track_height(30.f);
+  style_switch.set_padding(4.f);
+  style_switch.set_track_on(nvgRGB(53, 77, 230));
+  style_switch.set_track_off(nvgRGB(28, 41, 103));
+  style_switch.set_knob_color(nvgRGB(255, 255, 255));
+  style_switch.set_anim_time(0.25f);
+  //style_switch->set_shadow_size(12.f);
+  style_switch.set_all_corners_radius(style_switch.get_track_height() * 0.5f);
+
+  rm_switch* sw = new rm_switch(ptab11->get_page_widget(), 10, 120, 60, &style_switch, false,
+    [](rm_switch* sw) {
+      //if (sw->is_on())
+      //  printf("switch enabled \n");
+    });
+
+  //sw->set_on(true, 1);
+
+  static rm_slider_style style_slider;
+  style_slider.set_track_height(7.f);
+  style_slider.set_padding(9.8f);
+  style_slider.set_track_bg(nvgRGB(109, 119, 213));
+  style_slider.set_track_fill(nvgRGB(53, 79, 206));
+  style_slider.set_thumb_radius(7.f);
+  style_slider.set_thumb_color(nvgRGB(255, 255, 255));
+  style_slider.set_thumb_border_color(nvgRGB(57, 76, 195));
+  style_slider.set_thumb_border_width(3.5f);
+  style_slider.set_all_corners_radius(style_slider.get_track_height() * 0.5f);
+  rm_slider* slider = new rm_slider(ptab11->get_page_widget(), 10, 160, 400, 40, &style_slider, 0.0f, 100.0f, 50.0f,
+    [](rm_slider* psilder) {
+      //psilder->get_userptr<rm_output_text>()->printf("slider value changed: %f", psilder->get_value());
+    }
+  );
 }
 
 int main() {

@@ -492,6 +492,14 @@ public:
     *this = nvgLerpRGBA(*this, color, u);//TODO: K.D. optimize stack costs!!
     return *this;
   }
+  static inline NVGcolor lerp(const NVGcolor& from_color, const NVGcolor& to_color, float factor) { // NOTE: added by d2
+    return NVGcolor{
+      from_color.r + (to_color.r - from_color.r) * factor,
+      from_color.g + (to_color.g - from_color.g) * factor,
+      from_color.b + (to_color.b - from_color.b) * factor,
+      from_color.a + (to_color.a - from_color.a) * factor
+    };
+  }
   inline rm_color& set_transp(uint8_t alpha) {
     *this = nvgTransRGBA(*this, alpha);//TODO: K.D. optimize stack costs!!
     return *this;

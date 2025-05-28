@@ -741,15 +741,19 @@ bool rm_combobox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, 
 
 void rm_slider::compute_value(rm_vec2& cursor_pos)
 {
-  float localX = cursor_pos.x - (m_pos_of_parent.x + m_thumb_size);
-  float fraction = localX / m_inner_rect.width;
-  fraction = std::max(0.f, std::min(1.f, fraction));
-  m_value = m_min + fraction * (m_max - m_min);
-  if (m_last_value != m_value) {
-    m_last_value = m_value;
-    if (m_pcallback) {
+  rm_slider_style& style = *m_pstyle;
+  float pad = style.get_padding();
+  float track_w = m_size.x - pad * 2.f;
+
+  float x = cursor_pos.x - pad;
+  float frac = x / track_w;
+  frac = std::clamp(frac, 0.f, 1.f);
+
+  float new_val = m_min + frac * (m_max - m_min);
+  if (new_val != m_value) {
+    m_value = new_val;
+    if (m_pcallback) 
       m_pcallback(this);
-    }
   }
 }
 
@@ -762,39 +766,62 @@ void rm_slider::compute_inner_and_thumb()
   m_inner_rect.height = m_size.y;
 }
 
-rm_slider::rm_slider(rm_widget* p_parent, int x, int y, int width, int height, float min, float max, float initial, rm_slider_callback pcallback)
+rm_slider::rm_slider(rm_widget* p_parent, int x, int y, int width, int height, rm_slider_style* pstyle, float min, float max, float initial, rm_slider_callback pcallback)
   : rm_widget(x, y, width, height, p_parent, "ui_slider", RM_FLAG_DEFAULT|RM_FLAG_GLOBAL), 
-  m_min(min), m_max(max), m_value(initial), m_dragging(false), m_pcallback(pcallback)
-{
+  m_min(min), m_max(max), m_value(initial), m_dragging(false), m_pcallback(pcallback){
+  set_style(pstyle);
   compute_inner_and_thumb();
 }
 
 rm_slider::~rm_slider() {}
 
 void rm_slider::on_draw(NVGcontext* pctx) {
-  //m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
+  rm_slider_style& style = *m_pstyle;
+  float w = m_size.x;
+  float h = m_size.y;
+  float th = style.get_track_height();
+  float tr = style.get_avg_radius();
+  float pad = style.get_padding();
+  float ty = (h - th) * 0.5f;
 
-  float trackY = m_inner_rect.y + m_inner_rect.height / 2.0f;
+  /* draw bg track */
+  NVGpaint bgPaint = nvgBoxGradient(pctx, pad + 0.5f, ty + 0.5f, w - 2 * pad - 1.0f, th, tr, 1.0f, style.get_track_bg(), style.get_track_bg());
   nvgBeginPath(pctx);
-  nvgMoveTo(pctx, m_inner_rect.x, trackY);
-  nvgLineTo(pctx, m_inner_rect.x + m_inner_rect.width, trackY);
-  nvgStrokeColor(pctx, nvgRGBA(150, 150, 150, 255));
+  nvgRoundedRect(pctx, pad + 0.5f, ty + 0.5f, w - 2 * pad - 1.0f, th, tr);
+  nvgFillPaint(pctx, bgPaint);
+  nvgFill(pctx);
+
+  /* draw fill track */
+  float frac = (m_value - m_min) / (m_max - m_min);
+  frac = std::clamp(frac, 0.f, 1.f);
+  float fill_w = (w - 2 * pad) * frac;
+  NVGpaint fg_paint = nvgBoxGradient(pctx, pad + 0.5f, ty + 0.5f, fill_w - 1.0f, th, tr, 1.0f, style.get_track_fill(), style.get_track_fill());
+  nvgBeginPath(pctx);
+  nvgRoundedRectVarying(pctx, pad + 0.5f, ty + 0.5f,fill_w - 1.0f, th, 
+    style.get_corner_radius(LEFT_TOP), style.get_corner_radius(RIGHT_TOP), style.get_corner_radius(RIGHT_BOTTOM), style.get_corner_radius(LEFT_BOTTOM));
+  nvgFillPaint(pctx, fg_paint);
+  nvgFill(pctx);
+
+  /* draw thumb */
+  float cx = pad + fill_w;
+  float cy = h * 0.5f;
+  float kr = style.get_thumb_radius();
+  nvgBeginPath(pctx);
+  nvgCircle(pctx, cx, cy, kr);
+  nvgFillColor(pctx, style.get_thumb_color());
+  nvgFill(pctx);
+  nvgStrokeWidth(pctx, style.get_thumb_border_width());
+  nvgStrokeColor(pctx, style.get_thumb_border_color());
   nvgStroke(pctx);
 
-  float fraction = (m_value - m_min) / (m_max - m_min);
-  float thumbX = m_inner_rect.x + fraction * m_inner_rect.width;
-
-  nvgBeginPath(pctx);
-  nvgCircle(pctx, thumbX, trackY, m_inner_rect.height / 2.5f);
-  nvgFillColor(pctx, nvgRGBA(100, 100, 250, 255));
-  nvgFill(pctx);
   rm_widget::on_draw(pctx);
 }
 
 bool rm_slider::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos) {
+  rm_vec2 local = cursor_to_local(cursor_pos);
   if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
     m_dragging = true;
-    compute_value(cursor_pos);
+    compute_value(local);
     return false;
   }
   if (event == RM_MOUSE_EVENT_CLICK && state == UP) {
@@ -802,7 +829,7 @@ bool rm_slider::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm
     return false;
   }
   if (m_dragging && event == RM_MOUSE_EVENT_MOVE) {
-    compute_value(cursor_pos);
+    compute_value(local);
     return false;
   }
   return true;
@@ -2107,6 +2134,7 @@ rm_radiobutton::rm_radiobutton(rm_widget* parent, int x, int y, int width, int h
   rm_widget(x, y, width, height, parent, "ui_radiobutton"),
   m_label(label), m_checked(false), m_allow_uncheck(false) {
   set_style(pstyle);
+  set_callback(cb);
   assert(pstyle && "pstyle must not be null");
   auto& grp = s_groups[parent];
   grp.push_back(this);
@@ -2115,8 +2143,14 @@ rm_radiobutton::rm_radiobutton(rm_widget* parent, int x, int y, int width, int h
 }
 
 rm_radiobutton::~rm_radiobutton() {
-  // HACKHACK: d2: REMOVE ALL GROUPS IF PARENT IS DELETED!!!!!!!!!
-  /* clear from group if needed? */
+  auto it = s_groups.find(m_pparent);
+  if (it != s_groups.end()) {
+    auto& grp = it->second;
+    grp.erase(std::remove(grp.begin(), grp.end(), this), grp.end());
+    if (grp.empty()) {
+      s_groups.erase(it);
+    }
+  }
 }
 
 void rm_radiobutton::select_default(rm_widget* parent, int index) {
@@ -2146,16 +2180,10 @@ void rm_radiobutton::on_draw(NVGcontext* pctx) {
   float h = (float)m_size.y;
   float circle_radius = style.get_circle_radius();
 
-  NVGpaint pg = nvgBoxGradient(pctx, 0.5f, 0.5f,
-    w - 1.0f, h - 1.0f,
-    style.get_avg_radius(), // FIXME: d2 if all the angles are the same
-    style.get_blur(),
-    style.get_bg_inner(),
-    nvgRGBA(0, 0, 0, 0)
-  );
-  
+  /* draw shadow */
   rm_utl::draw_shadow(pctx, rm_vec2(0.f, 0.f), m_size, rm_vec2(0.f, 1.0f), style.get_shadow_offset(), style.get_shadow_color(), style.get_shadow_size(), style.get_avg_radius());
 
+  /* draw bg */
   nvgBeginPath(pctx);
   nvgRoundedRectVarying(pctx,
     0.5f, 0.5f, w - 1.0f, h - 1.0f,
@@ -2163,7 +2191,7 @@ void rm_radiobutton::on_draw(NVGcontext* pctx) {
     style.get_corner_radius(RIGHT_TOP),
     style.get_corner_radius(RIGHT_BOTTOM),
     style.get_corner_radius(LEFT_BOTTOM));
-  nvgFillPaint(pctx, pg);
+  nvgFillColor(pctx, style.get_bg_inner());
   nvgFill(pctx);
 
   float cy = h * 0.5f;
@@ -2173,6 +2201,7 @@ void rm_radiobutton::on_draw(NVGcontext* pctx) {
     float w_o = style.get_border_width_outer();
     float w_i = style.get_border_width_inner();
 
+    /* draw active outer border */
     float r_o = circle_radius - w_o * 0.5f;
     nvgBeginPath(pctx);
     nvgCircle(pctx, cx, cy, r_o);
@@ -2180,6 +2209,7 @@ void rm_radiobutton::on_draw(NVGcontext* pctx) {
     nvgStrokeColor(pctx, style.get_border_active_outer());
     nvgStroke(pctx);
 
+    /* draw active inner border */
     float r_i = r_o - w_o * 0.5f - w_i * 0.5f;
     nvgBeginPath(pctx);
     nvgCircle(pctx, cx, cy, r_i);
@@ -2187,6 +2217,7 @@ void rm_radiobutton::on_draw(NVGcontext* pctx) {
     nvgStrokeColor(pctx, style.get_border_active_inner());
     nvgStroke(pctx);
 
+    /* draw active mark */
     float r_fill = r_i - w_i * 0.5f;
     nvgBeginPath(pctx);
     nvgCircle(pctx, cx, cy, r_fill);
@@ -2194,6 +2225,7 @@ void rm_radiobutton::on_draw(NVGcontext* pctx) {
     nvgFill(pctx);
   }
   else {
+    /* draw inactive border */
     float w_n = style.get_border_width_inactive();
     float r_n = circle_radius - w_n * 0.5f;
     nvgBeginPath(pctx);
@@ -2242,6 +2274,72 @@ bool rm_radiobutton::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE stat
     }
     if (is_valid_callback())
       get_callback()(this);
+    return false;
+  }
+  return true;
+}
+
+rm_switch::rm_switch(rm_widget* parent, int x, int y, int width, 
+  rm_switch_style* pstyle, bool initial, rm_switch_cb cb) : rm_widget(x, y, width, int(pstyle->get_track_height()), parent, "ui_switch"), 
+  m_state(initial), m_progress(initial ? 1.f : 0.f), m_target(m_progress){
+
+  set_style(pstyle);
+  set_callback(cb);
+  assert(pstyle && "pstyle must not be null");
+}
+
+void rm_switch::on_draw(NVGcontext* pctx) {
+  rm_switch_style& style = *m_pstyle;
+  float w = float(m_size.x);
+  float h = float(m_size.y);
+  float dt = m_proot->get_delta_time();
+
+  /* shadow */
+  rm_utl::draw_shadow(pctx, rm_vec2(0.f, 0.f), m_size, rm_vec2(0.f, 1.f), style.get_shadow_offset(), style.get_shadow_color(), style.get_shadow_size(), style.get_track_height() * 0.4f);
+
+  /* animation d2: mb use class animation?? */ 
+  if (m_progress != m_target) {
+    float dir = (m_target > m_progress ? +1.f : -1.f);
+    m_progress += dir * (dt / style.get_anim_time());
+    m_progress = std::clamp(m_progress, 0.f, 1.f);
+  }
+
+  float e = ease_in_out(m_progress);
+
+  /* track */
+  NVGcolor track_color = rm_color::lerp(style.get_track_off(), style.get_track_on(), e);
+  nvgBeginPath(pctx);
+  nvgRoundedRectVarying(pctx, 0.5f, 0.5f, w - 1, h - 1,
+    style.get_corner_radius(LEFT_TOP),
+    style.get_corner_radius(RIGHT_TOP),
+    style.get_corner_radius(RIGHT_BOTTOM),
+    style.get_corner_radius(LEFT_BOTTOM));
+  nvgFillColor(pctx, track_color);
+  nvgFill(pctx);
+
+  /* knob */
+  float pad = style.get_padding();
+  float r = style.get_knob_radius();
+  float x0 = pad + r;
+  float x1 = w - pad - r;
+  float kx = x0 + (x1 - x0) * e;
+  float ky = h * 0.5f;
+  nvgBeginPath(pctx);
+  nvgCircle(pctx, kx, ky, r);
+  nvgFillColor(pctx, style.get_knob_color());
+  nvgFill(pctx);
+
+  rm_widget::on_draw(pctx);
+}
+
+bool rm_switch::on_mouse(RM_MOUSE_EVENT event, RM_KEY key, RM_KEY_STATE state, rm_vec2& pos) {
+  if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(pos)) {
+    m_state = !m_state;
+    m_target = m_state ? 1.f : 0.f;
+
+    if (is_valid_callback())
+      get_callback()(this);
+
     return false;
   }
   return true;

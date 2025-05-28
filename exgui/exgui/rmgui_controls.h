@@ -252,6 +252,48 @@ public:
 };
 
 /**
+ * SLIDER STYLE
+ */
+class rm_slider_style : public rm_corners_style {
+  float   m_track_height;       
+  float   m_padding;            
+  NVGcolor m_track_bg;          
+  NVGcolor m_track_fill;        
+  float   m_thumb_radius;       
+  float   m_thumb_border_width; 
+  NVGcolor m_thumb_color;       
+  NVGcolor m_thumb_border_color;
+
+public:
+  rm_slider_style(): m_track_height(4.f), 
+    m_padding(8.f), m_track_bg(nvgRGB(200, 200, 200)),
+    m_track_fill(nvgRGB(57, 76, 195)), m_thumb_radius(12.f), 
+    m_thumb_border_width(2.f), m_thumb_color(nvgRGB(255, 255, 255)), 
+    m_thumb_border_color(nvgRGB(57, 76, 195)){
+  }
+
+  /* selectors */
+  inline float   get_track_height()       const { return m_track_height; }
+  inline float   get_padding()            const { return m_padding; }
+  inline NVGcolor get_track_bg()           const { return m_track_bg; }
+  inline NVGcolor get_track_fill()         const { return m_track_fill; }
+  inline float   get_thumb_radius()       const { return m_thumb_radius; }
+  inline float   get_thumb_border_width() const { return m_thumb_border_width; }
+  inline NVGcolor get_thumb_color()        const { return m_thumb_color; }
+  inline NVGcolor get_thumb_border_color() const { return m_thumb_border_color; }
+
+  /* modificators */
+  inline void set_track_height(float h) { m_track_height = h; }
+  inline void set_padding(float p) { m_padding = p; }
+  inline void set_track_bg(NVGcolor c) { m_track_bg = c; }
+  inline void set_track_fill(NVGcolor c) { m_track_fill = c; }
+  inline void set_thumb_radius(float r) { m_thumb_radius = r; }
+  inline void set_thumb_border_width(float w) { m_thumb_border_width = w; }
+  inline void set_thumb_color(NVGcolor c) { m_thumb_color = c; }
+  inline void set_thumb_border_color(NVGcolor c) { m_thumb_border_color = c; }
+};
+
+/**
 * =============================================
 * Slider
 *
@@ -260,7 +302,7 @@ public:
 */
 class rm_slider;
 using rm_slider_callback = void(*)(rm_slider *pslider);
-class rm_slider : public rm_widget {
+class rm_slider : public rm_widget, public rm_styled<rm_slider_style> {
   float   m_min;
   float   m_max;
   float   m_value;
@@ -276,7 +318,7 @@ class rm_slider : public rm_widget {
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos);
 
 public:
-  rm_slider(rm_widget* p_parent, int x, int y, int width, int height, float min, float max, float initial, rm_slider_callback pcallback=nullptr);
+  rm_slider(rm_widget* p_parent, int x, int y, int width, int height, rm_slider_style* style, float min, float max, float initial, rm_slider_callback pcallback=nullptr);
   virtual ~rm_slider();
   float get_value() const { return m_value; }
 };
@@ -1038,7 +1080,6 @@ public:
 class rm_radiobutton_style : public rm_corners_style {
   rm_vec2   m_text_offset;
   NVGcolor  m_bg_inner;
-  float     m_blur;
   NVGcolor  m_text_color;
   NVGcolor  m_border_active_outer;
   NVGcolor  m_border_active_inner;
@@ -1054,8 +1095,8 @@ class rm_radiobutton_style : public rm_corners_style {
   NVGcolor  m_shadow_color;
 
 public:
-  rm_radiobutton_style() : m_text_offset(0.f, 0.f), m_bg_inner(nvgRGBA(0, 0, 0, 60)),
-    m_blur(0.f), m_text_color(nvgRGB(255, 255, 255)),
+  rm_radiobutton_style() : m_text_offset(0.f, 0.f), 
+    m_bg_inner(nvgRGBA(0, 0, 0, 60)), m_text_color(nvgRGB(255, 255, 255)),
     m_border_active_outer(nvgRGB(0, 122, 255)),
     m_border_active_inner(nvgRGB(102, 204, 255)), m_border_width_outer(2.f),
     m_border_width_inner(1.f),
@@ -1068,7 +1109,6 @@ public:
   /* selectors */
   inline const rm_vec2& get_text_offset()       const { return m_text_offset; }
   inline NVGcolor       get_bg_inner()          const { return m_bg_inner; }
-  inline float          get_blur()              const { return m_blur; }
   inline NVGcolor       get_text_color()        const { return m_text_color; }
   inline NVGcolor       get_border_active_outer() const { return m_border_active_outer; }
   inline NVGcolor       get_border_active_inner() const { return m_border_active_inner; }
@@ -1086,7 +1126,6 @@ public:
   /* modificators */
   inline void set_text_offset(const rm_vec2& v) { m_text_offset = v; }
   inline void set_bg_inner(NVGcolor c) { m_bg_inner = c; }
-  inline void set_blur(float b) { m_blur = b; }
   inline void set_text_color(NVGcolor c) { m_text_color = c; }
   inline void set_border_active_outer(NVGcolor c) { m_border_active_outer = c; }
   inline void set_border_active_inner(NVGcolor c) { m_border_active_inner = c; }
@@ -1104,7 +1143,9 @@ public:
 
 class rm_radiobutton;
 using rm_radiobutton_cb = bool(*)(rm_radiobutton*);
-
+/**
+ * RADIOBUTTON
+ */
 class rm_radiobutton : public rm_widget, public rm_styled<rm_radiobutton_style>, public rm_callback<rm_radiobutton_cb>
 {
   std::string m_label;
@@ -1134,4 +1175,82 @@ public:
 
   virtual void on_draw(NVGcontext* pctx) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& pos) override;
+};
+
+/**
+ * SWITCH STYLE
+*/
+class rm_switch_style : public rm_corners_style {
+  float     m_track_height;
+  float     m_padding;
+  float     m_anim_time;
+  NVGcolor  m_track_on;
+  NVGcolor  m_track_off;
+  NVGcolor  m_knob_color;
+  float     m_knob_radius;
+  float     m_shadow_offset;
+  float     m_shadow_size;
+  NVGcolor  m_shadow_color;
+public:
+  rm_switch_style() : m_track_height(24.f), m_padding(4.f), m_anim_time(0.2f), 
+    m_track_on(nvgRGB(57, 76, 195)), m_track_off(nvgRGBA(200, 200, 200, 128)), 
+    m_knob_color(nvgRGB(255, 255, 255)), m_knob_radius(11.f),
+    m_shadow_offset(5.f), m_shadow_size(7.f),
+    m_shadow_color(nvgRGBA(0, 0, 0, 63.75f)) {
+  }
+
+  /* selectors */
+  inline float          get_track_height() const { return m_track_height; }
+  inline float          get_padding()      const { return m_padding; }
+  inline float          get_anim_time()    const { return m_anim_time; }
+  inline NVGcolor       get_track_on()     const { return m_track_on; }
+  inline NVGcolor       get_track_off()    const { return m_track_off; }
+  inline NVGcolor       get_knob_color()   const { return m_knob_color; }
+  inline float          get_knob_radius() const { return m_knob_radius; }
+  inline float          get_shadow_offset() const { return m_shadow_offset; }
+  inline float          get_shadow_size()   const { return m_shadow_size; }
+  inline NVGcolor       get_shadow_color()  const { return m_shadow_color; }
+
+  /* modificators */
+  inline void set_track_height(float h) { m_track_height = h;}
+  inline void set_padding(float p) { m_padding = p; }
+  inline void set_anim_time(float t) { m_anim_time = t; }
+  inline void set_track_on(NVGcolor c) { m_track_on = c; }
+  inline void set_track_off(NVGcolor c) { m_track_off = c; }
+  inline void set_knob_color(NVGcolor c) { m_knob_color = c; }
+  inline void set_knob_radius(float r) { m_knob_radius = r; }
+  inline void set_shadow_offset(float offset) { m_shadow_offset = offset; }
+  inline void set_shadow_size(float size) { m_shadow_size = size; }
+  inline void set_shadow_color(NVGcolor c) { m_shadow_color = c; }
+};
+
+class rm_switch;
+using rm_switch_cb = void(*)(rm_switch*);
+/**
+ * SWITCH
+*/
+class rm_switch : public rm_widget, public rm_styled<rm_switch_style>, public rm_callback<rm_switch_cb>{
+  bool  m_state;
+  float m_progress;
+  float m_target;
+
+public:
+  rm_switch(rm_widget* parent, int x, int y, int width, 
+    rm_switch_style* pstyle, bool initial = false, rm_switch_cb cb = nullptr);
+
+  virtual void on_draw(NVGcontext* pctx) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY key, RM_KEY_STATE state, rm_vec2& pos) override;
+  
+  inline void set_on(bool state, bool animation) {
+    m_state = state;
+    m_target = state ? 1.f : 0.f;
+    if(!animation)
+      m_progress = m_target;
+  }
+  
+  inline bool is_on() const { return m_state; }
+
+  static float ease_in_out(float t) {
+    return t * t * (3 - 2 * t);
+  }
 };
