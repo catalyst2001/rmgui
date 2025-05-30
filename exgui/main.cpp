@@ -587,6 +587,26 @@ void example_widgets(rm_surface* gui)
       //psilder->get_userptr<rm_output_text>()->printf("slider value changed: %f", psilder->get_value());
     }
   );
+
+  static rm_listview_style lv_style;
+  lv_style.set_row_height(30.f);
+  lv_style.set_text_padding(12.f);
+  lv_style.set_background_color(nvgRGB(250, 250, 250));
+  lv_style.set_text_color(nvgRGB(30, 30, 30));
+  lv_style.set_hover_color(nvgRGB(230, 230, 255));
+  lv_style.set_selected_color(nvgRGB(180, 200, 255));
+  lv_style.set_font_size(14.f);
+
+  rm_listview *list = new rm_listview(ptab11->get_page_widget(), 20, 210, 200, 150, &lv_style,
+    [](rm_listview* lv, size_t idx) {
+      printf("Selected item #%zu: %s\n", idx, lv->get_selected_index() == idx ? lv->get_items()[idx].c_str() : "");
+    }
+  );
+
+  list->add_item("First option");
+  list->add_item("Second option");
+  list->add_item("Third option");
+  list->add_item("Another item");
 }
 
 int main() {

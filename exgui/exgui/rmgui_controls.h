@@ -1256,3 +1256,66 @@ public:
     return t * t * (3 - 2 * t);
   }
 };
+
+/**
+ * LISTVIEW STYLE
+*/
+class rm_listview_style : public rm_corners_style {
+  float     m_padding;
+  float     m_row_height;
+  NVGcolor  m_bg_color;
+  NVGcolor  m_text_color;
+  NVGcolor  m_hover_color;
+  NVGcolor  m_selected_color;
+  float     m_font_size;
+public:
+  rm_listview_style(): m_padding(8.f), m_row_height(24.f), 
+    m_bg_color(nvgRGB(255, 255, 255)), 
+    m_text_color(nvgRGB(0, 0, 0)), m_hover_color(nvgRGB(240, 240, 240)), 
+    m_selected_color(nvgRGB(200, 200, 255)), m_font_size(16.f){
+  }
+
+  /* selectors */
+  inline float            get_text_padding()        const { return m_padding; }
+  inline float            get_row_height()          const { return m_row_height; }
+  inline const NVGcolor&  get_background_color()    const { return m_bg_color; }
+  inline const NVGcolor&  get_text_color()          const { return m_text_color; }
+  inline const NVGcolor&  get_hover_color()         const { return m_hover_color; }
+  inline const NVGcolor&  get_selected_color()      const { return m_selected_color; }
+  inline float            get_font_size()           const { return m_font_size; }
+
+  /* modifiers */
+  inline void set_text_padding(float p) { m_padding = p; }
+  inline void set_row_height(float h) { m_row_height = h; }
+  inline void set_background_color(NVGcolor c) { m_bg_color = c; }
+  inline void set_text_color(NVGcolor c) { m_text_color = c; }
+  inline void set_hover_color(NVGcolor c) { m_hover_color = c; }
+  inline void set_selected_color(NVGcolor c) { m_selected_color = c; }
+  inline void set_font_size(float f) { m_font_size = f; }
+};
+
+/**
+ * LISTVIEW
+*/
+class rm_listview;
+using rm_listview_cb = void(*)(rm_listview* lv, size_t index);
+class rm_listview : public rm_widget, public rm_styled<rm_listview_style>, public rm_callback<rm_listview_cb>
+{
+  std::vector<std::string> m_items;
+  size_t m_hover_index;
+  size_t m_selected_index;
+
+public:
+  rm_listview(rm_widget* parent, int x, int y, int width, int height, rm_listview_style* pstyle, rm_listview_cb cb = nullptr);
+  ~rm_listview() {};
+
+  void add_item(const std::string& text);
+  void clear_items();
+
+  float get_item_height() const { return m_pstyle->get_row_height(); }
+  size_t get_selected_index() const { return m_selected_index; }
+  std::vector<std::string> get_items() const { return m_items; }
+
+  virtual void on_draw(NVGcontext* pctx) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
+};

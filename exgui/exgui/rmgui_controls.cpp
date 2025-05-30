@@ -1945,11 +1945,13 @@ rm_menu* rm_menu::create_submenu(const char* pname,
   uint32_t itemid,
   uint32_t flags)
 {
-  rm_menu* pmenu = new (std::nothrow)rm_menu(this, 0, pname);
+  rm_menu* pmenu = new (std::nothrow)rm_menu(this, int(this->m_size.y), pname);
   if (!pmenu)
     return nullptr;
 
   pmenu->m_flags = MF_NONE;
+  pmenu->m_menuid = menuid;
+  pmenu->m_itemid = itemid;
   /* noname == menu separator */
   if (!pname)
     pmenu->m_flags |= MF_SEPARATOR;
@@ -1958,6 +1960,7 @@ rm_menu* rm_menu::create_submenu(const char* pname,
     m_max_text_width = recompute_text_width();
     resize(m_max_text_width, m_size.y);
   }
+
   return pmenu;
 }
 
@@ -1968,8 +1971,16 @@ size_t rm_menu::get_num_submenus()
 
 rm_menu* rm_menu::get_submenu(size_t idx)
 {
-  //FIXME: K.D. it is possible that it will not work properly
-  return reinterpret_cast<rm_menu*>(rm_widget::get_child(idx));
+  if (idx >= get_num_submenus()) {
+    return nullptr;
+  }
+
+  rm_widget* child = rm_widget::get_child(idx);
+  if (!child || !child->classname_is("ui_menu")) {
+    return nullptr;
+  }
+
+  return static_cast<rm_menu*>(child);
 }
 
 /**
@@ -2042,11 +2053,11 @@ void rm_menu::on_draw(NVGcontext* pctx)
     }
   }
   else {
-    static bool b = false;
+ /*   static bool b = false;
     if (!b) {
       b = true;
       move({ 600, 200 });
-    }
+    }*/
 
     /* draw popup menu */
     nvgBeginPath(pctx);
@@ -2080,12 +2091,59 @@ bool rm_menu::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_v
 {
   /* handle root */
   rm_vec2 local = cursor_to_local(cursor_pos);
-  if (!m_level) {
 
+  constexpr float padding = 10.f;
+
+  if (!m_level) {
+    float header_h = m_size.y;
+    if (event == RM_MOUSE_EVENT_MOVE) {
+      if (local.y >= 0 && local.y < header_h) {
+        float x = 0;
+        for (size_t i = 0; i < get_num_submenus(); ++i) {
+          auto* itm = get_submenu(i);
+          float w = padding + itm->m_text_width;
+          if (local.x >= x && local.x < x + w) itm->m_flags |= MF_NAVIGATED;
+          else itm->m_flags &= ~MF_NAVIGATED;
+          x += w;
+        }
+      }
+      else {
+        for (size_t i = 0; i < get_num_submenus(); ++i)
+          get_submenu(i)->m_flags &= ~MF_NAVIGATED;
+      }
+      return true;
+    }
+    if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
+      float x = 0;
+      for (size_t i = 0; i < get_num_submenus(); ++i) {
+        auto* itm = get_submenu(i);
+        float w = padding + itm->m_text_width;
+        if (local.x >= x && local.x < x + w) {
+          for (size_t j = 0; j < get_num_submenus(); ++j)
+            get_submenu(j)->m_flags &= ~MF_NAVIGATED;
+          itm->m_flags |= MF_NAVIGATED;
+          itm->move({ x, header_h });
+          break;
+        }
+        x += w;
+      }
+      return false;
+    }
     return true;
   }
 
-  /* handle popup */
+  if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(cursor_pos)) {
+    size_t idx = size_t(local.y / m_size.y);
+    if (idx < get_num_submenus()) {
+      auto* itm = get_submenu(idx);
+      if (!(itm->m_flags & MF_SEPARATOR) && is_valid_callback())
+        get_callback()(m_proot_menu, m_menuid, itm->m_itemid);
+    }
+    for (size_t i = 0; i < m_proot_menu->get_num_submenus(); ++i)
+      m_proot_menu->get_submenu(i)->m_flags &= ~MF_NAVIGATED;
+    return false;
+  }
+
   return true;
 }
 
@@ -2106,7 +2164,7 @@ float rm_menu::recompute_text_width()
 }
 
 rm_menu::rm_menu(rm_widget* p_parent, int height, const char* pname) :
-  rm_widget(0.f, 0.f, 0.f, height, p_parent, "ui_menu"), m_text(pname ? pname : ""), m_max_text_width(0.f), m_proot_menu(nullptr)
+  rm_widget(0.f, 0.f, 0.f, height, p_parent, "ui_menu", RM_FLAG_DEFAULT|RM_FLAG_GLOBAL), m_text(pname ? pname : ""), m_max_text_width(0.f), m_proot_menu(nullptr)
 {
   /* detect menu level from parent */
   assert(p_parent && "p_parent was nullptr!");
@@ -2124,7 +2182,8 @@ rm_menu::rm_menu(rm_widget* p_parent, int height, const char* pname) :
   }
   else {
     /* */
-
+    rm_menu *parent_menu = static_cast<rm_menu*>(p_parent);
+    m_proot_menu = parent_menu->m_proot_menu;
   }
 }
 
@@ -2343,6 +2402,91 @@ bool rm_switch::on_mouse(RM_MOUSE_EVENT event, RM_KEY key, RM_KEY_STATE state, r
     if (is_valid_callback())
       get_callback()(this);
 
+    return false;
+  }
+  return true;
+}
+
+rm_listview::rm_listview(rm_widget* parent, int x, int y, int width, int height, rm_listview_style* pstyle, rm_listview_cb cb) : 
+  rm_widget(x, y, width, height, parent, "ui_listview", RM_FLAG_DEFAULT|RM_FLAG_GLOBAL), m_hover_index((size_t)-1), m_selected_index((size_t)-1)
+{
+  set_style(pstyle);
+  set_callback(cb);
+  assert(pstyle && "style must not be null");
+}
+
+void rm_listview::add_item(const std::string& text)
+{
+  m_items.push_back(text);
+  float h = m_items.size() * get_style()->get_row_height();
+  resize({ m_size.x, h });
+}
+
+void rm_listview::clear_items()
+{
+  m_items.clear();
+  m_hover_index = m_selected_index = (size_t)-1;
+  resize({ m_size.x, 0.f });
+}
+
+void rm_listview::on_draw(NVGcontext* pctx)
+{
+  rm_listview_style& style = *get_style();
+  /* draw background */
+  nvgBeginPath(pctx);
+  nvgRect(pctx, 0, 0, m_size.x, m_size.y);
+  nvgFillColor(pctx, style.get_background_color());
+  nvgFill(pctx);
+
+  /* draw items */
+  nvgFontFaceId(pctx, get_font());
+  nvgFontSize(pctx, style.get_font_size());
+  nvgTextAlign(pctx, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+
+  float row_h = style.get_row_height();
+  float pad = style.get_text_padding();
+  for (size_t i = 0; i < m_items.size(); ++i) {
+    float y0 = i * row_h;
+    /* background for hover/selected */
+    if (i == m_selected_index) {
+      nvgBeginPath(pctx);
+      nvgRect(pctx, 0, y0, m_size.x, row_h);
+      nvgFillColor(pctx, style.get_selected_color());
+      nvgFill(pctx);
+    }
+    else if (i == m_hover_index) {
+      nvgBeginPath(pctx);
+      nvgRect(pctx, 0, y0, m_size.x, row_h);
+      nvgFillColor(pctx, style.get_hover_color());
+      nvgFill(pctx);
+    }
+    nvgFillColor(pctx, style.get_text_color());
+    nvgText(pctx, pad, y0 + row_h * 0.5f,
+      m_items[i].c_str(), nullptr);
+  }
+
+  rm_widget::on_draw(pctx);
+}
+
+bool rm_listview::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+{
+  rm_listview_style& style = *get_style();
+  rm_vec2 local = cursor_to_local(cursor_pos);
+  float row_h = style.get_row_height();
+  size_t idx = size_t(local.y / row_h);
+  if (local.x < 0 || local.x > m_size.x || idx >= m_items.size()) {
+    m_hover_index = (size_t)-1;
+  }
+  else {
+    m_hover_index = idx;
+  }
+
+  if (event == RM_MOUSE_EVENT_CLICK && state == DOWN) {
+    if (m_hover_index < m_items.size()) {
+      m_selected_index = m_hover_index;
+      if (is_valid_callback())
+        get_callback()(this, m_selected_index);
+    }
     return false;
   }
   return true;
