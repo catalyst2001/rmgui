@@ -379,7 +379,7 @@ void rm_window::on_draw(NVGcontext* pctx)
 {
   rm_window_style* p_style = get_style();
   assert(p_style && "rmgui_window::on_draw(): window style is not set! Use rmgui_window::set_style(rmgui_wi1ndow_style *)");
-  int b_is_active = (int)(get_elem_flags().is_focused() || get_elem_flags().is_hovered());
+  int b_is_active = (int)((get_elem_flags().is_focused() || get_elem_flags().is_hovered() || (m_flags & FL_DRAG)));
 
   rm_vec2 pos(0.f, 0.f);
   NVGcolor shadow_color = nvgRGBA(0, 0, 0, 63);
@@ -402,29 +402,27 @@ bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm
   rm_vec2 local = cursor_to_local(cursor_pos);
   if (event == RM_MOUSE_EVENT_CLICK) {
     if (rm_bbox(start, rm_vec2(m_size.x, drag_height)).inside(local)) {
-      if (!m_dragging && state == DOWN) {
-        m_dragging = true;
+      if (!(m_flags & FL_DRAG) && state == DOWN) {
+        m_flags |= FL_DRAG;
       }
     }
 
-    if (m_dragging && state == UP) {
-      m_dragging = false;
+    if ((m_flags & FL_DRAG) && state == UP) {
+      m_flags &= ~FL_DRAG;
       return true;
     }
   }
 
-  if(m_dragging) {
-    printf("m_dragging = %d\n", (int)m_dragging);
+  if(m_flags & FL_DRAG) {
+    printf("m_dragging = %d\n", (int)!!(m_flags & FL_DRAG));
     move_relative(delta);
   }
   return true;
 }
 
 rm_window::rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags, uint32_t uflags, void* p_userptr) :
-  rm_widget(x, y, width, height, p_parent, "ui_window", flags, uflags, p_userptr)
+  rm_widget(x, y, width, height, p_parent, "ui_window", flags, uflags, p_userptr), m_flags(FL_NONE), m_pstyle(nullptr)
 {
-  m_dragging = 0;
-  set_style(nullptr);
   set_zindex(-1);
 }
 

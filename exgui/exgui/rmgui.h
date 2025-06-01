@@ -1049,11 +1049,22 @@ enum RM_ORIENT : uint32_t {
   RM_ORIENT_VERT
 };
 
+enum rm_window_flags : uint32_t {
+  WCF_NONE = 0,
+  WCF_VRESIZE=1<<0,
+  WCF_HRESIZE=1<<1,
+};
+
 class rm_window : public rm_widget, public rm_styled<rm_window_style>
 {
-  rm_window_style        *m_pstyle;
+  enum {
+    FL_NONE=0,
+    FL_DRAG=1<<0,
+    FL_RESIZE=1<<1
+  };
+  uint32_t                m_flags;
   std::vector<rm_widget*> m_top_widgets;
-  bool                    m_dragging;
+  rm_window_style        *m_pstyle;
 
   /* paint window background */
   virtual void on_draw(NVGcontext* pctx);
