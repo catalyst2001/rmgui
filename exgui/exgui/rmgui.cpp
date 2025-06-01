@@ -16,11 +16,9 @@ void rm_widget::move_childs_relative(rm_widget* pwidget, rm_vec2 deltapos)
 void rm_widget::move_to(rm_widget* proot_widget, rm_vec2 newpos)
 {
   assert(proot_widget && "proot_widget was nullptr");
-  /* compute delta for moving childs */
-  rm_vec2 delta = newpos - proot_widget->m_pos_of_parent;
-  /* set pos of parent to root node */
-  proot_widget->m_pos_of_parent = delta;
-  /* relative move childs */
+  rm_vec2 oldpos = proot_widget->m_pos_of_parent;
+  rm_vec2 delta = newpos - oldpos;
+  proot_widget->m_pos_of_parent = newpos;
   move_childs_relative(proot_widget, delta);
 }
 
@@ -99,9 +97,9 @@ void rm_widget::set_parent(rm_widget* p_parent)
 
 void rm_widget::resize(float width, float height)
 {
-  rm_vec2 start(0.f, 0.f);
+  //rm_vec2 start(0.f, 0.f);
   m_size.init(width, height);
-  m_bbox.init(start, m_size);
+  m_bbox.init(m_pos_of_parent, m_size);
 }
 
 void rm_surface::keybd_dispatcher(rm_widget* p_elem, int sc, RM_KEY vk, RM_KEY_STATE state)
