@@ -557,6 +557,75 @@ public:
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) = 0;
 };
 
+/**
+* layout interface
+*/
+class irm_layout
+{
+public:
+  /**
+  * @brief performs measurements and pre-calculations
+  * of positioning depending on the selected mode (defined by the class implementer)
+  */
+  virtual bool measure(rm_widget* pwidget) = 0;
+
+  /**
+  * @brief performs the arrangement of elements
+  * taking into account previously taken measurements
+  *
+  */
+  virtual bool perform(rm_widget* pwidget, rm_vec2 old_size) = 0;
+
+  /**
+  * @brief resets previously calculated positions
+  */
+  virtual bool reset(rm_widget* pwidget) = 0;
+};
+
+/**
+* basic layout properties for any widget
+*/
+class rm_basic_layout_props
+{
+  rm_vec2 m_min_size;
+  rm_vec2 m_max_size;
+protected:
+  rm_basic_layout_props() :
+    m_min_size(0.f, 0.f), m_max_size(0.f, 0.f) {}
+
+  inline void init(rm_vec2 size) {
+    m_min_size = size;
+    m_max_size = size;
+  }
+public:
+  inline void set_min_size(rm_vec2 size) { m_min_size = size; }
+  inline void set_max_size(rm_vec2 size) { m_max_size = size; }
+  inline const rm_vec2& get_min_size() { return m_min_size; }
+  inline const rm_vec2& get_max_size() { return m_max_size; }
+};
+
+/**
+* flex box layout
+*/
+class rm_flexbox_layout : public irm_layout
+{
+public:
+  bool measure(rm_widget* pwidget) override;
+  bool perform(rm_widget* pwidget, rm_vec2 old_size) override;
+  bool reset(rm_widget* pwidget) override;
+};
+
+/**
+* grid layout
+*/
+class rm_grid_layout : public irm_layout
+{
+public:
+  bool measure(rm_widget* pwidget) override;
+  bool perform(rm_widget* pwidget, rm_vec2 old_size) override;
+  bool reset(rm_widget* pwidget) override;
+};
+
 enum RM_CORNER : uint32_t {
   LEFT_TOP = 0,
   RIGHT_TOP,
@@ -606,16 +675,10 @@ class rm_utl
 public:
 
   /**
-  * draw_border_frame
-  * 
   * draws border frame
-  * 
   * modes:
   * RM_BFRM_MODE_RAISED
   * RM_BFRM_MODE_SUNKEN
-  * 
-  * 
-  * 
   */
   enum {
     RM_BFRM_MODE_SUNKEN = 0,
@@ -667,7 +730,7 @@ public:
 */
 class rm_surface;
 
-class rm_widget : protected irmgui_widget
+class rm_widget : protected irmgui_widget, public rm_basic_layout_props
 {
   /* allow rmgui_root class to call irmgui_element vmethods */
   friend class rm_surface;
