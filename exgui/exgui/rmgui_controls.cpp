@@ -1952,6 +1952,7 @@ rm_menu* rm_menu::create_submenu(const char* pname,
   pmenu->m_flags = MF_NONE;
   pmenu->m_menuid = menuid;
   pmenu->m_itemid = itemid;
+  
   /* noname == menu separator */
   if (!pname)
     pmenu->m_flags |= MF_SEPARATOR;
@@ -1960,7 +1961,7 @@ rm_menu* rm_menu::create_submenu(const char* pname,
     m_max_text_width = recompute_text_width();
     resize(m_max_text_width, m_size.y);
   }
-
+  m_proot_menu->hide_all_submenus_except(nullptr);
   return pmenu;
 }
 
@@ -2011,6 +2012,9 @@ uint32_t rm_menu::detect_my_level(rm_widget* pparent)
   return depth;
 }
 
+//TODO: K.D. add this to styles
+constexpr float menu_text_pad = 5.f;
+
 void rm_menu::on_draw(NVGcontext* pctx)
 {
   rm_vec2  pos;
@@ -2031,11 +2035,10 @@ void rm_menu::on_draw(NVGcontext* pctx)
     nvgFill(pctx);
     nvgFontFaceId(pctx, get_font());
     nvgTextAlign(pctx, NVG_ALIGN_MIDDLE);
-    constexpr float padding = 10.f;
     for (size_t i = 0; i < num_submenus; i++) {
       pmenu_item = get_submenu(i);
       assert(pmenu_item && "pmenu_item was nullptr!");
-      item_width = padding + pmenu_item->m_text_width;
+      item_width = menu_text_pad + pmenu_item->m_text_width + menu_text_pad;
       if (pmenu_item->is_navigated()) {
         nvgBeginPath(pctx);
         nvgFillColor(pctx, rm_color(180, 180, 180));
@@ -2045,7 +2048,7 @@ void rm_menu::on_draw(NVGcontext* pctx)
 
       nvgFillColor(pctx, rm_color(255, 255, 255));
       nvgText(pctx,
-        pos.x + padding,
+        menu_text_pad + pos.x,
         pos.y + half_height,
         pmenu_item->m_text.c_str(),
         nullptr);
@@ -2053,12 +2056,7 @@ void rm_menu::on_draw(NVGcontext* pctx)
     }
   }
   else {
- /*   static bool b = false;
-    if (!b) {
-      b = true;
-      move({ 600, 200 });
-    }*/
-
+    //printf("popup pos of parent: %f %f\n", m_pos_of_parent.x, m_pos_of_parent.y);
     /* draw popup menu */
     nvgBeginPath(pctx);
     nvgFillColor(pctx, rm_color(120, 120, 120));
@@ -2080,7 +2078,7 @@ void rm_menu::on_draw(NVGcontext* pctx)
       nvgFontFaceId(pctx, get_font());
       nvgTextAlign(pctx, NVG_ALIGN_MIDDLE);
       nvgFillColor(pctx, rm_color(255, 255, 255));
-      nvgText(pctx, pos.x, pos.y + half_height, m_text.c_str(), nullptr);
+      nvgText(pctx, pos.x, pos.y + half_height, pmenu_item->m_text.c_str(), nullptr);
       pos.y += 25.f;
     }
   }
@@ -2090,60 +2088,56 @@ void rm_menu::on_draw(NVGcontext* pctx)
 bool rm_menu::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
 {
   /* handle root */
+  rm_vec2 pos;
+  float   item_width;
   rm_vec2 local = cursor_to_local(cursor_pos);
-
-  constexpr float padding = 10.f;
-
-  if (!m_level) {
-    float header_h = m_size.y;
-    if (event == RM_MOUSE_EVENT_MOVE) {
-      if (local.y >= 0 && local.y < header_h) {
-        float x = 0;
-        for (size_t i = 0; i < get_num_submenus(); ++i) {
-          auto* itm = get_submenu(i);
-          float w = padding + itm->m_text_width;
-          if (local.x >= x && local.x < x + w) itm->m_flags |= MF_NAVIGATED;
-          else itm->m_flags &= ~MF_NAVIGATED;
-          x += w;
+  if (m_bbox.inside(cursor_pos) && state == DOWN) {
+    if (!m_level) {
+      /* handle root menu */
+      for (size_t i = 0; i < get_num_submenus(); i++) {
+        rm_menu* psubmenu = get_submenu(i);
+        item_width = menu_text_pad + psubmenu->m_text_width + menu_text_pad;
+        bool in_submenu = pos.x <= local.x && local.x < pos.x + item_width;
+        if (event == RM_MOUSE_EVENT_MOVE) {
+          psubmenu->set_navigated(in_submenu);
         }
-      }
-      else {
-        for (size_t i = 0; i < get_num_submenus(); ++i)
-          get_submenu(i)->m_flags &= ~MF_NAVIGATED;
-      }
-      return true;
-    }
-    if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
-      float x = 0;
-      for (size_t i = 0; i < get_num_submenus(); ++i) {
-        auto* itm = get_submenu(i);
-        float w = padding + itm->m_text_width;
-        if (local.x >= x && local.x < x + w) {
-          for (size_t j = 0; j < get_num_submenus(); ++j)
-            get_submenu(j)->m_flags &= ~MF_NAVIGATED;
-          itm->m_flags |= MF_NAVIGATED;
-          itm->move({ x, header_h });
-          break;
+        else if (event == RM_MOUSE_EVENT_CLICK && in_submenu) {
+          //printf("%f %f   STATE: %d\n", pos.x, m_size.y, (int)in_submenu);
+          if (!psubmenu->is_visible()) {
+            psubmenu->move({ pos.x, m_size.y });
+            hide_all_submenus_except(psubmenu);
+          }
+          else {
+            psubmenu->hide();
+          }
         }
-        x += w;
+        if(event == RM_MOUSE_EVENT_CLICK && state == UP) {
+ 
+        }
+        pos.x += item_width;
       }
       return false;
     }
-    return true;
-  }
+    else {
+      /* handle child menu */
 
-  if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(cursor_pos)) {
-    size_t idx = size_t(local.y / m_size.y);
-    if (idx < get_num_submenus()) {
-      auto* itm = get_submenu(idx);
-      if (!(itm->m_flags & MF_SEPARATOR) && is_valid_callback())
-        get_callback()(m_proot_menu, m_menuid, itm->m_itemid);
+      return false;
     }
-    for (size_t i = 0; i < m_proot_menu->get_num_submenus(); ++i)
-      m_proot_menu->get_submenu(i)->m_flags &= ~MF_NAVIGATED;
-    return false;
   }
+  else if(!m_bbox.inside(cursor_pos)){
+    for (size_t i = 0; i < get_num_submenus(); i++) {
+      rm_menu* psubmenu = get_submenu(i);
+      psubmenu->set_navigated(false);
+      if (event == RM_MOUSE_EVENT_CLICK && state == DOWN) {
+        //hide_all_submenus_except(psubmenu);
+        psubmenu->hide();
+      }
 
+    }
+  }
+  
+
+  //hide_all_submenus_except
   return true;
 }
 
@@ -2161,6 +2155,16 @@ float rm_menu::recompute_text_width()
     width = rm_max(width, pmenu->m_text_width);
   }
   return width;
+}
+
+void rm_menu::hide_all_submenus_except(rm_menu* psubmenu)
+{
+  rm_menu* pmenu;
+  for (size_t i = 0; i < get_num_submenus(); i++) {
+    pmenu = get_submenu(i);
+    assert(pmenu && "pmenu was nullptr");
+    pmenu->show(pmenu == psubmenu);
+  }
 }
 
 rm_menu::rm_menu(rm_widget* p_parent, int height, const char* pname) :
@@ -2182,6 +2186,7 @@ rm_menu::rm_menu(rm_widget* p_parent, int height, const char* pname) :
   }
   else {
     /* */
+    //m_elem_flags.set_bit(RM_FLAG_HIGHEST_PRIORITY);
     rm_menu *parent_menu = static_cast<rm_menu*>(p_parent);
     m_proot_menu = parent_menu->m_proot_menu;
   }
@@ -2408,7 +2413,8 @@ bool rm_switch::on_mouse(RM_MOUSE_EVENT event, RM_KEY key, RM_KEY_STATE state, r
 }
 
 rm_listview::rm_listview(rm_widget* parent, int x, int y, int width, int height, rm_listview_style* pstyle, rm_listview_cb cb) : 
-  rm_widget(x, y, width, height, parent, "ui_listview", RM_FLAG_DEFAULT|RM_FLAG_GLOBAL), m_hover_index((size_t)-1), m_selected_index((size_t)-1)
+  rm_widget(x, y, width, height, parent, "ui_listview", RM_FLAG_DEFAULT|RM_FLAG_GLOBAL), 
+  m_hover_index((size_t)-1), m_selected_index((size_t)-1)
 {
   set_style(pstyle);
   set_callback(cb);
@@ -2482,10 +2488,15 @@ bool rm_listview::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, 
   }
 
   if (event == RM_MOUSE_EVENT_CLICK && state == DOWN) {
-    if (m_hover_index < m_items.size()) {
-      m_selected_index = m_hover_index;
-      if (is_valid_callback())
-        get_callback()(this, m_selected_index);
+    if (m_bbox.inside(cursor_pos)) {
+      if (m_hover_index < m_items.size()) {
+        m_selected_index = m_hover_index;
+        if (is_valid_callback())
+          get_callback()(this, m_selected_index);
+      }
+    }
+    else {
+      m_selected_index = (size_t)-1;
     }
     return false;
   }

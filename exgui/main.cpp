@@ -508,7 +508,7 @@ void example_widgets(rm_surface* gui)
   tabstyle.set_tab_corners_radius(2.f);
   tabstyle.set_tab_up_offsets({ 0.f, 0.f });
 
-  rm_tabcontrol_ex* ptabctl = new rm_tabcontrol_ex(gui, 0, 25, 800, 600, TCF_NONE, TC_DEFAULT, &tabstyle);
+  rm_tabcontrol_ex* ptabctl = new rm_tabcontrol_ex(gui, 0, 105, 800, 600, TCF_NONE, TC_DEFAULT, &tabstyle);
   tc::tab* ptab01 = ptabctl->add_tab("Main page", 0, 10);
 
   static rm_window_style wstyle;

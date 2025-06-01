@@ -1043,8 +1043,12 @@ private:
   bool     on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 
   inline bool is_navigated() const { return m_flags & MF_NAVIGATED; }
+  inline void set_navigated(bool b=true) {
+    m_flags = (b) ? (m_flags | MF_NAVIGATED) : (m_flags & ~MF_NAVIGATED);
+  }
   bool  add_submenu(rm_menu* pmenu);
   float recompute_text_width();
+  void  hide_all_submenus_except(rm_menu *psubmenu);
 public:
   rm_menu(rm_widget* p_parent, int height, const char *pname);
   /* delete methods */
@@ -1305,6 +1309,8 @@ class rm_listview : public rm_widget, public rm_styled<rm_listview_style>, publi
   size_t m_hover_index;
   size_t m_selected_index;
 
+  virtual void on_draw(NVGcontext* pctx) override;
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
   rm_listview(rm_widget* parent, int x, int y, int width, int height, rm_listview_style* pstyle, rm_listview_cb cb = nullptr);
   ~rm_listview() {};
@@ -1315,7 +1321,4 @@ public:
   float get_item_height() const { return m_pstyle->get_row_height(); }
   size_t get_selected_index() const { return m_selected_index; }
   std::vector<std::string> get_items() const { return m_items; }
-
-  virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 };
