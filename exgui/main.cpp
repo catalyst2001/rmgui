@@ -486,14 +486,16 @@ void example_widgets(rm_surface* gui)
 
   rm_menu* pmenu = new rm_menu(gui, 20, "");
   rm_menu* psubmenu0 = pmenu->create_submenu("File", 0, 0);
+  pmenu->create_submenu("Settings", 1, 0);
+  pmenu->create_submenu("Elements", 2, 0);
+  pmenu->create_submenu("Control", 3, 0);
+
   psubmenu0->add_item("Open project", 0);
   psubmenu0->add_item("Close project", 0);
   psubmenu0->add_separator();
   psubmenu0->add_item("Create project", 0);
 
-  pmenu->create_submenu("Settings", 1, 0);
-  pmenu->create_submenu("Elements", 2, 0);
-  pmenu->create_submenu("Control", 3, 0);
+
 
 
   static rm_tabcontrol_ex_style tabstyle;

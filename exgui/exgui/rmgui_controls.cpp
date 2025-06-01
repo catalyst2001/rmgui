@@ -2056,7 +2056,6 @@ void rm_menu::on_draw(NVGcontext* pctx)
     }
   }
   else {
-    //printf("popup pos of parent: %f %f\n", m_pos_of_parent.x, m_pos_of_parent.y);
     /* draw popup menu */
     nvgBeginPath(pctx);
     nvgFillColor(pctx, rm_color(120, 120, 120));
@@ -2091,53 +2090,58 @@ bool rm_menu::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_v
   rm_vec2 pos;
   float   item_width;
   rm_vec2 local = cursor_to_local(cursor_pos);
-  if (m_bbox.inside(cursor_pos) && state == DOWN) {
-    if (!m_level) {
-      /* handle root menu */
-      for (size_t i = 0; i < get_num_submenus(); i++) {
-        rm_menu* psubmenu = get_submenu(i);
-        item_width = menu_text_pad + psubmenu->m_text_width + menu_text_pad;
-        bool in_submenu = pos.x <= local.x && local.x < pos.x + item_width;
-        if (event == RM_MOUSE_EVENT_MOVE) {
-          psubmenu->set_navigated(in_submenu);
-        }
-        else if (event == RM_MOUSE_EVENT_CLICK && in_submenu) {
-          //printf("%f %f   STATE: %d\n", pos.x, m_size.y, (int)in_submenu);
-          if (!psubmenu->is_visible()) {
-            psubmenu->move({ pos.x, m_size.y });
-            hide_all_submenus_except(psubmenu);
-          }
-          else {
-            psubmenu->hide();
-          }
-        }
-        if(event == RM_MOUSE_EVENT_CLICK && state == UP) {
- 
-        }
-        pos.x += item_width;
-      }
-      return false;
-    }
-    else {
-      /* handle child menu */
+  rm_menu* psubmenu;
+  if (m_bbox.inside(cursor_pos)) {
+    if (state == DOWN) {
+      if (!m_level) {
+        /* handle root menu */
+        for (size_t i = 0; i < get_num_submenus(); i++) {
+          psubmenu = get_submenu(i);
+          item_width = menu_text_pad + psubmenu->m_text_width + menu_text_pad;
+          bool over_header = (local.y >= 0 && local.y < m_size.y &&
+            local.x >= 0.f && local.x < 0.f + item_width);
+          bool in_submenu = pos.x <= local.x && local.x < pos.x + item_width;
+          if (event == RM_MOUSE_EVENT_MOVE) {
+            if (!over_header)// нужно что бы для каждого так работало, щас ток для первого File (короче это должно быть не скрытие, а открытие след меню при условии если меню какое либо уже открыто посмотри у визуалки как)
+              psubmenu->hide();
 
-      return false;
+            if (psubmenu->is_visible() && !over_header) {
+              psubmenu->show();
+            }
+
+            psubmenu->set_navigated(in_submenu);
+          }
+          else if (event == RM_MOUSE_EVENT_CLICK && in_submenu) {
+            if (!psubmenu->is_visible()) {
+              psubmenu->move({ pos.x, m_size.y });
+              hide_all_submenus_except(psubmenu);
+            }
+            else {
+              psubmenu->hide();
+            }
+          }
+
+          pos.x += item_width;
+        }
+        return false;
+      }
+      else {
+        /* handle child menu */
+
+        return false;
+      }
     }
   }
-  else if(!m_bbox.inside(cursor_pos)){
+  else {
     for (size_t i = 0; i < get_num_submenus(); i++) {
-      rm_menu* psubmenu = get_submenu(i);
+      psubmenu = get_submenu(i);
       psubmenu->set_navigated(false);
-      if (event == RM_MOUSE_EVENT_CLICK && state == DOWN) {
-        //hide_all_submenus_except(psubmenu);
-        psubmenu->hide();
-      }
 
+      if (event == RM_MOUSE_EVENT_CLICK && state == UP)
+        psubmenu->hide();
     }
   }
-  
 
-  //hide_all_submenus_except
   return true;
 }
 

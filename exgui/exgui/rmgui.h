@@ -529,7 +529,7 @@ public:
 };
 
 /**
-* GUI element abstract class
+* GUI element interface
 */
 class irmgui_widget
 {
