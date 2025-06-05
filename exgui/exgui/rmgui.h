@@ -126,6 +126,7 @@ class rm_rect
 {
 public:
   union {
+    struct { float left, top, right, bottom; };
     struct { float x, y, width, height; };
     struct { float v[4]; };
   };
@@ -574,7 +575,7 @@ public:
   * taking into account previously taken measurements
   *
   */
-  virtual bool perform(rm_widget* pwidget, rm_vec2 old_size) = 0;
+  virtual bool perform(rm_widget* pwidget) = 0;
 
   /**
   * @brief resets previously calculated positions
@@ -607,24 +608,126 @@ public:
 /**
 * flex box layout
 */
-class rm_flexbox_layout : public irm_layout
-{
+enum class rm_flex_direction : uint32_t {
+  Row,
+  RowReverse,
+  Column,
+  ColumnReverse
+};
+
+enum class rm_flex_wrap : uint32_t {
+  NoWrap,
+  Wrap,
+  WrapReverse
+};
+
+enum class rm_flex_justify : uint32_t {
+  FlexStart,
+  Center,
+  FlexEnd,
+  SpaceBetween,
+  SpaceAround,
+  SpaceEvenly
+};
+
+enum class rm_flex_align : uint32_t {
+  Auto,
+  FlexStart,
+  Center,
+  FlexEnd,
+  Stretch,
+  Baseline,
+  SpaceBetween,
+  SpaceAround
+};
+
+enum class rm_flex_fill : uint32_t {
+  None = 0,
+  Fill
+};
+
+class rm_flexbox_layout : public irm_layout {
+  rm_flex_direction m_dir;
+  rm_flex_wrap      m_wrap;
+  rm_flex_justify   m_justify;
+  rm_flex_align     m_align_items;
+  rm_flex_align     m_align_content;
+  rm_flex_fill      m_fill_x;
+  rm_flex_fill      m_fill_y;
+  rm_rect           m_padding;
+  rm_rect           m_margin;
+  float             m_gap_main;
+  float             m_gap_cross;
+  float             m_min_size; //main axis size (0.f - unlimited)
+  float             m_max_size; //main axis size (0.f - unlimited)
 public:
+  rm_flexbox_layout(rm_flex_direction dir = rm_flex_direction::Row,
+    rm_flex_wrap wrap = rm_flex_wrap::NoWrap,
+    rm_flex_justify justify = rm_flex_justify::FlexStart,
+    rm_flex_align align_items = rm_flex_align::Center,
+    rm_flex_align align_content = rm_flex_align::FlexStart,
+    rm_flex_fill fillx = rm_flex_fill::None,
+    rm_flex_fill filly = rm_flex_fill::None,
+    rm_rect padding = rm_rect(10.f, 10.f, 10.f, 10.f),
+    rm_rect margin = rm_rect(10.f, 10.f, 10.f, 10.f),
+    float gap_main = 10.f,
+    float gap_cross = 10.f,
+    float min_size = 0.f,
+    float max_size = 0.f
+  );
+
+  inline void set_dir(rm_flex_direction param) { m_dir = param; }
+  inline void set_wrap(rm_flex_wrap param) { m_wrap = param; }
+  inline void set_justify(rm_flex_justify param) { m_justify = param; }
+  inline void set_align_items(rm_flex_align param) { m_align_items = param; }
+  inline void set_align_content(rm_flex_align param) { m_align_content = param; }
+  inline void set_fill_x(rm_flex_fill param) { m_fill_x = param; }
+  inline void set_fill_y(rm_flex_fill param) { m_fill_y = param; }
+  inline void set_paddings(rm_rect pad) { m_padding = pad; }
+  inline void set_padding_left(float pad) { m_padding.left = pad; }
+  inline void set_padding_top(float pad) { m_padding.top = pad; }
+  inline void set_padding_right(float pad) { m_padding.right = pad; }
+  inline void set_padding_bottom(float pad) { m_padding.bottom = pad; }
+  inline void set_margins(rm_rect margin) { m_margin = margin; }
+  inline void set_margin_left(float margin) { m_margin.left = margin; }
+  inline void set_margin_top(float margin) { m_margin.top = margin; }
+  inline void set_margin_right(float margin) { m_margin.right = margin; }
+  inline void set_margin_bottom(float margin) { m_margin.bottom = margin; }
+  inline void set_gap_main(float gap) { m_gap_main = gap; }
+  inline void set_gap_cross(float gap) { m_gap_cross = gap; }
+  inline void set_min_size(float minsize) { m_min_size = minsize; }
+  inline void set_max_size(float maxsize) { m_max_size = maxsize; }
+
+  inline rm_flex_direction get_dir() { return m_dir; }
+  inline rm_flex_wrap      get_wrap() { return m_wrap; }
+  inline rm_flex_justify   get_justify() { return m_justify; }
+  inline rm_flex_align     get_align_items() { return m_align_items; }
+  inline rm_flex_align     get_align_content() { return m_align_content; }
+  inline rm_flex_fill      get_fill_x() { return m_fill_x; }
+  inline rm_flex_fill      get_fill_y() { return m_fill_y; }
+  inline const rm_rect    &get_paddings() const { return m_padding; }
+  inline const rm_rect    &get_margins() const { return m_margin; }
+  inline float             get_gap_main() { return m_gap_main; }
+  inline float             get_gap_cross() { return m_gap_cross; }
+  inline float             get_min_size() { return m_min_size; }
+  inline float             get_max_size() { return m_max_size; }
+
+  /* interface impl */
   bool measure(rm_widget* pwidget) override;
-  bool perform(rm_widget* pwidget, rm_vec2 old_size) override;
+  bool perform(rm_widget* pwidget) override;
   bool reset(rm_widget* pwidget) override;
 };
 
 /**
 * grid layout
 */
-class rm_grid_layout : public irm_layout
-{
-public:
-  bool measure(rm_widget* pwidget) override;
-  bool perform(rm_widget* pwidget, rm_vec2 old_size) override;
-  bool reset(rm_widget* pwidget) override;
-};
+//class rm_grid_layout : public irm_layout
+//{
+//public:
+//  bool measure(rm_widget* pwidget) override;
+//  bool perform(rm_widget* pwidget, rm_vec2 old_size) override;
+//  bool reset(rm_widget* pwidget) override;
+//};
 
 enum RM_CORNER : uint32_t {
   LEFT_TOP = 0,
@@ -779,6 +882,7 @@ protected:
   rm_widget       *m_pparent;
   void            *m_puserptr;
   irm_sysdf       *m_psysdf;
+  irm_layout      *m_playout;
   rmgui_flags_elem m_elem_flags;
   uint32_t         m_user_flags;
   rm_font          m_font;
@@ -787,7 +891,7 @@ protected:
   rm_vec2          m_size; //width;height
   rm_vec2          m_pos_of_parent;
   rm_rect          m_content_area;
-  int              m_zindex;
+  //int              m_zindex;
 
   ///* rmgui_root::rebuild_draw_cache accessor class */
   //class rmgui_root_update_acessor : public rmgui_root {
@@ -823,7 +927,7 @@ public:
 
   rm_widget(int x, int y, int width, int height, rm_widget *p_parent, const char *p_classname,
     uint32_t flags = RM_FLAG_DEFAULT, uint32_t uflags = 0, void *p_userptr = nullptr) : m_proot(nullptr),
-    m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_zindex(0) {
+    m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_playout(nullptr)/*, m_zindex(0)*/ {
     rm_vec2 parent_coord;
     if (m_pparent) {
       parent_coord = m_pparent->get_pos_of_parent();
@@ -844,6 +948,11 @@ public:
     set_classname(p_classname);
   }
   ~rm_widget() {}
+
+  /* layouts */
+  inline void        set_layout(irm_layout* playout) { m_playout = playout; }
+  inline irm_layout* get_layout() { return m_playout; }
+  bool               perform_layout();
 
   inline const char *get_classname() { return m_szclass; }
   inline void       *get_userptr() { return m_puserptr; }
@@ -892,10 +1001,11 @@ public:
   inline rm_font     get_font() { return m_font; }
 
   /* layers */
-  inline void        set_zindex(int zidx) { m_zindex = zidx; }
-  inline int         get_zindex() const { return m_zindex; }
+  //TODO: K.D. [Okay+++] layers not used now! remove this later?
+  inline void        set_zindex(int zidx) { /*m_zindex = zidx;*/ }
+  inline int         get_zindex() const { return /*m_zindex*/0; }
 
-  void resize(float width, float height);
+  void        resize(float width, float height);
   inline void resize(rm_vec2 newsize) { resize(newsize.x, newsize.y); }
 
   void move(int newx, int newy) { move_to(this, { newx, newy }); }
@@ -982,13 +1092,10 @@ public:
     m_curr_time = current_time;
     m_next_time = m_curr_time + m_interval;
   }
-
   void  set_interval(float f) { m_interval = f; }
   float get_interval() { return m_interval; }
-
-  bool has_elapsed(irm_sysdf* p_sysdf);
-
-  void reset(irm_sysdf* p_sysdf) { m_curr_time = p_sysdf->get_time(); m_next_time = m_curr_time + m_interval; }
+  bool  has_elapsed(irm_sysdf* p_sysdf);
+  void  reset(irm_sysdf* p_sysdf) { m_curr_time = p_sysdf->get_time(); m_next_time = m_curr_time + m_interval; }
 };
 
 /**
@@ -1193,8 +1300,8 @@ void rm_construct(_class& obj, _args... args) {
 }
 
 template<class _class>
-void rm_destruct(_class& obj) {
-  _class::operator delete(&obj);
+void rm_destruct(_class *pobj) {
+  pobj->~_class();
 }
 
 class rm_string_tokenizer
@@ -1210,6 +1317,7 @@ public:
   inline bool next_token() { return m_next_token_available; }
 };
 
+//BUGBUG: K.D. new lines are added with indentation in "m_num_output_lines"
 class rm_line_ring_buffer
 {
 public:

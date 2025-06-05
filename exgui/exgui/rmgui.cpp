@@ -9,6 +9,7 @@ void rm_widget::move_childs_relative(rm_widget* pwidget, rm_vec2 deltapos)
     rm_widget* pchild = pwidget->get_child(i);
     assert(pchild && "pchild was nullptr");
     pchild->m_pos_of_parent += deltapos;
+    pchild->m_bbox.init(pchild->m_pos_of_parent, pchild->m_size);
     move_childs_relative(pchild, deltapos);
   }
 }
@@ -19,6 +20,7 @@ void rm_widget::move_to(rm_widget* proot_widget, rm_vec2 newpos)
   rm_vec2 oldpos = proot_widget->m_pos_of_parent;
   rm_vec2 delta = newpos - oldpos;
   proot_widget->m_pos_of_parent = newpos;
+  proot_widget->m_bbox.init(proot_widget->m_pos_of_parent, proot_widget->m_size);
   move_childs_relative(proot_widget, delta);
 }
 
@@ -26,6 +28,20 @@ void rm_widget::move_relative(rm_vec2& delta)
 {
   m_pos_of_parent += delta;
   m_bbox.init(m_pos_of_parent, m_size);
+}
+
+bool rm_widget::perform_layout()
+{
+  /* layout attached? */
+  if (m_playout) {
+    /* try measure */
+    if (m_playout->measure(this)) {
+      /* perform layout */
+      return m_playout->perform(this);
+    }
+  }
+  /* layout not attached or measure or perform failed */
+  return false;
 }
 
 bool rm_widget::add_child(rm_widget* p_child)
@@ -100,6 +116,8 @@ void rm_widget::resize(float width, float height)
   //rm_vec2 start(0.f, 0.f);
   m_size.init(width, height);
   m_bbox.init(m_pos_of_parent, m_size);
+  m_content_area.init(0.f, 0.f, m_size.x, m_size.y); //TODO: K.D. check this later
+  perform_layout();
 }
 
 void rm_surface::keybd_dispatcher(rm_widget* p_elem, int sc, RM_KEY vk, RM_KEY_STATE state)
@@ -412,7 +430,7 @@ bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm
   }
 
   if(m_flags & FL_DRAG) {
-    printf("m_dragging = %d\n", (int)!!(m_flags & FL_DRAG));
+    //printf("m_dragging = %d\n", (int)!!(m_flags & FL_DRAG));
     move_relative(delta);
   }
   return true;
@@ -964,4 +982,278 @@ void rm_utl::draw_edge(NVGcontext* pctx, rm_vec2 pos, rm_vec2& size,
     pcstyle->get_bottom_right(),
     pcstyle->get_bottom_left());
   nvgStroke(pctx);
+}
+
+rm_flexbox_layout::rm_flexbox_layout(rm_flex_direction dir,
+  rm_flex_wrap wrap,
+  rm_flex_justify justify,
+  rm_flex_align align_items,
+  rm_flex_align align_content,
+  rm_flex_fill fillx,
+  rm_flex_fill filly,
+  rm_rect padding,
+  rm_rect margin,
+  float gap_main,
+  float gap_cross,
+  float min_size,
+  float max_size) :
+  m_dir(dir),
+  m_wrap(wrap),
+  m_justify(justify),
+  m_align_items(align_items),
+  m_align_content(align_content), 
+  m_fill_x(fillx),
+  m_fill_y(filly),
+  m_padding(padding),
+  m_margin(margin),
+  m_gap_main(gap_main),
+  m_gap_cross(gap_cross),
+  m_min_size(min_size),
+  m_max_size(max_size)
+{
+}
+
+bool rm_flexbox_layout::measure(rm_widget* pwidget)
+{
+  return true;
+}
+
+bool rm_flexbox_layout::perform(rm_widget* pwidget)
+{
+  if (!pwidget)
+    return false;
+
+  const size_t child_count = pwidget->get_num_childs();
+  if (child_count == 0)
+    return true;
+
+  // Get parent's content box (subtract padding)
+  rm_vec2 parent_size = pwidget->get_size();
+  const float pad_left = m_padding.left;
+  const float pad_right = m_padding.right;
+  const float pad_top = m_padding.top;
+  const float pad_bottom = m_padding.bottom;
+
+  const float content_x = pad_left;
+  const float content_y = pad_top;
+  const float content_width = std::max(0.0f, parent_size.x - pad_left - pad_right);
+  const float content_height = std::max(0.0f, parent_size.y - pad_top - pad_bottom);
+
+  bool is_row = (m_dir == rm_flex_direction::Row || m_dir == rm_flex_direction::RowReverse);
+  bool reverse = (m_dir == rm_flex_direction::RowReverse || m_dir == rm_flex_direction::ColumnReverse);
+
+  // 1) Gather each child's "base" size and margins (we have no per-child margins stored here).
+  //    We'll treat each child’s current size as its "preferred" size.
+  //    Sum up total length along main axis and track max cross-axis size.
+
+  float total_main_size = 0.0f;
+  float max_cross_size = 0.0f;
+  for (size_t i = 0; i < child_count; ++i) {
+    rm_widget* child = pwidget->get_child(i);
+    if (!child->is_visible()) continue;
+    rm_vec2 sz = child->get_size();
+    total_main_size += (is_row ? sz.x : sz.y);
+    max_cross_size = std::max(max_cross_size, is_row ? sz.y : sz.x);
+  }
+
+  // 2) Compute total gap (using m_gap_main for FlexStart/Center/FlexEnd, or override if justify==Space*)
+  const size_t visible_count = child_count; // assume all are visible
+  float used_gap = 0.0f;
+  float free_space = 0.0f;
+
+  if (visible_count > 1) {
+    switch (m_justify) {
+    case rm_flex_justify::SpaceBetween:
+    case rm_flex_justify::SpaceAround:
+    case rm_flex_justify::SpaceEvenly:
+      used_gap = 0.0f;
+      break;
+    default:
+      // FlexStart, Center, FlexEnd: use configured gap
+      used_gap = m_gap_main * float(visible_count - 1);
+    }
+  }
+  else {
+    used_gap = 0.0f;
+  }
+
+  // Available space along main axis
+  const float main_axis_size = is_row ? content_width : content_height;
+  free_space = main_axis_size - total_main_size - used_gap;
+  if (free_space < 0.0f) free_space = 0.0f;
+
+  // 3) If fill_x or fill_y are set, distribute free space to children along that axis.
+  if (is_row && m_fill_x == rm_flex_fill::Fill && visible_count > 0) {
+    // Distribute free_space equally to each child's width
+    const float extra_per_child = free_space / float(visible_count);
+    for (size_t i = 0; i < child_count; ++i) {
+      rm_widget* child = pwidget->get_child(i);
+      if (!child->is_visible())
+        continue;
+
+      rm_vec2 old_sz = child->get_size();
+      float new_w = old_sz.x + extra_per_child;
+      child->resize(new_w, old_sz.y);
+    }
+    // Recompute total_main_size
+    total_main_size = 0.0f;
+    for (size_t i = 0; i < child_count; ++i) {
+      rm_widget* child = pwidget->get_child(i);
+      if (!child->is_visible())
+        continue;
+
+      total_main_size += child->get_size().x;
+    }
+    used_gap = m_gap_main * float(visible_count - 1);
+    free_space = main_axis_size - total_main_size - used_gap;
+    if (free_space < 0.0f)
+      free_space = 0.0f;
+  }
+  if (!is_row && m_fill_y == rm_flex_fill::Fill && visible_count > 0) {
+    // Distribute free_space equally to each child's height
+    const float extra_per_child = free_space / float(visible_count);
+    for (size_t i = 0; i < child_count; ++i) {
+      rm_widget* child = pwidget->get_child(i);
+      if (!child->is_visible())
+        continue;
+
+      rm_vec2 old_sz = child->get_size();
+      float new_h = old_sz.y + extra_per_child;
+      child->resize(old_sz.x, new_h);
+    }
+    // Recompute total_main_size
+    total_main_size = 0.0f;
+    for (size_t i = 0; i < child_count; ++i) {
+      rm_widget* child = pwidget->get_child(i);
+      if (!child->is_visible())
+        continue;
+      total_main_size += child->get_size().y;
+    }
+    used_gap = m_gap_main * float(visible_count - 1);
+    free_space = main_axis_size - total_main_size - used_gap;
+    if (free_space < 0.0f)
+      free_space = 0.0f;
+  }
+
+  // 4) Determine gap between items and initial offset based on justify-content
+  float gap_between = m_gap_main;
+  float offset_main = 0.0f;
+  if (visible_count > 1) {
+    switch (m_justify) {
+    case rm_flex_justify::FlexStart:
+      gap_between = m_gap_main;
+      offset_main = 0.0f;
+      break;
+    case rm_flex_justify::Center:
+      gap_between = m_gap_main;
+      offset_main = free_space * 0.5f;
+      break;
+    case rm_flex_justify::FlexEnd:
+      gap_between = m_gap_main;
+      offset_main = free_space;
+      break;
+    case rm_flex_justify::SpaceBetween:
+      gap_between = (visible_count > 1) ? (free_space / float(visible_count - 1)) : 0.0f;
+      offset_main = 0.0f;
+      break;
+    case rm_flex_justify::SpaceAround:
+      gap_between = (visible_count > 0) ? (free_space / float(visible_count)) : 0.0f;
+      offset_main = gap_between * 0.5f;
+      break;
+    case rm_flex_justify::SpaceEvenly:
+      gap_between = (visible_count > 0) ? (free_space / float(visible_count + 1)) : 0.0f;
+      offset_main = gap_between;
+      break;
+    default:
+      // default to FlexStart
+      gap_between = m_gap_main;
+      offset_main = 0.0f;
+    }
+  }
+  else {
+    // Single child: center or flex-start or flex-end accordingly
+    if (m_justify == rm_flex_justify::Center) {
+      offset_main = free_space * 0.5f;
+    }
+    else if (m_justify == rm_flex_justify::FlexEnd) {
+      offset_main = free_space;
+    }
+    else {
+      offset_main = 0.0f;
+    }
+    gap_between = 0.0f;
+  }
+
+  // 5) Place each child in order (or reverse if needed), computing cross-axis alignment
+  //    Compute cross-space leftover (for align-items)
+  for (size_t raw_i = 0; raw_i < child_count; ++raw_i) {
+    const size_t idx = reverse ? (child_count - 1 - raw_i) : raw_i;
+    rm_widget* child = pwidget->get_child(idx);
+    if (!child->is_visible())
+      continue;
+
+    rm_vec2 csz = child->get_size();
+    float child_main = is_row ? csz.x : csz.y;
+    float child_cross = is_row ? csz.y : csz.x;
+
+    // Determine cross-axis position based on align-items
+    float cross_free = (is_row ? content_height : content_width) - child_cross;
+    if (cross_free < 0.0f)
+      cross_free = 0.0f;
+
+    float offset_cross = 0.0f;
+    if (m_align_items == rm_flex_align::FlexStart || m_align_items == rm_flex_align::Auto) {
+      offset_cross = 0.0f;
+    }
+    else if (m_align_items == rm_flex_align::Center) {
+      offset_cross = cross_free * 0.5f;
+    }
+    else if (m_align_items == rm_flex_align::FlexEnd) {
+      offset_cross = cross_free;
+    }
+    else if (m_align_items == rm_flex_align::Stretch) {
+      // Stretch child along cross axis
+      if (is_row) {
+        child->resize(csz.x, content_height);
+        child_cross = content_height;
+        cross_free = 0.0f;
+        offset_cross = 0.0f;
+      }
+      else {
+        child->resize(content_width, csz.y);
+        child_cross = content_width;
+        cross_free = 0.0f;
+        offset_cross = 0.0f;
+      }
+    }
+    else {
+      // Baseline, SpaceBetween, SpaceAround not supported here; default to FlexStart
+      offset_cross = 0.0f;
+    }
+
+    // Compute child's final position
+    float final_main_pos = offset_main;
+    // Raw offset_main is relative to content box. We'll adjust it each iteration.
+    rm_vec2 child_pos;
+    if (is_row) {
+      float x = content_x + final_main_pos;
+      float y = content_y + offset_cross;
+      child_pos.init(x, y);
+    }
+    else {
+      float x = content_x + offset_cross;
+      float y = content_y + final_main_pos;
+      child_pos.init(x, y);
+    }
+    child->move(child_pos);
+
+    // Advance offset_main for next child
+    offset_main += child_main + gap_between;
+  }
+  return true;
+}
+
+bool rm_flexbox_layout::reset(rm_widget* pwidget)
+{
+  return true;
 }

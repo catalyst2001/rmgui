@@ -496,8 +496,6 @@ void example_widgets(rm_surface* gui)
   psubmenu0->add_item("Create project", 0);
 
 
-
-
   static rm_tabcontrol_ex_style tabstyle;
   using tc = rm_tabcontrol_ex;
   tabstyle.set_text_color({ 255, 255, 255 });
@@ -518,13 +516,25 @@ void example_widgets(rm_surface* gui)
   pwindow->set_style(&wstyle);
 
 
-  tc::tab* ptab02 = ptabctl->add_tab("Page 2", 1, 10);
   tc::tab* ptab11 = ptabctl->add_tab("Main page asdasda", 0, 10);
   tc::tab* ptab12 = ptabctl->add_tab("Page 2 asdasdasd", 1, 10);
   
+  rm_flexbox_layout* pflexlayout = new rm_flexbox_layout();
+  pflexlayout->set_dir(rm_flex_direction::Column);
+  pflexlayout->set_paddings({ 10.f, 10.f, 10.f, 10.f });
+  pflexlayout->set_margins({ 10.f, 10.f, 10.f, 10.f });
+  pflexlayout->set_align_content(rm_flex_align::Center);
+  pflexlayout->set_align_items(rm_flex_align::Center);
+  pflexlayout->set_gap_main(10.f);
+  pflexlayout->set_gap_cross(10.f);
+  pflexlayout->set_justify(rm_flex_justify::SpaceEvenly);
+
+  rm_window* pdiv = new rm_window(ptab11->get_page_widget(), 10, 10, 200, 300);
+  pdiv->set_style(&wstyle);
+  pdiv->set_layout(pflexlayout);
 
   static rm_checkbox_style checkstyle;
-  rm_checkbox *pcb = new rm_checkbox(ptab12->get_page_widget(), 10, 100, 200, &checkstyle, "Checkbox on page 0",
+  rm_checkbox *pcb = new rm_checkbox(pdiv, 10, 100, 200, &checkstyle, "This is checkbox",
     [](rm_checkbox* pcheckbox) {
       printf("checkbox is %s\n", pcheckbox->is_checked() ? "checked" : "unchecked");
       return true;
@@ -542,18 +552,18 @@ void example_widgets(rm_surface* gui)
   style_rb.set_bg_inner(nvgRGBA(33, 36, 71, 68.85f));
   style_rb.set_circle_radius(9.5f);
 
-  new rm_radiobutton(ptab11->get_page_widget(), 10, 10, 150, 25, &style_rb, "Holding",
+  new rm_radiobutton(pdiv, 10, 10, 150, 25, &style_rb, "Holding",
     [](rm_radiobutton* rb) {
       return true;
     });
 
-  new rm_radiobutton(ptab11->get_page_widget(), 10, 70, 150, 25, &style_rb, "Always",
+  new rm_radiobutton(pdiv, 10, 70, 150, 25, &style_rb, "Always",
     [](rm_radiobutton* rb) {
       return true;
     });
-  //rm_radiobutton* first = rm_radiobutton::get_groups()[ptab11->get_page_widget()][0];
+  //rm_radiobutton* first = rm_radiobutton::get_groups()[pdiv][0];
   //first->set_allow_uncheck(true);
-  rm_radiobutton::select_default(ptab11->get_page_widget(), 0);
+  rm_radiobutton::select_default(pdiv, 0);
 
 
   static rm_switch_style style_switch;
@@ -566,7 +576,7 @@ void example_widgets(rm_surface* gui)
   //style_switch->set_shadow_size(12.f);
   style_switch.set_all_corners_radius(style_switch.get_track_height() * 0.5f);
 
-  rm_switch* sw = new rm_switch(ptab11->get_page_widget(), 10, 120, 60, &style_switch, false,
+  rm_switch* sw = new rm_switch(pdiv, 10, 120, 60, &style_switch, false,
     [](rm_switch* sw) {
       //if (sw->is_on())
       //  printf("switch enabled \n");
@@ -584,7 +594,7 @@ void example_widgets(rm_surface* gui)
   style_slider.set_thumb_border_color(nvgRGB(57, 76, 195));
   style_slider.set_thumb_border_width(3.5f);
   style_slider.set_all_corners_radius(style_slider.get_track_height() * 0.5f);
-  rm_slider* slider = new rm_slider(ptab11->get_page_widget(), 10, 160, 400, 40, &style_slider, 0.0f, 100.0f, 50.0f,
+  rm_slider* slider = new rm_slider(pdiv, 10, 160, 400, 40, &style_slider, 0.0f, 100.0f, 50.0f,
     [](rm_slider* psilder) {
       //psilder->get_userptr<rm_output_text>()->printf("slider value changed: %f", psilder->get_value());
     }
@@ -599,7 +609,7 @@ void example_widgets(rm_surface* gui)
   lv_style.set_selected_color(nvgRGB(180, 200, 255));
   lv_style.set_font_size(14.f);
 
-  rm_listview *list = new rm_listview(ptab11->get_page_widget(), 20, 210, 200, 150, &lv_style,
+  rm_listview *list = new rm_listview(pdiv, 20, 210, 200, 150, &lv_style,
     [](rm_listview* lv, size_t idx) {
       printf("Selected item #%zu: %s\n", idx, lv->get_selected_index() == idx ? lv->get_items()[idx].c_str() : "");
     }
@@ -609,6 +619,9 @@ void example_widgets(rm_surface* gui)
   list->add_item("Second option");
   list->add_item("Third option");
   list->add_item("Another item");
+
+  /* performing layout */
+  pdiv->perform_layout();
 }
 
 int main() {
