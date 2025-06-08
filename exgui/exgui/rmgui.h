@@ -35,6 +35,53 @@
 #define RM_UNUSED(x) (void)(x)
 #define RM_HANDLE_EXCEPTIONS(retval, expr) try { expr } catch (...) { return retval; }
 
+
+/* undef min/max if defined macro */
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
+
+template<class _type>
+_type rm_min(_type a, _type b)
+{
+  if (a < b)
+    return a;
+  return b;
+}
+
+template<class _type>
+_type rm_max(_type a, _type b)
+{
+  if (a > b)
+    return a;
+  return b;
+}
+
+template<class _type>
+_type rm_abs(_type a)
+{
+  //static_assert(std::is_integral<_type>() || std::is_floating_point<_type>(), "rm_abs have unsupported type!");
+  if (a < (_type)0)
+    return -a;
+
+  return a;
+}
+
+template<class _type>
+_type rm_clamp(_type v, _type minval, _type maxval)
+{
+  return rm_max(minval, rm_min(v, maxval));
+}
+
+template<class _type>
+_type rm_sign(_type v)
+{
+  return (v < (_type)0) ? (_type)-1 : (_type)1;
+}
+
 /**
 * object base class
 */
@@ -93,33 +140,38 @@ public:
     y = vec.y;
     return *this;
   }
-  inline rm_vec2 operator+(rm_vec2& vec) { return rm_vec2(x + vec.x, y + vec.y); }
-  inline rm_vec2 operator-(rm_vec2& vec) { return rm_vec2(x - vec.x, y - vec.y); }
-  inline rm_vec2 operator*(rm_vec2& vec) { return rm_vec2(x * vec.x, y * vec.y); }
-  inline rm_vec2 operator/(rm_vec2& vec) { return rm_vec2(x / vec.x, y / vec.y); }
+  inline rm_vec2 operator+(const rm_vec2& vec) { return rm_vec2(x + vec.x, y + vec.y); }
+  inline rm_vec2 operator-(const rm_vec2& vec) { return rm_vec2(x - vec.x, y - vec.y); }
+  inline rm_vec2 operator*(const rm_vec2& vec) { return rm_vec2(x * vec.x, y * vec.y); }
+  inline rm_vec2 operator/(const rm_vec2& vec) { return rm_vec2(x / vec.x, y / vec.y); }
   inline rm_vec2 operator+(float s) { return rm_vec2(x + s, y + s); }
   inline rm_vec2 operator-(float s) { return rm_vec2(x - s, y - s); }
   inline rm_vec2 operator*(float s) { return rm_vec2(x * s, y * s); }
   inline rm_vec2 operator/(float s) { return rm_vec2(x / s, y / s); }
-  inline rm_vec2 operator+=(rm_vec2& vec) { x += vec.x; y += vec.y; return *this; }
-  inline rm_vec2 operator-=(rm_vec2& vec) { x -= vec.x; y -= vec.y; return *this; }
-  inline rm_vec2 operator*=(rm_vec2& vec) { x *= vec.x; y *= vec.y; return *this; }
-  inline rm_vec2 operator/=(rm_vec2& vec) { x /= vec.x; y /= vec.y; return *this; }
+  inline rm_vec2 operator+=(const rm_vec2& vec) { x += vec.x; y += vec.y; return *this; }
+  inline rm_vec2 operator-=(const rm_vec2& vec) { x -= vec.x; y -= vec.y; return *this; }
+  inline rm_vec2 operator*=(const rm_vec2& vec) { x *= vec.x; y *= vec.y; return *this; }
+  inline rm_vec2 operator/=(const rm_vec2& vec) { x /= vec.x; y /= vec.y; return *this; }
   inline rm_vec2 operator*=(float s) { x *= s; y *= s; return *this; }
   inline rm_vec2 operator/=(float s) { x /= s; y /= s; return *this; }
   inline rm_vec2 operator+=(float s) { x += s; y += s; return *this; }
   inline rm_vec2 operator-=(float s) { x -= s; y -= s; return *this; }
 
-  inline bool compare_strong(rm_vec2& vec) { return x == vec.x && y == vec.y; }
-  inline bool operator==(rm_vec2& vec) { return fabsf(x - vec.x) < FLT_EPSILON && fabsf(y - vec.y) < FLT_EPSILON; }
-  inline bool operator!=(rm_vec2& vec) { return fabsf(x - vec.x) >= FLT_EPSILON && fabsf(y - vec.y) >= FLT_EPSILON; }
-  inline bool operator<(rm_vec2& vec) { return x < vec.x && y < vec.y; }
-  inline bool operator<=(rm_vec2& vec) { return x <= vec.x && y <= vec.y; }
-  inline bool operator>(rm_vec2& vec) { return x > vec.x && y > vec.y; }
-  inline bool operator>=(rm_vec2& vec) { return x >= vec.x && y >= vec.y; }
+  inline bool compare_strong(const rm_vec2& vec) const { return x == vec.x && y == vec.y; }
+  inline bool operator==(const rm_vec2& vec) const { return fabsf(x - vec.x) < FLT_EPSILON && fabsf(y - vec.y) < FLT_EPSILON; }
+  inline bool operator!=(const rm_vec2& vec) const { return fabsf(x - vec.x) >= FLT_EPSILON && fabsf(y - vec.y) >= FLT_EPSILON; }
+  inline bool operator<(const rm_vec2& vec) const { return x < vec.x && y < vec.y; }
+  inline bool operator<=(const rm_vec2& vec) const { return x <= vec.x && y <= vec.y; }
+  inline bool operator>(const rm_vec2& vec) const { return x > vec.x && y > vec.y; }
+  inline bool operator>=(const rm_vec2& vec) const { return x >= vec.x && y >= vec.y; }
   inline float operator[](int idx) { assert(idx < RM_COUNTOF(v) && "index out of bounds"); return v[idx]; }
   inline float lengthsq() { return x * x + y * y; }
   inline float length() { return sqrtf(lengthsq()); }
+
+  inline void clamp(rm_vec2 min, rm_vec2 max) {
+    x = rm_clamp(x, min.x, max.x);
+    y = rm_clamp(y, min.y, max.y);
+  }
 };
 
 class rm_rect
@@ -155,52 +207,6 @@ public:
   inline float operator[](int idx) { assert(idx < RM_COUNTOF(v) && "index out of bounds"); return v[idx]; }
 };
 
-/* undef min/max if defined macro */
-#ifdef min
-#undef min
-#endif
-#ifdef max
-#undef max
-#endif
-
-template<class _type>
-_type rm_min(_type a, _type b)
-{
-  if (a < b)
-    return a;
-  return b;
-}
-
-template<class _type>
-_type rm_max(_type a, _type b)
-{
-  if (a > b)
-    return a;
-  return b;
-}
-
-template<class _type>
-_type rm_abs(_type a)
-{
-  //static_assert(std::is_integral<_type>() || std::is_floating_point<_type>(), "rm_abs have unsupported type!");
-  if (a < (_type)0)
-    return -a;
-
-  return a;
-}
-
-template<class _type>
-_type rm_clamp(_type v, _type minval, _type maxval)
-{
-  return rm_max(minval, rm_min(v, maxval));
-}
-
-template<class _type>
-_type rm_sign(_type v)
-{
-  return (v < (_type)0) ? (_type)-1 : (_type)1;
-}
-
 class rm_bbox
 {
 public:
@@ -214,11 +220,12 @@ public:
   rm_bbox(rm_vec2 _min, rm_vec2 _max) : min(_min), max(_max) {}
   ~rm_bbox() {}
 
-  inline bool  inside(rm_vec2& pt) { return min <= pt && pt <= max; }
+  inline bool inside(const rm_vec2& pt) const { return min <= pt && pt <= max; }
+  inline bool inside(const rm_bbox& bbox) const { return min <= bbox.min && bbox.max <= max; }
   inline float get_width() const { return rm_abs(max.x-min.x); }
   inline float get_height() const { return rm_abs(max.y-min.y); }
 
-  inline void init(rm_vec2& pos, rm_vec2& size) {
+  inline void init(rm_vec2 pos, rm_vec2 size) {
     min.x = pos.x;
     min.y = pos.y;
     max.x = min.x + size.x;
@@ -643,7 +650,8 @@ enum class rm_flex_align : uint32_t {
 
 enum class rm_flex_fill : uint32_t {
   None = 0,
-  Fill
+  Fill,
+  Clamp
 };
 
 class rm_flexbox_layout : public irm_layout {
@@ -684,11 +692,13 @@ public:
   inline void set_fill_x(rm_flex_fill param) { m_fill_x = param; }
   inline void set_fill_y(rm_flex_fill param) { m_fill_y = param; }
   inline void set_paddings(rm_rect pad) { m_padding = pad; }
+  inline void set_paddings(float pad) { m_padding = rm_rect(pad, pad, pad, pad); }
   inline void set_padding_left(float pad) { m_padding.left = pad; }
   inline void set_padding_top(float pad) { m_padding.top = pad; }
   inline void set_padding_right(float pad) { m_padding.right = pad; }
   inline void set_padding_bottom(float pad) { m_padding.bottom = pad; }
   inline void set_margins(rm_rect margin) { m_margin = margin; }
+  inline void set_margins(float margin) { m_margin = rm_rect(margin, margin, margin, margin); }
   inline void set_margin_left(float margin) { m_margin.left = margin; }
   inline void set_margin_top(float margin) { m_margin.top = margin; }
   inline void set_margin_right(float margin) { m_margin.right = margin; }
@@ -906,7 +916,8 @@ protected:
   /* perform update root draw cache */
   inline void root_update() { /*((rmgui_surface *)m_proot)->rebuild_draw_cache();*/ }
   static void move_childs_relative(rm_widget *pwidget, rm_vec2 deltapos);
-  static void move_to(rm_widget* proot_widget, rm_vec2 newpos);
+  static void move_to(rm_widget* proot_widget, float xpos, float ypos);
+  void        resize_nolayout(float width, float height);
 
   inline bool dispatch_event(RM_EVENT event, rm_widget* p_from, rm_event_data* pevent_data) {
     return on_event(event, p_from, pevent_data);
@@ -1005,12 +1016,12 @@ public:
   inline void        set_zindex(int zidx) { /*m_zindex = zidx;*/ }
   inline int         get_zindex() const { return /*m_zindex*/0; }
 
-  void        resize(float width, float height);
-  inline void resize(rm_vec2 newsize) { resize(newsize.x, newsize.y); }
+  virtual void       resize(float width, float height);
+  inline void        resize(rm_vec2 newsize) { resize(newsize.x, newsize.y); }
 
-  void move(int newx, int newy) { move_to(this, { newx, newy }); }
-  void move(rm_vec2 newpos) { move_to(this, newpos); }
-  void move_relative(rm_vec2& delta);
+  inline  void       move(int newx, int newy) { move_to(this, newx, newy); }
+  virtual void       move(rm_vec2 newpos) { move_to(this, newpos.x, newpos.y); }
+  virtual void       move_relative(rm_vec2& delta);
 
   rm_vec2 cursor_to_local(const rm_vec2& cursor_pos) {
     return rm_vec2(cursor_pos.x - m_pos_of_parent.x, cursor_pos.y - m_pos_of_parent.y);
@@ -1220,29 +1231,60 @@ enum RM_ORIENT : uint32_t {
 };
 
 enum rm_window_flags : uint32_t {
-  WCF_NONE = 0,
-  WCF_VRESIZE=1<<0,
-  WCF_HRESIZE=1<<1,
+  WCF_NONE = 0, /*< window no resizable */
+  WCF_LRESIZE = 1 << 0, /*< left resize border */
+  WCF_TRESIZE = 1 << 1, /*< top resize border */
+  WCF_RRESIZE = 1 << 2, /*< right resize border */
+  WCF_BRESIZE = 1 << 3, /*< bottom resize border */
+  WCF_HRESIZE = (WCF_LRESIZE | WCF_RRESIZE), /*< horizontal resizable */
+  WCF_VRESIZE = (WCF_TRESIZE | WCF_BRESIZE), /*< vertical resizable */
+  WCF_RESIZABLE = (WCF_HRESIZE | WCF_VRESIZE) /*< fill resizable */
 };
 
 class rm_window : public rm_widget, public rm_styled<rm_window_style>
 {
-  enum {
-    FL_NONE=0,
-    FL_DRAG=1<<0,
-    FL_RESIZE=1<<1
+  /* window state flags */
+  enum WSF {
+    WSF_NONE=0,
+    WSF_DRAG=1<<0,
+    WSF_RESIZE=1<<1
   };
+
+  /* window size corners */
+  enum WSC : uint32_t {
+    SC_LEFT_TOP = 0,
+    SC_RIGHT_TOP,
+    SC_RIGHT_BOTTOM,
+    SC_LEFT_BOTTOM,
+    SC_NO_CORNER //no corner
+  };
+
   uint32_t                m_flags;
+  uint32_t                m_state_flags;
+  uint32_t                m_active_resizes;
   std::vector<rm_widget*> m_top_widgets;
   rm_window_style        *m_pstyle;
+  rm_vec2                 m_drag_start_pos;
+  rm_vec2                 m_drag_start_mouse;
+  float                   m_size_drag_width;
+
+  rm_vec2                 m_resize_start_pos;
+  rm_vec2                 m_resize_start_size;
+  rm_vec2                 m_resize_start_mouse;
+
+  WSC  get_active_size_corner();
+  void handle_sizeboxes(const rm_vec2 &local_pos);
 
   /* paint window background */
   virtual void on_draw(NVGcontext* pctx);
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta);
+  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+    RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta);
 
 public:
-  rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags = RM_FLAG_DEFAULT|RM_FLAG_GLOBAL, uint32_t uflags = 0, void* p_userptr = nullptr);
+  rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags = WCF_RESIZABLE);
   ~rm_window();
+
+
 };
 
 class rmgui_textbuffer {
@@ -1317,7 +1359,7 @@ public:
   inline bool next_token() { return m_next_token_available; }
 };
 
-//BUGBUG: K.D. new lines are added with indentation in "m_num_output_lines"
+//BUGBUG: K.D. new lines are added with indentation in "-"
 class rm_line_ring_buffer
 {
 public:

@@ -357,7 +357,6 @@ void test_old(rm_surface* gui)
   default_style.apply_defaults();
   rm_window* pwindow = new rm_window(gui, 20, 20, 1024, 768);
   pwindow->set_style(&default_style);
-  pwindow->set_zindex(-1);
 
   rm_image_button* imgButton = new rm_image_button(pwindow, 20, 20, 200, 40, "idle-button-login.png");
   rm_button* textButton = new rm_button(pwindow, 200 + 20 + 10, 20, 200, 40, "Test Button");
@@ -518,16 +517,19 @@ void example_widgets(rm_surface* gui)
 
   tc::tab* ptab11 = ptabctl->add_tab("Main page asdasda", 0, 10);
   tc::tab* ptab12 = ptabctl->add_tab("Page 2 asdasdasd", 1, 10);
-  
+
   rm_flexbox_layout* pflexlayout = new rm_flexbox_layout();
   pflexlayout->set_dir(rm_flex_direction::Column);
-  pflexlayout->set_paddings({ 10.f, 10.f, 10.f, 10.f });
-  pflexlayout->set_margins({ 10.f, 10.f, 10.f, 10.f });
+  pflexlayout->set_paddings(10.f);
+  pflexlayout->set_margins(0.f);
   pflexlayout->set_align_content(rm_flex_align::Center);
   pflexlayout->set_align_items(rm_flex_align::Center);
   pflexlayout->set_gap_main(10.f);
   pflexlayout->set_gap_cross(10.f);
   pflexlayout->set_justify(rm_flex_justify::SpaceEvenly);
+  pflexlayout->set_wrap(rm_flex_wrap::NoWrap);
+  pflexlayout->set_fill_x(rm_flex_fill::Clamp);
+  pflexlayout->set_fill_y(rm_flex_fill::Clamp);
 
   rm_window* pdiv = new rm_window(ptab11->get_page_widget(), 10, 10, 200, 300);
   pdiv->set_style(&wstyle);

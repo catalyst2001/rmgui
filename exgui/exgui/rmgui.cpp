@@ -14,14 +14,23 @@ void rm_widget::move_childs_relative(rm_widget* pwidget, rm_vec2 deltapos)
   }
 }
 
-void rm_widget::move_to(rm_widget* proot_widget, rm_vec2 newpos)
+void rm_widget::move_to(rm_widget* proot_widget, float xpos, float ypos)
 {
   assert(proot_widget && "proot_widget was nullptr");
   rm_vec2 oldpos = proot_widget->m_pos_of_parent;
-  rm_vec2 delta = newpos - oldpos;
-  proot_widget->m_pos_of_parent = newpos;
+  //rm_vec2 delta = newpos - oldpos;
+  proot_widget->m_pos_of_parent = /*newpos*/rm_vec2(xpos, ypos);
   proot_widget->m_bbox.init(proot_widget->m_pos_of_parent, proot_widget->m_size);
-  move_childs_relative(proot_widget, delta);
+  //TODO: K.D. move_childs_relative is not needed because children are already moving relative to their parent's position! Right?
+  //move_childs_relative(proot_widget, delta);
+}
+
+void rm_widget::resize_nolayout(float width, float height)
+{
+  //rm_vec2 start(0.f, 0.f);
+  m_size.init(width, height);
+  m_bbox.init(m_pos_of_parent, m_size);
+  m_content_area.init(0.f, 0.f, m_size.x, m_size.y); //TODO: K.D. check this later
 }
 
 void rm_widget::move_relative(rm_vec2& delta)
@@ -113,10 +122,7 @@ void rm_widget::set_parent(rm_widget* p_parent)
 
 void rm_widget::resize(float width, float height)
 {
-  //rm_vec2 start(0.f, 0.f);
-  m_size.init(width, height);
-  m_bbox.init(m_pos_of_parent, m_size);
-  m_content_area.init(0.f, 0.f, m_size.x, m_size.y); //TODO: K.D. check this later
+  resize_nolayout(width, height);
   perform_layout();
 }
 
@@ -391,11 +397,88 @@ rm_surface::~rm_surface()
 {
 }
 
+rm_window::WSC rm_window::get_active_size_corner()
+{
+  assert(!(m_active_resizes & (WCF_LRESIZE | WCF_RRESIZE)) && "L&R impossible sizeboxes activity!");
+  assert(!(m_active_resizes & (WCF_TRESIZE | WCF_BRESIZE)) && "T&B impossible sizeboxes activity!");
+  /* handle corners */
+  if (m_active_resizes & (WCF_LRESIZE | WCF_TRESIZE))
+    return SC_LEFT_TOP;
+  if (m_active_resizes & (WCF_TRESIZE | WCF_RRESIZE))
+    return SC_RIGHT_TOP;
+  if (m_active_resizes & (WCF_RRESIZE | WCF_BRESIZE))
+    return SC_RIGHT_BOTTOM;
+  if (m_active_resizes & (WCF_LRESIZE | WCF_BRESIZE))
+    return SC_LEFT_BOTTOM;
+
+  return SC_NO_CORNER;
+}
+
+void rm_window::handle_sizeboxes(const rm_vec2& parent_local)
+{
+  rm_vec2 min, max;
+  m_active_resizes = WCF_NONE;
+  rm_bbox curr_bbox;
+  rm_bbox ext = get_bbox();
+  printf("handle_sizeboxes: AABB (%f %f) (%f %f) mouse(%f %f)\n",
+    ext.min.x, ext.min.y,
+    ext.max.x, ext.max.y,
+    parent_local.x, parent_local.y
+  );
+
+  float width = ext.get_width();
+  float height = ext.get_height();
+
+  // left
+  if (m_flags & WCF_LRESIZE) {
+    curr_bbox.init(
+      ext.min - rm_vec2(m_size_drag_width, m_size_drag_width),
+      rm_vec2(m_size_drag_width, width));
+    if (curr_bbox.inside(parent_local))
+      m_active_resizes |= WCF_LRESIZE;
+  }
+
+  // right
+  if (m_flags & WCF_RRESIZE) {
+    curr_bbox.init(rm_vec2(
+      ext.max.x + m_size_drag_width, ext.min.y),
+      rm_vec2(m_size_drag_width, ext.get_height()));
+    if (curr_bbox.inside(parent_local))
+      m_active_resizes |= WCF_RRESIZE;
+  }
+
+  // top
+  if (m_flags & WCF_TRESIZE) {
+    curr_bbox.init(
+      ext.min + rm_vec2(-m_size_drag_width, m_size_drag_width),
+      rm_vec2(ext.get_width(), m_size_drag_width));
+    if (curr_bbox.inside(parent_local))
+      m_active_resizes |= WCF_TRESIZE;
+  }
+
+  // bottom
+  if (m_flags & WCF_BRESIZE) {
+    curr_bbox.init(
+      rm_vec2(ext.min.x, ext.max.y - m_size_drag_width),
+      rm_vec2(ext.get_width(), m_size_drag_width));
+    if (curr_bbox.inside(parent_local))
+      m_active_resizes |= WCF_BRESIZE;
+  }
+
+  /* save all parameters if window resizing */
+  if (m_active_resizes != WCF_NONE) {
+    m_state_flags |= WSF_RESIZE;
+    m_resize_start_pos = m_pos_of_parent;
+    m_resize_start_size = m_size;
+    m_resize_start_mouse = parent_local;
+  }
+}
+
 void rm_window::on_draw(NVGcontext* pctx)
 {
   rm_window_style* p_style = get_style();
   assert(p_style && "rmgui_window::on_draw(): window style is not set! Use rmgui_window::set_style(rmgui_wi1ndow_style *)");
-  int b_is_active = (int)((get_elem_flags().is_focused() || get_elem_flags().is_hovered() || (m_flags & FL_DRAG)));
+  int b_is_active = (int)((get_elem_flags().is_focused() || get_elem_flags().is_hovered() || (m_state_flags & WSF_DRAG)));
 
   rm_vec2 pos(0.f, 0.f);
   NVGcolor shadow_color = nvgRGBA(0, 0, 0, 63);
@@ -411,35 +494,93 @@ void rm_window::on_draw(NVGcontext* pctx)
   nvgFill(pctx);
 }
 
-bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
+  rm_vec2& cursor_pos, rm_vec2 /*delta*/)
 {
   constexpr float drag_height = 30.f;
-  rm_vec2 start(0.f, 0.f);
-  rm_vec2 local = cursor_to_local(cursor_pos);
-  if (event == RM_MOUSE_EVENT_CLICK) {
-    if (rm_bbox(start, rm_vec2(m_size.x, drag_height)).inside(local)) {
-      if (!(m_flags & FL_DRAG) && state == DOWN) {
-        m_flags |= FL_DRAG;
-      }
-    }
+  rm_vec2 zero(0.f, 0.f);
+  rm_vec2 parent_local = m_pparent->cursor_to_local(cursor_pos);
+  if (event == RM_MOUSE_EVENT_CLICK && state == DOWN) {
+    handle_sizeboxes(cursor_pos);
+    if (m_state_flags & WSF_RESIZE)
+      return true;
 
-    if ((m_flags & FL_DRAG) && state == UP) {
-      m_flags &= ~FL_DRAG;
+    rm_bbox header(zero, rm_vec2(m_size.x, drag_height));
+    if (header.inside(cursor_to_local(cursor_pos))) {
+      m_state_flags |= WSF_DRAG;
+      m_drag_start_pos = m_pos_of_parent;
+      m_drag_start_mouse = parent_local;
       return true;
     }
   }
 
-  if(m_flags & FL_DRAG) {
-    //printf("m_dragging = %d\n", (int)!!(m_flags & FL_DRAG));
-    move_relative(delta);
+  if (event == RM_MOUSE_EVENT_CLICK && state == UP) {
+    m_state_flags &= ~WSF_DRAG;
+    m_state_flags &= ~WSF_RESIZE;
+    m_active_resizes = WCF_NONE;
+    return true;
+  }
+
+  if (event == RM_MOUSE_EVENT_MOVE) {
+    const rm_vec2& ps = m_pparent->get_size();
+    if (m_state_flags & WSF_RESIZE) {
+      rm_vec2 delta = parent_local - m_resize_start_mouse;
+      if (m_active_resizes & WCF_LRESIZE) {
+        float newW = std::max(m_resize_start_size.x - delta.x, 50.0f);
+        newW = std::clamp(newW, 50.0f, ps.x - m_resize_start_pos.x);
+        float newX = m_resize_start_pos.x + (m_resize_start_size.x - newW);
+        newX = std::clamp(newX, 0.0f, ps.x - newW);
+        m_pos_of_parent.x = newX;
+        m_size.x = newW;
+      }
+
+      if (m_active_resizes & WCF_RRESIZE) {
+        float newW = std::max(m_resize_start_size.x + delta.x, 50.0f);
+        newW = std::clamp(newW, 50.0f, ps.x - m_pos_of_parent.x);
+        m_size.x = newW;
+      }
+
+      if (m_active_resizes & WCF_TRESIZE) {
+        float newH = std::max(m_resize_start_size.y - delta.y, 50.0f);
+        newH = std::clamp(newH, 50.0f, ps.y - m_resize_start_pos.y);
+        float newY = m_resize_start_pos.y + (m_resize_start_size.y - newH);
+        newY = std::clamp(newY, 0.0f, ps.y - newH);
+        m_pos_of_parent.y = newY;
+        m_size.y = newH;
+      }
+
+      if (m_active_resizes & WCF_BRESIZE) {
+        float newH = std::max(m_resize_start_size.y + delta.y, 50.0f);
+        newH = std::clamp(newH, 50.0f, ps.y - m_pos_of_parent.y);
+        m_size.y = newH;
+      }
+
+      m_bbox.init(m_pos_of_parent, m_size);
+      if (m_active_resizes)
+        perform_layout();
+
+      return true;
+    }
+
+    if (m_state_flags & WSF_DRAG) {
+      rm_vec2 delta = parent_local - m_drag_start_mouse;
+      rm_vec2 np;
+      np.x = m_drag_start_pos.x + delta.x;
+      np.y = m_drag_start_pos.y + delta.y;
+      np.x = std::clamp(np.x, 0.0f, ps.x - m_size.x);
+      np.y = std::clamp(np.y, 0.0f, ps.y - m_size.y);
+      m_pos_of_parent = np;
+      m_bbox.init(m_pos_of_parent, m_size);
+      return true;
+    }
   }
   return true;
 }
 
-rm_window::rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags, uint32_t uflags, void* p_userptr) :
-  rm_widget(x, y, width, height, p_parent, "ui_window", flags, uflags, p_userptr), m_flags(FL_NONE), m_pstyle(nullptr)
+rm_window::rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags) :
+  rm_widget(x, y, width, height, p_parent, "ui_window", RM_FLAG_DEFAULT | RM_FLAG_GLOBAL), m_flags(flags), m_state_flags(WSF_NONE), m_active_resizes(WSF_NONE), m_pstyle(nullptr), m_size_drag_width(5.f)
 {
-  set_zindex(-1);
+  //set_zindex(-1);
 }
 
 rm_window::~rm_window()
@@ -1027,7 +1168,7 @@ bool rm_flexbox_layout::perform(rm_widget* pwidget)
   if (child_count == 0)
     return true;
 
-  // Get parent's content box (subtract padding)
+  // 1) Compute parent's content rectangle (subtract padding)
   rm_vec2 parent_size = pwidget->get_size();
   const float pad_left = m_padding.left;
   const float pad_right = m_padding.right;
@@ -1041,215 +1182,212 @@ bool rm_flexbox_layout::perform(rm_widget* pwidget)
 
   bool is_row = (m_dir == rm_flex_direction::Row || m_dir == rm_flex_direction::RowReverse);
   bool reverse = (m_dir == rm_flex_direction::RowReverse || m_dir == rm_flex_direction::ColumnReverse);
+  bool do_wrap = (m_wrap != rm_flex_wrap::NoWrap);
 
-  // 1) Gather each child's "base" size and margins (we have no per-child margins stored here).
-  //    We'll treat each child’s current size as its "preferred" size.
-  //    Sum up total length along main axis and track max cross-axis size.
+  // 2) First pass: collect each child's size; apply per-child Clamp only if the child alone exceeds content area
+  struct ChildInfo { rm_widget* w; float main; float cross; };
+  std::vector<ChildInfo> infos;
+  infos.reserve(child_count);
 
-  float total_main_size = 0.0f;
-  float max_cross_size = 0.0f;
   for (size_t i = 0; i < child_count; ++i) {
     rm_widget* child = pwidget->get_child(i);
-    if (!child->is_visible()) continue;
-    rm_vec2 sz = child->get_size();
-    total_main_size += (is_row ? sz.x : sz.y);
-    max_cross_size = std::max(max_cross_size, is_row ? sz.y : sz.x);
-  }
-
-  // 2) Compute total gap (using m_gap_main for FlexStart/Center/FlexEnd, or override if justify==Space*)
-  const size_t visible_count = child_count; // assume all are visible
-  float used_gap = 0.0f;
-  float free_space = 0.0f;
-
-  if (visible_count > 1) {
-    switch (m_justify) {
-    case rm_flex_justify::SpaceBetween:
-    case rm_flex_justify::SpaceAround:
-    case rm_flex_justify::SpaceEvenly:
-      used_gap = 0.0f;
-      break;
-    default:
-      // FlexStart, Center, FlexEnd: use configured gap
-      used_gap = m_gap_main * float(visible_count - 1);
-    }
-  }
-  else {
-    used_gap = 0.0f;
-  }
-
-  // Available space along main axis
-  const float main_axis_size = is_row ? content_width : content_height;
-  free_space = main_axis_size - total_main_size - used_gap;
-  if (free_space < 0.0f) free_space = 0.0f;
-
-  // 3) If fill_x or fill_y are set, distribute free space to children along that axis.
-  if (is_row && m_fill_x == rm_flex_fill::Fill && visible_count > 0) {
-    // Distribute free_space equally to each child's width
-    const float extra_per_child = free_space / float(visible_count);
-    for (size_t i = 0; i < child_count; ++i) {
-      rm_widget* child = pwidget->get_child(i);
-      if (!child->is_visible())
-        continue;
-
-      rm_vec2 old_sz = child->get_size();
-      float new_w = old_sz.x + extra_per_child;
-      child->resize(new_w, old_sz.y);
-    }
-    // Recompute total_main_size
-    total_main_size = 0.0f;
-    for (size_t i = 0; i < child_count; ++i) {
-      rm_widget* child = pwidget->get_child(i);
-      if (!child->is_visible())
-        continue;
-
-      total_main_size += child->get_size().x;
-    }
-    used_gap = m_gap_main * float(visible_count - 1);
-    free_space = main_axis_size - total_main_size - used_gap;
-    if (free_space < 0.0f)
-      free_space = 0.0f;
-  }
-  if (!is_row && m_fill_y == rm_flex_fill::Fill && visible_count > 0) {
-    // Distribute free_space equally to each child's height
-    const float extra_per_child = free_space / float(visible_count);
-    for (size_t i = 0; i < child_count; ++i) {
-      rm_widget* child = pwidget->get_child(i);
-      if (!child->is_visible())
-        continue;
-
-      rm_vec2 old_sz = child->get_size();
-      float new_h = old_sz.y + extra_per_child;
-      child->resize(old_sz.x, new_h);
-    }
-    // Recompute total_main_size
-    total_main_size = 0.0f;
-    for (size_t i = 0; i < child_count; ++i) {
-      rm_widget* child = pwidget->get_child(i);
-      if (!child->is_visible())
-        continue;
-      total_main_size += child->get_size().y;
-    }
-    used_gap = m_gap_main * float(visible_count - 1);
-    free_space = main_axis_size - total_main_size - used_gap;
-    if (free_space < 0.0f)
-      free_space = 0.0f;
-  }
-
-  // 4) Determine gap between items and initial offset based on justify-content
-  float gap_between = m_gap_main;
-  float offset_main = 0.0f;
-  if (visible_count > 1) {
-    switch (m_justify) {
-    case rm_flex_justify::FlexStart:
-      gap_between = m_gap_main;
-      offset_main = 0.0f;
-      break;
-    case rm_flex_justify::Center:
-      gap_between = m_gap_main;
-      offset_main = free_space * 0.5f;
-      break;
-    case rm_flex_justify::FlexEnd:
-      gap_between = m_gap_main;
-      offset_main = free_space;
-      break;
-    case rm_flex_justify::SpaceBetween:
-      gap_between = (visible_count > 1) ? (free_space / float(visible_count - 1)) : 0.0f;
-      offset_main = 0.0f;
-      break;
-    case rm_flex_justify::SpaceAround:
-      gap_between = (visible_count > 0) ? (free_space / float(visible_count)) : 0.0f;
-      offset_main = gap_between * 0.5f;
-      break;
-    case rm_flex_justify::SpaceEvenly:
-      gap_between = (visible_count > 0) ? (free_space / float(visible_count + 1)) : 0.0f;
-      offset_main = gap_between;
-      break;
-    default:
-      // default to FlexStart
-      gap_between = m_gap_main;
-      offset_main = 0.0f;
-    }
-  }
-  else {
-    // Single child: center or flex-start or flex-end accordingly
-    if (m_justify == rm_flex_justify::Center) {
-      offset_main = free_space * 0.5f;
-    }
-    else if (m_justify == rm_flex_justify::FlexEnd) {
-      offset_main = free_space;
-    }
-    else {
-      offset_main = 0.0f;
-    }
-    gap_between = 0.0f;
-  }
-
-  // 5) Place each child in order (or reverse if needed), computing cross-axis alignment
-  //    Compute cross-space leftover (for align-items)
-  for (size_t raw_i = 0; raw_i < child_count; ++raw_i) {
-    const size_t idx = reverse ? (child_count - 1 - raw_i) : raw_i;
-    rm_widget* child = pwidget->get_child(idx);
     if (!child->is_visible())
       continue;
 
-    rm_vec2 csz = child->get_size();
-    float child_main = is_row ? csz.x : csz.y;
-    float child_cross = is_row ? csz.y : csz.x;
+    rm_vec2 sz = child->get_size();
+    float child_main = is_row ? sz.x : sz.y;
+    float child_cross = is_row ? sz.y : sz.x;
 
-    // Determine cross-axis position based on align-items
-    float cross_free = (is_row ? content_height : content_width) - child_cross;
-    if (cross_free < 0.0f)
-      cross_free = 0.0f;
+    // 2.a) If fill==Clamp on main axis, clamp child's main size to content
+    if (is_row && m_fill_x == rm_flex_fill::Clamp) {
+      if (child_main > content_width) {
+        child_main = content_width;
+        child->resize(child_main, sz.y);
+        sz.x = child_main;
+      }
+    }
+    else if (!is_row && m_fill_y == rm_flex_fill::Clamp) {
+      if (child_main > content_height) {
+        child_main = content_height;
+        child->resize(sz.x, child_main);
+        sz.y = child_main;
+      }
+    }
 
-    float offset_cross = 0.0f;
-    if (m_align_items == rm_flex_align::FlexStart || m_align_items == rm_flex_align::Auto) {
-      offset_cross = 0.0f;
-    }
-    else if (m_align_items == rm_flex_align::Center) {
-      offset_cross = cross_free * 0.5f;
-    }
-    else if (m_align_items == rm_flex_align::FlexEnd) {
-      offset_cross = cross_free;
-    }
-    else if (m_align_items == rm_flex_align::Stretch) {
-      // Stretch child along cross axis
-      if (is_row) {
-        child->resize(csz.x, content_height);
+    // 2.b) If fill==Clamp on cross axis, clamp child's cross size to content
+    if (is_row && m_fill_y == rm_flex_fill::Clamp) {
+      if (child_cross > content_height) {
         child_cross = content_height;
-        cross_free = 0.0f;
-        offset_cross = 0.0f;
+        child->resize(sz.x, child_cross);
+        sz.y = child_cross;
+      }
+    }
+    else if (!is_row && m_fill_x == rm_flex_fill::Clamp) {
+      if (child_cross > content_width) {
+        child_cross = content_width;
+        child->resize(child_cross, sz.y);
+        sz.x = child_cross;
+      }
+    }
+
+    infos.push_back({ child, child_main, child_cross });
+  }
+
+  // 3) Position children, handling Clamp-on-overflow or wrap
+  float offset_main = 0.0f;
+  float offset_cross = 0.0f;
+  float line_cross_size = 0.0f;
+  bool wrap_reverse = (m_wrap == rm_flex_wrap::WrapReverse);
+
+  const float max_main = is_row ? content_width : content_height;
+  const float max_cross = is_row ? content_height : content_width;
+
+  auto in_bounds = [&](float pos, float size, float limit) {
+    return (pos + size) <= limit;
+    };
+
+  auto advance_line = [&]() {
+    offset_main = 0.0f;
+    offset_cross += line_cross_size + m_gap_cross;
+    line_cross_size = 0.0f;
+    };
+
+  size_t start = 0, end = infos.size();
+  int step = 1;
+  if (reverse) {
+    start = infos.size() - 1;
+    end = SIZE_MAX; // loop until idx becomes SIZE_MAX (underflow)
+    step = -1;
+  }
+
+  for (size_t idx = start; idx != end; idx = size_t((int)idx + step)) {
+    ChildInfo& info = infos[idx];
+    rm_widget* child = info.w;
+
+    float child_main = info.main;
+    float child_cross = info.cross;
+
+    // 3.a) On main-axis overflow: if Clamp mode, shrink to remaining space; otherwise wrap if enabled
+    bool clamp_main = (is_row ? (m_fill_x == rm_flex_fill::Clamp) : (m_fill_y == rm_flex_fill::Clamp));
+
+    if (!in_bounds(offset_main, child_main, max_main)) {
+      if (clamp_main) {
+        // Shrink child_main to fit exactly remaining space
+        float remain = max_main - offset_main;
+        if (remain < 0.0f) remain = 0.0f;
+        child_main = remain;
+        if (is_row) {
+          child->resize(child_main, child->get_size().y);
+        }
+        else {
+          child->resize(child->get_size().x, child_main);
+        }
+        info.main = child_main;
+        // Recompute cross if Stretch and cross Clamp not applied
+        if (!is_row && m_fill_x != rm_flex_fill::Clamp && m_align_items == rm_flex_align::Stretch) {
+          // For column, stretching cross means width = content_width
+          child->resize(content_width, child_main);
+          child_cross = content_width;
+          info.cross = child_cross;
+        }
+      }
+      else if (do_wrap) {
+        // Wrap to next line
+        advance_line();
+      }
+      // else: no wrap, no clamp → child overflows freely
+    }
+
+    // 3.b) Compute cross-axis overflow and possible Clamp on cross axis for this child
+    bool clamp_cross = (is_row ? (m_fill_y == rm_flex_fill::Clamp) : (m_fill_x == rm_flex_fill::Clamp));
+    if (!in_bounds(offset_cross + 0.0f, child_cross, max_cross) && clamp_cross) {
+      // Squeeze child_cross to remaining cross space in the first line if offset_cross is zero,
+      // or to max_cross if offset_cross > 0.
+      float limit = (offset_cross == 0.0f) ? max_cross : (max_cross - offset_cross);
+      if (limit < 0.0f) limit = 0.0f;
+      if (is_row) {
+        child->resize(child_main, limit);
+        child_cross = limit;
       }
       else {
-        child->resize(content_width, csz.y);
-        child_cross = content_width;
-        cross_free = 0.0f;
-        offset_cross = 0.0f;
+        child->resize(limit, child_main);
+        child_cross = limit;
       }
-    }
-    else {
-      // Baseline, SpaceBetween, SpaceAround not supported here; default to FlexStart
-      offset_cross = 0.0f;
+      info.cross = child_cross;
     }
 
-    // Compute child's final position
-    float final_main_pos = offset_main;
-    // Raw offset_main is relative to content box. We'll adjust it each iteration.
+    // 3.c) Compute cross offset inside its “line” based on align_items
+    float cross_free = ((is_row ? content_height : content_width) - child_cross);
+    if (cross_free < 0.0f) cross_free = 0.0f;
+    float offset_cross_child = 0.0f;
+    switch (m_align_items) {
+    case rm_flex_align::Auto:
+    case rm_flex_align::FlexStart:
+      offset_cross_child = 0.0f;
+      break;
+    case rm_flex_align::Center:
+      offset_cross_child = cross_free * 0.5f;
+      break;
+    case rm_flex_align::FlexEnd:
+      offset_cross_child = cross_free;
+      break;
+    case rm_flex_align::Stretch:
+      if (is_row && m_fill_y != rm_flex_fill::Clamp) {
+        child->resize(child_main, content_height);
+        child_cross = content_height;
+        info.cross = child_cross;
+      }
+      else if (!is_row && m_fill_x != rm_flex_fill::Clamp) {
+        child->resize(content_width, child_main);
+        child_cross = content_width;
+        info.cross = child_cross;
+      }
+      offset_cross_child = 0.0f;
+      break;
+    default:
+      offset_cross_child = 0.0f;
+      break;
+    }
+
+    // 3.d) Determine final position for this child
+    float main_pos = offset_main;
+    float cross_pos = offset_cross + offset_cross_child;
+
     rm_vec2 child_pos;
     if (is_row) {
-      float x = content_x + final_main_pos;
-      float y = content_y + offset_cross;
-      child_pos.init(x, y);
+      child_pos.init(content_x + main_pos, content_y + cross_pos);
     }
     else {
-      float x = content_x + offset_cross;
-      float y = content_y + final_main_pos;
-      child_pos.init(x, y);
+      child_pos.init(content_x + cross_pos, content_y + main_pos);
     }
     child->move(child_pos);
 
-    // Advance offset_main for next child
-    offset_main += child_main + gap_between;
+    // 3.e) Update line_cross_size to the max cross dimension on this line
+    line_cross_size = std::max(line_cross_size, child_cross);
+
+    // 3.f) Advance offset_main for next child
+    offset_main += child_main + m_gap_main;
   }
+
+  // 4) If WrapReverse is set, reflect lines in the cross axis
+  if (do_wrap && wrap_reverse) {
+    // Total cross used = offset_cross (all previous lines) + line_cross_size (last line)
+    float total_cross_used = offset_cross + line_cross_size;
+    for (auto& info : infos) {
+      rm_widget* child = info.w;
+      rm_vec2 pos = child->get_pos_of_parent();
+      float cx = is_row ? (pos.y - content_y) : (pos.x - content_x);
+      float dimension = is_row ? info.cross : info.cross;
+      float reflected = ((is_row ? content_height : content_width) - (cx + dimension));
+      if (is_row) {
+        child->move({ pos.x, content_y + reflected });
+      }
+      else {
+        child->move({ content_x + reflected, pos.y });
+      }
+    }
+  }
+
   return true;
 }
 
