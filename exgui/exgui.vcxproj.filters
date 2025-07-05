@@ -20,8 +20,8 @@
     <Filter Include="vendor\glfw">
       <UniqueIdentifier>{10536642-ca67-4886-816e-d692e590aa48}</UniqueIdentifier>
     </Filter>
-    <Filter Include="launcher">
-      <UniqueIdentifier>{8db13552-ca80-4bed-8e15-60c5136583fd}</UniqueIdentifier>
+    <Filter Include="exgui\backend">
+      <UniqueIdentifier>{fbd820d1-f41f-4a29-8622-acb1a369a538}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -46,6 +46,12 @@
     </ClCompile>
     <ClCompile Include="exgui\rmgui_resources.cpp">
       <Filter>exgui</Filter>
+    </ClCompile>
+    <ClCompile Include="exgui\backend\rmgui_glfw_opnegl33.cpp">
+      <Filter>exgui\backend</Filter>
+    </ClCompile>
+    <ClCompile Include="exgui\backend\rmgui_win32_opnegl33.cpp">
+      <Filter>exgui\backend</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -85,6 +91,12 @@
     <ClInclude Include="blendish_test.h" />
     <ClInclude Include="exgui\rmgui_resources.h">
       <Filter>exgui</Filter>
+    </ClInclude>
+    <ClInclude Include="exgui\backend\rmgui_glfw_opnegl33.h">
+      <Filter>exgui\backend</Filter>
+    </ClInclude>
+    <ClInclude Include="exgui\backend\rmgui_win32_opnegl33.h">
+      <Filter>exgui\backend</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

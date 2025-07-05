@@ -140,6 +140,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="blendish_test.cpp" />
+    <ClCompile Include="exgui\backend\rmgui_glfw_opnegl33.cpp" />
+    <ClCompile Include="exgui\backend\rmgui_win32_opnegl33.cpp" />
     <ClCompile Include="exgui\rmgui.cpp" />
     <ClCompile Include="exgui\rmgui_controls.cpp" />
     <ClCompile Include="exgui\rmgui_resources.cpp" />
@@ -150,6 +152,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="blendish_test.h" />
+    <ClInclude Include="exgui\backend\rmgui_glfw_opnegl33.h" />
+    <ClInclude Include="exgui\backend\rmgui_win32_opnegl33.h" />
     <ClInclude Include="exgui\rmgui.h" />
     <ClInclude Include="exgui\rmgui_controls.h" />
     <ClInclude Include="exgui\rmgui_resources.h" />

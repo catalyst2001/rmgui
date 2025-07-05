@@ -381,8 +381,9 @@ float rm_surface::get_text_height(const char* ptext, rm_font hfont, rm_vec2 star
   return bbox.get_height();
 }
 
-rm_surface::rm_surface(NVGcontext* pctx, int width, int height, irm_sysdf* p_sysdf) : rm_widget(0, 0, width, height, nullptr, "ui_root_node")
+rm_surface::rm_surface(NVGcontext* pctx, int width, int height, irm_sysdf* p_sysdf, void *psyswindow) : rm_widget(0, 0, width, height, nullptr, "ui_root_node")
 {
+  m_psyswindow = psyswindow;
   m_psysdf = p_sysdf;
   set_root(this);
   m_pctx = pctx;

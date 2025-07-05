@@ -35,6 +35,11 @@
 #define RM_UNUSED(x) (void)(x)
 #define RM_HANDLE_EXCEPTIONS(retval, expr) try { expr } catch (...) { return retval; }
 
+#ifdef _DEBUG
+#define rm_perr(x, ...) fprintf(stderr, x "\n", __VA_ARGS__)
+#else
+#define rm_perr(x, ...) ((void)0)
+#endif
 
 /* undef min/max if defined macro */
 #ifdef min
@@ -1036,6 +1041,7 @@ class rm_surface : public rm_widget, rm_object_accrssor
   float       m_device_pixel_ratio;
   rm_vec2     m_last_cursor;
   rm_vec2     m_delta_cursor;
+  void       *m_psyswindow;
 
   /* event notifier functions */
   static void keybd_dispatcher(rm_widget *p_elem, int sc, 
@@ -1049,7 +1055,7 @@ class rm_surface : public rm_widget, rm_object_accrssor
   void draw_recursive(rm_widget* p_elem, float dt);
 
 public:
-  rm_surface(NVGcontext *pctx, int width, int height, irm_sysdf *p_sysdf);
+  rm_surface(NVGcontext *pctx, int width, int height, irm_sysdf *p_sysdf, void *psyswindow);
   ~rm_surface();
 
   /* main events */
@@ -1059,6 +1065,8 @@ public:
   void mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, int x, int y);
 
   NVGcontext* get_context() { return m_pctx; }
+
+  template<class _TYPE> _TYPE get_syswindow() { return reinterpret_cast<_TYPE>(m_psyswindow); }
 
   /* delta time */
   inline float get_delta_time() const { return m_delta_time; }
