@@ -427,42 +427,40 @@ void rm_window::handle_sizeboxes(const rm_vec2& parent_local)
     parent_local.x, parent_local.y
   );
 
-  float width = ext.get_width();
-  float height = ext.get_height();
+  // Use window-local coordinates for hit-testing to avoid offsets from parent's transforms
+  rm_vec2 local(parent_local.x - m_pos_of_parent.x, parent_local.y - m_pos_of_parent.y); // cursor relative to window top-left
+  float width = m_size.x;
+  float height = m_size.y;
 
-  // left
+  // left: tall rect around left edge
   if (m_flags & WCF_LRESIZE) {
-    curr_bbox.init(
-      ext.min - rm_vec2(m_size_drag_width, m_size_drag_width),
-      rm_vec2(m_size_drag_width, ext.get_height()));
-    if (curr_bbox.inside(parent_local))
+    curr_bbox.init(rm_vec2(-m_size_drag_width, -m_size_drag_width),
+                  rm_vec2(m_size_drag_width * 2.f, height + m_size_drag_width * 2.f));
+    if (curr_bbox.inside(local))
       m_active_resizes |= WCF_LRESIZE;
   }
 
-  // right
+  // right: tall rect around right edge
   if (m_flags & WCF_RRESIZE) {
-    curr_bbox.init(rm_vec2(
-      ext.max.x - m_size_drag_width, ext.min.y),
-      rm_vec2(m_size_drag_width * 2.f, ext.get_height()));
-    if (curr_bbox.inside(parent_local))
+    curr_bbox.init(rm_vec2(width - m_size_drag_width, -m_size_drag_width),
+                  rm_vec2(m_size_drag_width * 2.f, height + m_size_drag_width * 2.f));
+    if (curr_bbox.inside(local))
       m_active_resizes |= WCF_RRESIZE;
   }
 
-  // top
+  // top: wide rect around top edge
   if (m_flags & WCF_TRESIZE) {
-    curr_bbox.init(
-      ext.min + rm_vec2(-m_size_drag_width, -m_size_drag_width),
-      rm_vec2(ext.get_width(), m_size_drag_width * 2.f));
-    if (curr_bbox.inside(parent_local))
+    curr_bbox.init(rm_vec2(-m_size_drag_width, -m_size_drag_width),
+                  rm_vec2(width + m_size_drag_width * 2.f, m_size_drag_width * 2.f));
+    if (curr_bbox.inside(local))
       m_active_resizes |= WCF_TRESIZE;
   }
 
-  // bottom
+  // bottom: wide rect around bottom edge
   if (m_flags & WCF_BRESIZE) {
-    curr_bbox.init(
-      rm_vec2(ext.min.x, ext.max.y - m_size_drag_width),
-      rm_vec2(ext.get_width(), m_size_drag_width * 2.f));
-    if (curr_bbox.inside(parent_local))
+    curr_bbox.init(rm_vec2(-m_size_drag_width, height - m_size_drag_width),
+                  rm_vec2(width + m_size_drag_width * 2.f, m_size_drag_width * 2.f));
+    if (curr_bbox.inside(local))
       m_active_resizes |= WCF_BRESIZE;
   }
 
@@ -500,11 +498,10 @@ bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
 {
   constexpr float drag_height = 30.f;
   rm_vec2 zero(0.f, 0.f);
-  rm_vec2 parent_local = m_pparent->cursor_to_local(cursor_pos);
+  // cursor_pos passed to this handler is already in parent's local coordinates
+  rm_vec2 parent_local = cursor_pos;
   if (event == RM_MOUSE_EVENT_CLICK && state == DOWN) {
-    // compute local pos relative to parent for hit tests
-    rm_vec2 local_parent = m_pparent->cursor_to_local(cursor_pos);
-    handle_sizeboxes(local_parent);
+    handle_sizeboxes(parent_local);
     if (m_state_flags & WSF_RESIZE)
       return true;
 
@@ -512,7 +509,7 @@ bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
     if (header.inside(cursor_to_local(cursor_pos))) {
       m_state_flags |= WSF_DRAG;
       m_drag_start_pos = m_pos_of_parent;
-      // store mouse pos relative to parent at drag start
+      // store mouse pos relative to parent at drag start (cursor_pos already parent-local)
       m_drag_start_mouse = parent_local;
       return true;
     }
