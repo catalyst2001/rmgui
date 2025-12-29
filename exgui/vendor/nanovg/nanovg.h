@@ -24,6 +24,10 @@
 #include <memory>
 #include <utility>
 
+#ifdef RGB
+#undef RGB
+#endif
+
 #define NVG_PI 3.14159265358979323846264338327f
 
 #ifdef _MSC_VER
@@ -63,6 +67,40 @@ struct NVGpaint {
 	static NVGpaint BoxGradient(float x, float y, float w, float h, float r, float f, NVGcolor icol, NVGcolor ocol);
 	static NVGpaint RadialGradient(float cx, float cy, float inr, float outr, NVGcolor icol, NVGcolor ocol);
 	static NVGpaint ImagePattern(float ox, float oy, float ex, float ey, float angle, int image, float alpha);
+};
+
+struct NVGblurStyle {
+	float radius;
+	float strength;
+	int steps;
+	int rings;
+	NVGcolor color;
+
+	NVGblurStyle();
+};
+
+struct NVGglowStyle {
+	float radius;
+	float intensity;
+	NVGcolor color;
+
+	NVGglowStyle();
+};
+
+struct NVGglassStyle {
+	float radius;
+	float blur;
+	int blurSamples;
+	float highlight;
+	float borderWidth;
+	int backgroundImage;
+	float backgroundAlpha;
+	NVGcolor tint;
+	NVGcolor highlightColor;
+	NVGcolor shadowColor;
+	NVGcolor borderColor;
+
+	NVGglassStyle();
 };
 
 enum NVGwinding {
@@ -487,6 +525,11 @@ struct NVGcontext {
 	int TextGlyphPositions(float x, float y, const char* string, const char* end, NVGglyphPosition* positions, int maxPositions);
 	void TextMetrics(float* ascender, float* descender, float* lineh);
 	int TextBreakLines(const char* string, const char* end, float breakRowWidth, NVGtextRow* rows, int maxRows);
+
+	// Effects.
+	void TextBlur(float x, float y, const char* string, const char* end, const NVGblurStyle& style);
+	void GlowRect(float x, float y, float w, float h, float r, const NVGglowStyle& style);
+	void GlassRect(float x, float y, float w, float h, const NVGglassStyle& style);
 
 	// Custom pipeline.
 	int CreateRenderTarget(const NVGrenderTargetDesc& desc);

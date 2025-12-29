@@ -29,10 +29,10 @@
     <ClCompile Include="exgui\rmgui.cpp">
       <Filter>exgui</Filter>
     </ClCompile>
-    <ClCompile Include="vendor\nanovg\nanovg.c">
+    <ClCompile Include="vendor\nanovg\nanovg.cpp">
       <Filter>vendor\nanovg</Filter>
     </ClCompile>
-    <ClCompile Include="vendor\nanovg\blendish.c">
+    <ClCompile Include="vendor\nanovg\blendish.cpp">
       <Filter>vendor\nanovg</Filter>
     </ClCompile>
     <ClCompile Include="exgui\rmgui_controls.cpp">

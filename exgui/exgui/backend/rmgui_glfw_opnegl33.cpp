@@ -1,5 +1,6 @@
 #include "rmgui_glfw_opnegl33.h"
 #include <nanovg_gl.h>
+#include <utility>
 
 class csysdf : public irm_sysdf
 {
@@ -189,7 +190,7 @@ rm_surface* create_window(int posx, int posy, int width, int height, const char*
     glfwSetWindowPos(pwindow, posx, posy);
 
   /* create nvg ctx */
-  NVGcontext* pctx = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+  auto pctx = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
   if (!pctx) {
     rm_perr("create_window(): failed to create nvg context");
     glfwDestroyWindow(pwindow);
@@ -198,7 +199,7 @@ rm_surface* create_window(int posx, int posy, int width, int height, const char*
   }
 
   /* create surface */
-  rm_surface* psurface = new rm_surface(pctx, width, height, &instance, pwindow);
+  rm_surface* psurface = new rm_surface(std::move(pctx), width, height, &instance, pwindow);
 
   /* save surface */
   glfwSetWindowUserPointer(pwindow, psurface);
@@ -219,7 +220,6 @@ void destroy_window(rm_surface* psurface)
   assert(psurface->get_context() && "destroy_window(): nvg context was nullptr!");
   assert(psurface->get_syswindow<GLFWwindow*>() && "destroy_window(): GLFWwindow was nullptr!");
 
-  nvgDeleteGL3(psurface->get_context());
   glfwDestroyWindow(psurface->get_syswindow<GLFWwindow*>());
   delete psurface;
   glfwTerminate();

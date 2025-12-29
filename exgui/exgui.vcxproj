@@ -147,8 +147,8 @@
     <ClCompile Include="exgui\rmgui_resources.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="vendor\glad\src\glad.c" />
-    <ClCompile Include="vendor\nanovg\blendish.c" />
-    <ClCompile Include="vendor\nanovg\nanovg.c" />
+    <ClCompile Include="vendor\nanovg\blendish.cpp" />
+    <ClCompile Include="vendor\nanovg\nanovg.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="blendish_test.h" />

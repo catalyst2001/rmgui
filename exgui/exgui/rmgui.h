@@ -28,6 +28,7 @@
 #include <vector>
 #include <string>
 #include <cassert>
+#include <memory>
 #include "rmgui_resources.h"
 
 /* utils */
@@ -498,14 +499,14 @@ public:
     a = color.a;
   }
   inline void from_RGB(uint8_t _r, uint8_t _g, uint8_t _b) { 
-    *this = nvgRGB(_r, _g, _b); }//TODO: K.D. optimize stack costs!!
-  inline void from_RGBA(uint8_t _r, uint8_t _g, uint8_t _b, uint8_t _a) { *this = nvgRGBA(_r, _g, _b, _a); }//TODO: K.D. optimize stack costs!!
+    *this = NVGcolor::RGB(_r, _g, _b); }//TODO: K.D. optimize stack costs!!
+  inline void from_RGBA(uint8_t _r, uint8_t _g, uint8_t _b, uint8_t _a) { *this = NVGcolor::RGBA(_r, _g, _b, _a); }//TODO: K.D. optimize stack costs!!
   inline void from_HSL(float h, float s, float l) { 
-    *this = nvgHSL(h, s, l); }//TODO: K.D. optimize stack costs!!
+    *this = NVGcolor::HSL(h, s, l); }//TODO: K.D. optimize stack costs!!
   inline void from_HSLA(float h, float s, float l, float a) { 
-    *this = nvgHSLA(h, s, l, a); }//TODO: K.D. optimize stack costs!!
+    *this = NVGcolor::HSLA(h, s, l, a); }//TODO: K.D. optimize stack costs!!
   inline rm_color& lerp(rm_color &color, float u) {
-    *this = nvgLerpRGBA(*this, color, u);//TODO: K.D. optimize stack costs!!
+    *this = NVGcolor::LerpRGBA(*this, color, u);//TODO: K.D. optimize stack costs!!
     return *this;
   }
   static inline NVGcolor lerp(const NVGcolor& from_color, const NVGcolor& to_color, float factor) { // NOTE: added by d2
@@ -517,7 +518,7 @@ public:
     };
   }
   inline rm_color& set_transp(uint8_t alpha) {
-    *this = nvgTransRGBA(*this, alpha);//TODO: K.D. optimize stack costs!!
+    *this = NVGcolor::TransRGBA(*this, alpha);//TODO: K.D. optimize stack costs!!
     return *this;
   }
   inline rm_color negative() const {
@@ -525,7 +526,7 @@ public:
   }
   rm_color() { r=0.f, g=0.f, b=0.f, a=1.f; }
   rm_color(uint8_t _r, uint8_t _g, uint8_t _b) { from_RGB(_r, _g, _b); }
-  rm_color(uint8_t _r, uint8_t _g, uint8_t _b, uint8_t _a) { *this = nvgRGBA(_r, _g, _b, _a); }
+  rm_color(uint8_t _r, uint8_t _g, uint8_t _b, uint8_t _a) { *this = NVGcolor::RGBA(_r, _g, _b, _a); }
 };
 
 class rm_widget;
@@ -836,7 +837,7 @@ public:
     const rm_corners_style *pcstyle, const rm_color& suncolor, const rm_color& shadowcolor);
 
   static inline const NVGcolor &get_transparent() {
-    static const NVGcolor g_transparent_color = nvgRGBA(0, 0, 0, 0);
+    static const NVGcolor g_transparent_color = NVGcolor::RGBA(0, 0, 0, 0);
     return g_transparent_color;
   }
 };
@@ -865,13 +866,13 @@ protected:
   virtual void on_draw(NVGcontext* pctx) {
 #ifdef RMGUI_DEBUG_DRAW
     static NVGcolor colors[] = {
-      nvgRGB(255, 0, 0), nvgRGB(0, 255, 0)
+      NVGcolor::RGB(255, 0, 0), NVGcolor::RGB(0, 255, 0)
     };
-    nvgBeginPath(pctx);
-    nvgRect(pctx, 0.f, 0.f, m_size.x, m_size.y);
-    nvgStrokeColor(pctx, colors[get_elem_flags().is_hovered()]);
-    nvgStrokeWidth(pctx, 2.f);
-    nvgStroke(pctx);
+    pctx->BeginPath();
+    pctx->Rect( 0.f, 0.f, m_size.x, m_size.y);
+    pctx->StrokeColor( colors[get_elem_flags().is_hovered()]);
+    pctx->StrokeWidth( 2.f);
+    pctx->Stroke();
 #endif
   }
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) {
@@ -1035,7 +1036,7 @@ public:
 
 class rm_surface : public rm_widget, rm_object_accrssor
 {
-  NVGcontext *m_pctx;
+  std::unique_ptr<NVGcontext> m_pctx;
   rm_widget  *m_pfocus;
   float       m_delta_time;
   float       m_device_pixel_ratio;
@@ -1055,7 +1056,7 @@ class rm_surface : public rm_widget, rm_object_accrssor
   void draw_recursive(rm_widget* p_elem, float dt);
 
 public:
-  rm_surface(NVGcontext *pctx, int width, int height, irm_sysdf *p_sysdf, void *psyswindow);
+  rm_surface(std::unique_ptr<NVGcontext> pctx, int width, int height, irm_sysdf *p_sysdf, void *psyswindow);
   ~rm_surface();
 
   /* main events */
@@ -1064,7 +1065,7 @@ public:
   void textinput(int sym);
   void mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, int x, int y);
 
-  NVGcontext* get_context() { return m_pctx; }
+  NVGcontext* get_context() { return m_pctx.get(); }
 
   template<class _TYPE> _TYPE get_syswindow() { return reinterpret_cast<_TYPE>(m_psyswindow); }
 
@@ -1215,17 +1216,17 @@ public:
 
     m_title_font_size = 1.f;
     m_title_font_blur_factor = 0.f;
-    m_title_font_color = nvgRGBA(255, 255, 255, 255);
-    m_title_font_shadow_color = nvgRGBA(128, 128, 128, 128);
-    m_active_background_color = nvgRGBA(40, 40, 40, 128);
-    m_inactive_background_color = nvgRGBA(20, 20, 20, 128);
+    m_title_font_color = NVGcolor::RGBA(255, 255, 255, 255);
+    m_title_font_shadow_color = NVGcolor::RGBA(128, 128, 128, 128);
+    m_active_background_color = NVGcolor::RGBA(40, 40, 40, 128);
+    m_inactive_background_color = NVGcolor::RGBA(20, 20, 20, 128);
 
     m_titlebar_height=10.f;
-    m_titlebar_background_color = nvgRGBA(111, 111, 255, 128);
-    m_titlebar_shadow_color = nvgRGBA(20, 20, 20, 128);
-    m_titlebar_shadow_alpha_color = nvgRGBA(20, 20, 20, 128);
-    m_window_top_gradient = nvgRGBA(40, 40, 40, 255);
-    m_window_bottom_gradient = nvgRGBA(45, 45, 45, 255);
+    m_titlebar_background_color = NVGcolor::RGBA(111, 111, 255, 128);
+    m_titlebar_shadow_color = NVGcolor::RGBA(20, 20, 20, 128);
+    m_titlebar_shadow_alpha_color = NVGcolor::RGBA(20, 20, 20, 128);
+    m_window_top_gradient = NVGcolor::RGBA(40, 40, 40, 255);
+    m_window_bottom_gradient = NVGcolor::RGBA(45, 45, 45, 255);
   }
 };
 

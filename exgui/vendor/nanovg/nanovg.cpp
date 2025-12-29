@@ -840,6 +840,37 @@ NVGpaint NVGpaint::ImagePattern(float cx, float cy, float w, float h, float angl
 	return p;
 }
 
+NVGblurStyle::NVGblurStyle()
+	: radius(4.0f),
+	  strength(0.6f),
+	  steps(8),
+	  rings(2),
+	  color(NVGcolor::RGBA(0, 0, 0, 255))
+{
+}
+
+NVGglowStyle::NVGglowStyle()
+	: radius(12.0f),
+	  intensity(0.7f),
+	  color(NVGcolor::RGBA(255, 255, 255, 255))
+{
+}
+
+NVGglassStyle::NVGglassStyle()
+	: radius(14.0f),
+	  blur(6.0f),
+	  blurSamples(10),
+	  highlight(0.35f),
+	  borderWidth(1.0f),
+	  backgroundImage(0),
+	  backgroundAlpha(1.0f),
+	  tint(NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.08f)),
+	  highlightColor(NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.25f)),
+	  shadowColor(NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.25f)),
+	  borderColor(NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.35f))
+{
+}
+
 // Scissoring
 void NVGcontext::Scissor(float x, float y, float w, float h)
 {
@@ -2870,6 +2901,171 @@ void NVGcontext::TextMetrics(float* ascender, float* descender, float* lineh)
 		*lineh *= invscale;
 }
 
+static NVGcolor nvg__mulAlpha(NVGcolor color, float alpha)
+{
+	color.a *= alpha;
+	return color;
+}
+
+void NVGcontext::TextBlur(float x, float y, const char* string, const char* end, const NVGblurStyle& style)
+{
+	if (string == NULL) {
+		return;
+	}
+
+	if (style.radius <= 0.0f || style.steps <= 0 || style.rings <= 0) {
+		FillColor(style.color);
+		Text( x, y, string, end);
+		return;
+	}
+
+	Save();
+
+	const int steps = style.steps;
+	const int rings = style.rings;
+	const float strength = nvg__clampf(style.strength, 0.0f, 1.0f);
+	const float total = (float)(steps * rings);
+	const float alpha = (total > 0.0f) ? (style.color.a * strength / total) : 0.0f;
+
+	if (alpha > 0.0f) {
+		NVGcolor blurColor = style.color;
+		blurColor.a = alpha;
+
+		for (int r = 1; r <= rings; ++r) {
+			const float radius = style.radius * ((float)r / (float)rings);
+			for (int i = 0; i < steps; ++i) {
+				const float a = ((float)i / (float)steps) * NVG_PI * 2.0f;
+				const float dx = nvg__cosf(a) * radius;
+				const float dy = nvg__sinf(a) * radius;
+				FillColor(blurColor);
+				Text( x + dx, y + dy, string, end);
+			}
+		}
+	}
+
+	FillColor(style.color);
+	Text( x, y, string, end);
+	Restore();
+}
+
+void NVGcontext::GlowRect(float x, float y, float w, float h, float r, const NVGglowStyle& style)
+{
+	if (w <= 0.0f || h <= 0.0f || style.radius <= 0.0f || style.color.a <= 0.0f) {
+		return;
+	}
+
+	Save();
+
+	const float spread = style.radius;
+	const float intensity = nvg__clampf(style.intensity, 0.0f, 1.0f);
+	NVGcolor inner = nvg__mulAlpha(style.color, intensity);
+	NVGcolor outer = inner;
+	outer.a = 0.0f;
+
+	NVGpaint glow = NVGpaint::BoxGradient(
+		x - spread, y - spread,
+		w + spread * 2.0f, h + spread * 2.0f,
+		r + spread, spread,
+		inner, outer);
+
+	BeginPath();
+	Rect( x - spread, y - spread, w + spread * 2.0f, h + spread * 2.0f);
+	RoundedRect( x, y, w, h, r);
+	PathWinding( NVG_HOLE);
+	FillPaint( glow);
+	Fill();
+
+	Restore();
+}
+
+void NVGcontext::GlassRect(float x, float y, float w, float h, const NVGglassStyle& style)
+{
+	if (w <= 0.0f || h <= 0.0f) {
+		return;
+	}
+
+	Save();
+
+	const float radius = nvg__maxf(style.radius, 0.0f);
+	const float bgAlpha = nvg__clampf(style.backgroundAlpha, 0.0f, 1.0f);
+
+	if (style.backgroundImage > 0 && bgAlpha > 0.0f) {
+		const float blur = nvg__maxf(style.blur, 0.0f);
+		const int samples = nvg__maxi(1, style.blurSamples);
+
+		if (blur > 0.0f && samples > 1) {
+			const float sampleAlpha = bgAlpha / (float)samples;
+			for (int i = 0; i < samples; ++i) {
+				const float a = ((float)i / (float)samples) * NVG_PI * 2.0f;
+				const float dx = nvg__cosf(a) * blur;
+				const float dy = nvg__sinf(a) * blur;
+				NVGpaint img = NVGpaint::ImagePattern( x + dx, y + dy, w, h, 0.0f, style.backgroundImage, sampleAlpha);
+				BeginPath();
+				RoundedRect( x, y, w, h, radius);
+				FillPaint( img);
+				Fill();
+			}
+		} else {
+			NVGpaint img = NVGpaint::ImagePattern( x, y, w, h, 0.0f, style.backgroundImage, bgAlpha);
+			BeginPath();
+			RoundedRect( x, y, w, h, radius);
+			FillPaint( img);
+			Fill();
+		}
+	}
+
+	NVGcolor tintTop = style.tint;
+	NVGcolor tintBottom = style.tint;
+	tintBottom.a *= 0.6f;
+	NVGpaint tint = NVGpaint::LinearGradient( x, y, x, y + h, tintTop, tintBottom);
+	BeginPath();
+	RoundedRect( x, y, w, h, radius);
+	FillPaint( tint);
+	Fill();
+
+	if (style.highlightColor.a > 0.0f && style.highlight > 0.0f) {
+		const float highlightFrac = nvg__clampf(style.highlight, 0.0f, 1.0f);
+		const float highlightH = h * highlightFrac;
+		const float highlightR = nvg__maxf(radius - 1.0f, 0.0f);
+		NVGcolor h0 = style.highlightColor;
+		NVGcolor h1 = style.highlightColor;
+		h1.a = 0.0f;
+		NVGpaint hl = NVGpaint::LinearGradient( x, y, x, y + highlightH, h0, h1);
+		BeginPath();
+		RoundedRect( x + 1.0f, y + 1.0f, w - 2.0f, highlightH, highlightR);
+		FillPaint( hl);
+		Fill();
+	}
+
+	if (style.shadowColor.a > 0.0f) {
+		const float shadowSize = nvg__maxf(style.blur * 0.5f, 6.0f);
+		NVGcolor outer = style.shadowColor;
+		outer.a = 0.0f;
+		NVGpaint shadow = NVGpaint::BoxGradient(
+			x, y, w, h,
+			radius, shadowSize,
+			style.shadowColor, outer);
+
+		BeginPath();
+		Rect( x - shadowSize, y - shadowSize, w + shadowSize * 2.0f, h + shadowSize * 2.0f);
+		RoundedRect( x, y, w, h, radius);
+		PathWinding( NVG_HOLE);
+		FillPaint( shadow);
+		Fill();
+	}
+
+	if (style.borderWidth > 0.0f && style.borderColor.a > 0.0f) {
+		const float bw = nvg__minf(style.borderWidth, nvg__minf(w, h) * 0.5f);
+		StrokeWidth( bw);
+		StrokeColor( style.borderColor);
+		BeginPath();
+		RoundedRect( x + bw * 0.5f, y + bw * 0.5f, w - bw, h - bw, nvg__maxf(radius - bw * 0.5f, 0.0f));
+		Stroke();
+	}
+
+	Restore();
+}
+
 int NVGcontext::CreateRenderTarget(const NVGrenderTargetDesc& desc)
 {
 	return renderer ? renderer->CreateRenderTarget(desc) : 0;
@@ -2984,6 +3180,7 @@ std::unique_ptr<NVGcontext> NVGcontext::Create(std::unique_ptr<NVGrenderer> rend
 
 	std::unique_ptr<NVGcontext> ctx(new NVGcontext());
 	ctx->renderer = std::move(renderer);
+	ctx->rendererCreated = 1;
 	ctx->config = config;
 
 	ctx->commands = (float*)malloc(sizeof(float) * NVG_INIT_COMMANDS_SIZE);
@@ -3003,7 +3200,6 @@ std::unique_ptr<NVGcontext> NVGcontext::Create(std::unique_ptr<NVGrenderer> rend
 
 	if (ctx->renderer->Create() == 0)
 		return std::unique_ptr<NVGcontext>();
-	ctx->rendererCreated = 1;
 
 	// Init font rendering
 	memset(&fontParams, 0, sizeof(fontParams));

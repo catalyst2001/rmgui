@@ -68,12 +68,12 @@ class rm_text_input_style : public rm_corners_style {
   bool          m_rounded_selection;
 public:
   rm_text_input_style() :
-    m_text_color(nvgRGB(0, 0, 0)),
-    m_active_bg_color(nvgRGB(255, 255, 255)),
-    m_unactive_bg_color(nvgRGBA(220, 220, 220, 255)),
-    m_border_color(nvgRGBA(255, 255, 255, 255)),
-    m_blink_color(nvgRGB(0, 0, 0)),
-    m_selection_color(nvgRGBA(51, 153, 255, 128)),
+    m_text_color(NVGcolor::RGB(0, 0, 0)),
+    m_active_bg_color(NVGcolor::RGB(255, 255, 255)),
+    m_unactive_bg_color(NVGcolor::RGBA(220, 220, 220, 255)),
+    m_border_color(NVGcolor::RGBA(255, 255, 255, 255)),
+    m_blink_color(NVGcolor::RGB(0, 0, 0)),
+    m_selection_color(NVGcolor::RGBA(51, 153, 255, 128)),
     m_font_size(14.f), 
     m_border_width(1.f), 
     m_text_offset(1.f), m_blink_width(1.f), m_rounded_selection(false) {
@@ -156,10 +156,10 @@ class rm_checkbox_style : public rm_corners_style {
 public:
   rm_checkbox_style() :
     m_text_offset(5.f, 0.f),
-    m_text_color(nvgRGB(255, 255, 255)),
-    m_bg_color(nvgRGB(255, 255, 255)),
-    m_mark_color(nvgRGB(0, 0, 0)),
-    m_border_color(nvgRGB(0, 0, 0)),
+    m_text_color(NVGcolor::RGB(255, 255, 255)),
+    m_bg_color(NVGcolor::RGB(255, 255, 255)),
+    m_mark_color(NVGcolor::RGB(0, 0, 0)),
+    m_border_color(NVGcolor::RGB(0, 0, 0)),
     m_check_size(20),
     m_font_size(18.f), m_border_width(1.f){}
 
@@ -266,10 +266,10 @@ class rm_slider_style : public rm_corners_style {
 
 public:
   rm_slider_style(): m_track_height(4.f), 
-    m_padding(8.f), m_track_bg(nvgRGB(200, 200, 200)),
-    m_track_fill(nvgRGB(57, 76, 195)), m_thumb_radius(12.f), 
-    m_thumb_border_width(2.f), m_thumb_color(nvgRGB(255, 255, 255)), 
-    m_thumb_border_color(nvgRGB(57, 76, 195)){
+    m_padding(8.f), m_track_bg(NVGcolor::RGB(200, 200, 200)),
+    m_track_fill(NVGcolor::RGB(57, 76, 195)), m_thumb_radius(12.f), 
+    m_thumb_border_width(2.f), m_thumb_color(NVGcolor::RGB(255, 255, 255)), 
+    m_thumb_border_color(NVGcolor::RGB(57, 76, 195)){
   }
 
   /* selectors */
@@ -404,10 +404,10 @@ class rm_scroll_style
   float     m_thumb_stroke_width;
 public:
   void load_defaults() {
-    m_background_clr = nvgRGB(30, 30, 30);
-    m_thumb_clr = nvgRGB(80, 80, 80);
-    m_background_border_clr = nvgRGB(100, 100, 100);
-    m_thumb_border_clr = nvgRGB(100, 100, 100);
+    m_background_clr = NVGcolor::RGB(30, 30, 30);
+    m_thumb_clr = NVGcolor::RGB(80, 80, 80);
+    m_background_border_clr = NVGcolor::RGB(100, 100, 100);
+    m_thumb_border_clr = NVGcolor::RGB(100, 100, 100);
     m_corner_round = 0.f;
     m_thumb_size = 10.f;
     m_background_stroke_width = 1.f;
@@ -515,11 +515,11 @@ class rm_tabcontrol_style : public rm_corners_style {
 public:
   rm_tabcontrol_style() :
     m_text_offset(0.f, 0.f),
-    m_text_color(nvgRGB(0, 0, 0)),
-    m_bg_color(nvgRGB(255, 255, 255)),
-    m_border_color(nvgRGB(0, 0, 0)),
-    m_selected_color(nvgRGB(240, 240, 240)),
-    m_unselected_color(nvgRGB(200, 200, 200)),
+    m_text_color(NVGcolor::RGB(0, 0, 0)),
+    m_bg_color(NVGcolor::RGB(255, 255, 255)),
+    m_border_color(NVGcolor::RGB(0, 0, 0)),
+    m_selected_color(NVGcolor::RGB(240, 240, 240)),
+    m_unselected_color(NVGcolor::RGB(200, 200, 200)),
     m_font_size(15.f),
     m_is_horizontal(true), m_tab_height(30.f){
   }
@@ -1100,15 +1100,15 @@ class rm_radiobutton_style : public rm_corners_style {
 
 public:
   rm_radiobutton_style() : m_text_offset(0.f, 0.f), 
-    m_bg_inner(nvgRGBA(0, 0, 0, 60)), m_text_color(nvgRGB(255, 255, 255)),
-    m_border_active_outer(nvgRGB(0, 122, 255)),
-    m_border_active_inner(nvgRGB(102, 204, 255)), m_border_width_outer(2.f),
+    m_bg_inner(NVGcolor::RGBA(0, 0, 0, 60)), m_text_color(NVGcolor::RGB(255, 255, 255)),
+    m_border_active_outer(NVGcolor::RGB(0, 122, 255)),
+    m_border_active_inner(NVGcolor::RGB(102, 204, 255)), m_border_width_outer(2.f),
     m_border_width_inner(1.f),
-    m_border_inactive(nvgRGBA(255, 255, 255, 192)),
+    m_border_inactive(NVGcolor::RGBA(255, 255, 255, 192)),
     m_border_width_inactive(2.f),
-    m_mark_color(nvgRGB(255, 255, 255)), m_circle_radius(8), m_font_size(18.f),
+    m_mark_color(NVGcolor::RGB(255, 255, 255)), m_circle_radius(8), m_font_size(18.f),
     m_shadow_offset(5.f), m_shadow_size(6.f),
-    m_shadow_color(nvgRGBA(0, 0, 0, 63.75f)) {}
+    m_shadow_color(NVGcolor::RGBA(0, 0, 0, 63.75f)) {}
 
   /* selectors */
   inline const rm_vec2& get_text_offset()       const { return m_text_offset; }
@@ -1197,10 +1197,10 @@ class rm_switch_style : public rm_corners_style {
   NVGcolor  m_shadow_color;
 public:
   rm_switch_style() : m_track_height(24.f), m_padding(4.f), m_anim_time(0.2f), 
-    m_track_on(nvgRGB(57, 76, 195)), m_track_off(nvgRGBA(200, 200, 200, 128)), 
-    m_knob_color(nvgRGB(255, 255, 255)), m_knob_radius(11.f),
+    m_track_on(NVGcolor::RGB(57, 76, 195)), m_track_off(NVGcolor::RGBA(200, 200, 200, 128)), 
+    m_knob_color(NVGcolor::RGB(255, 255, 255)), m_knob_radius(11.f),
     m_shadow_offset(5.f), m_shadow_size(7.f),
-    m_shadow_color(nvgRGBA(0, 0, 0, 63.75f)) {
+    m_shadow_color(NVGcolor::RGBA(0, 0, 0, 63.75f)) {
   }
 
   /* selectors */
@@ -1274,9 +1274,9 @@ class rm_listview_style : public rm_corners_style {
   float     m_font_size;
 public:
   rm_listview_style(): m_padding(8.f), m_row_height(24.f), 
-    m_bg_color(nvgRGB(255, 255, 255)), 
-    m_text_color(nvgRGB(0, 0, 0)), m_hover_color(nvgRGB(240, 240, 240)), 
-    m_selected_color(nvgRGB(200, 200, 255)), m_font_size(16.f){
+    m_bg_color(NVGcolor::RGB(255, 255, 255)), 
+    m_text_color(NVGcolor::RGB(0, 0, 0)), m_hover_color(NVGcolor::RGB(240, 240, 240)), 
+    m_selected_color(NVGcolor::RGB(200, 200, 255)), m_font_size(16.f){
   }
 
   /* selectors */

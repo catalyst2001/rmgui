@@ -4,10 +4,14 @@
 #include "nanovg_gl.h"
 #include <iostream>
 #include <vector>
+#include <cmath>
 #include "blendish_test.h"
 
 #define NOMINMAX
 #include <Windows.h> //for Sleep
+#ifdef RGB
+#undef RGB
+#endif
 #define sleep(ms) Sleep(ms)
 
 static rm_surface* g_gui = nullptr;
@@ -29,36 +33,36 @@ void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float h
   int gutter = 0;
   NVG_NOTUSED(height);
 
-  nvgSave(vg);
+  vg->Save();
 
-  nvgFontSize(vg, 18.0f);
-  nvgFontFace(vg, "default");
-  nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-  nvgTextMetrics(vg, NULL, NULL, &lineh);
+  vg->FontSize( 18.0f);
+  vg->FontFace( "default");
+  vg->TextAlign( NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+  vg->TextMetrics( NULL, NULL, &lineh);
 
   // The text break API can be used to fill a large buffer of rows,
   // or to iterate over the text just few lines (or just one) at a time.
   // The "next" variable of the last returned item tells where to continue.
   start = text;
   end = text + strlen(text);
-  for (nrows = nvgTextBreakLines(vg, start, end, width, rows, 3); 0 != nrows; nrows = nvgTextBreakLines(vg, start, end, width, rows, 3))
+  for (nrows = vg->TextBreakLines( start, end, width, rows, 3); 0 != nrows; nrows = vg->TextBreakLines( start, end, width, rows, 3))
   {
     for (i = 0; i < nrows; i++) {
       struct NVGtextRow* row = &rows[i];
       int hit = mx > x && mx < (x + width) && my >= y && my < (y + lineh);
 
-      nvgBeginPath(vg);
-      nvgFillColor(vg, nvgRGBA(255, 255, 255, hit ? 64 : 16));
-      nvgRect(vg, x, y, row->width, lineh);
-      nvgFill(vg);
+      vg->BeginPath();
+      vg->FillColor( NVGcolor::RGBA(255, 255, 255, hit ? 64 : 16));
+      vg->Rect( x, y, row->width, lineh);
+      vg->Fill();
 
-      nvgFillColor(vg, nvgRGBA(255, 255, 255, 255));
-      nvgText(vg, x, y, row->start, row->end);
+      vg->FillColor( NVGcolor::RGBA(255, 255, 255, 255));
+      vg->Text( x, y, row->start, row->end);
 
       if (hit) {
         caretx = (mx < x + row->width / 2) ? x : x + row->width;
         px = x;
-        nglyphs = nvgTextGlyphPositions(vg, x, y, row->start, row->end, glyphs, 100);
+        nglyphs = vg->TextGlyphPositions( x, y, row->start, row->end, glyphs, 100);
         for (j = 0; j < nglyphs; j++) {
           float x0 = glyphs[j].x;
           float x1 = (j + 1 < nglyphs) ? glyphs[j + 1].x : x + row->width;
@@ -67,10 +71,10 @@ void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float h
             caretx = glyphs[j].x;
           px = tgx;
         }
-        nvgBeginPath(vg);
-        nvgFillColor(vg, nvgRGBA(255, 192, 0, 255));
-        nvgRect(vg, caretx, y, 1, lineh);
-        nvgFill(vg);
+        vg->BeginPath();
+        vg->FillColor( NVGcolor::RGBA(255, 192, 0, 255));
+        vg->Rect( caretx, y, 1, lineh);
+        vg->Fill();
 
         gutter = lnum + 1;
         gx = x - 10;
@@ -87,62 +91,199 @@ void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float h
   {
     char txt[16];
     snprintf(txt, sizeof(txt), "%d", gutter);
-    nvgFontSize(vg, 13.0f);
-    nvgTextAlign(vg, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
+    vg->FontSize( 13.0f);
+    vg->TextAlign( NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
 
-    nvgTextBounds(vg, gx, gy, txt, NULL, bounds);
+    vg->TextBounds( gx, gy, txt, NULL, bounds);
 
-    nvgBeginPath(vg);
-    nvgFillColor(vg, nvgRGBA(255, 192, 0, 255));
-    nvgRoundedRect(vg
-      , round(bounds[0]) - 4.0f
+    vg->BeginPath();
+    vg->FillColor( NVGcolor::RGBA(255, 192, 0, 255));
+    vg->RoundedRect( round(bounds[0]) - 4.0f
       , round(bounds[1]) - 2.0f
       , round(bounds[2] - bounds[0]) + 8.0f
       , round(bounds[3] - bounds[1]) + 4.0f
       , (round(bounds[3] - bounds[1]) + 4.0f) / 2.0f - 1.0f
     );
-    nvgFill(vg);
+    vg->Fill();
 
-    nvgFillColor(vg, nvgRGBA(32, 32, 32, 255));
-    nvgText(vg, gx, gy, txt, NULL);
+    vg->FillColor( NVGcolor::RGBA(32, 32, 32, 255));
+    vg->Text( gx, gy, txt, NULL);
   }
 
   y += 20.0f;
 
-  nvgFontSize(vg, 13.0f);
-  nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-  nvgTextLineHeight(vg, 1.2f);
+  vg->FontSize( 13.0f);
+  vg->TextAlign( NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+  vg->TextLineHeight( 1.2f);
 
-  nvgTextBoxBounds(vg, x, y, 150, "Hover your mouse over the text to see calculated caret position.", NULL, bounds);
+  vg->TextBoxBounds( x, y, 150, "Hover your mouse over the text to see calculated caret position.", NULL, bounds);
 
   // Fade the tooltip out when close to it.
   gx = abs((mx - (bounds[0] + bounds[2]) * 0.5f) / (bounds[0] - bounds[2]));
   gy = abs((my - (bounds[1] + bounds[3]) * 0.5f) / (bounds[1] - bounds[3]));
   a = rm_max(gx, gy) - 0.5f;
   a = rm_clamp(a, 0.0f, 1.0f);
-  nvgGlobalAlpha(vg, a);
+  vg->GlobalAlpha( a);
 
-  nvgBeginPath(vg);
-  nvgFillColor(vg, nvgRGBA(220, 220, 220, 255));
-  nvgRoundedRect(vg
-    , round(bounds[0] - 2.0f)
+  vg->BeginPath();
+  vg->FillColor( NVGcolor::RGBA(220, 220, 220, 255));
+  vg->RoundedRect( round(bounds[0] - 2.0f)
     , round(bounds[1] - 2.0f)
     , round(bounds[2] - bounds[0]) + 4.0f
     , round(bounds[3] - bounds[1]) + 4.0f
     , 3.0f
   );
   px = float((int)((bounds[2] + bounds[0]) / 2));
-  nvgMoveTo(vg, px, bounds[1] - 10);
-  nvgLineTo(vg, px + 7, bounds[1] + 1);
-  nvgLineTo(vg, px - 7, bounds[1] + 1);
-  nvgFill(vg);
+  vg->MoveTo( px, bounds[1] - 10);
+  vg->LineTo( px + 7, bounds[1] + 1);
+  vg->LineTo( px - 7, bounds[1] + 1);
+  vg->Fill();
 
-  nvgFillColor(vg, nvgRGBA(0, 0, 0, 220));
-  nvgTextBox(vg, x, y, 150, "Hover your mouse over the text to see calculated caret position.", NULL);
+  vg->FillColor( NVGcolor::RGBA(0, 0, 0, 220));
+  vg->TextBox( x, y, 150, "Hover your mouse over the text to see calculated caret position.", NULL);
 
-  nvgRestore(vg);
+  vg->Restore();
 }
 #pragma endregion
+
+class rm_effects_preview : public rm_widget {
+  int m_bgImage;
+
+  void ensure_background(NVGcontext* ctx) {
+    if (m_bgImage != 0 || ctx == nullptr) {
+      return;
+    }
+
+    const int w = 512;
+    const int h = 512;
+    std::vector<unsigned char> pixels(w * h * 4);
+    for (int y = 0; y < h; ++y) {
+      for (int x = 0; x < w; ++x) {
+        const float fx = x / (float)(w - 1);
+        const float fy = y / (float)(h - 1);
+        const float wave = 0.5f + 0.5f * sinf(fx * 8.0f + fy * 4.0f);
+        const unsigned int seed = (unsigned int)(x * 1973u + y * 9277u) ^ 0x68bc21u;
+        const float noise = ((float)(seed & 255u) / 255.0f) - 0.5f;
+
+        float r = 20.0f + 120.0f * fx + 60.0f * wave + 18.0f * noise;
+        float g = 18.0f + 90.0f * fy + 40.0f * wave + 14.0f * noise;
+        float b = 40.0f + 140.0f * (1.0f - fx) + 50.0f * wave + 12.0f * noise;
+
+        r = rm_clamp(r, 0.0f, 255.0f);
+        g = rm_clamp(g, 0.0f, 255.0f);
+        b = rm_clamp(b, 0.0f, 255.0f);
+
+        const int idx = (y * w + x) * 4;
+        pixels[idx + 0] = static_cast<unsigned char>(r);
+        pixels[idx + 1] = static_cast<unsigned char>(g);
+        pixels[idx + 2] = static_cast<unsigned char>(b);
+        pixels[idx + 3] = 255;
+      }
+    }
+
+    m_bgImage = ctx->CreateImageRGBA(w, h, NVG_IMAGE_REPEATX | NVG_IMAGE_REPEATY, pixels.data());
+  }
+
+public:
+  rm_effects_preview(rm_widget* p_parent, int x, int y, int width, int height)
+    : rm_widget(x, y, width, height, p_parent, "effects_preview"),
+      m_bgImage(0) {}
+
+  void on_draw(NVGcontext* ctx) override {
+    ensure_background(ctx);
+    if (m_bgImage == 0) {
+      return;
+    }
+
+    NVGpaint bg = NVGpaint::ImagePattern(0.0f, 0.0f, m_size.x, m_size.y, 0.0f, m_bgImage, 1.0f);
+    ctx->BeginPath();
+    ctx->Rect(0.0f, 0.0f, m_size.x, m_size.y);
+    ctx->FillPaint(bg);
+    ctx->Fill();
+
+    const float pad = 24.0f;
+    const float panelW = rm_min(380.0f, m_size.x - pad * 2.0f);
+    const float panelH = 200.0f;
+    const float panelX = pad;
+    const float panelY = pad;
+
+    NVGglassStyle glass;
+    glass.backgroundImage = m_bgImage;
+    glass.backgroundAlpha = 1.0f;
+    glass.blur = 7.0f;
+    glass.blurSamples = 12;
+    glass.radius = 18.0f;
+    glass.tint = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.10f);
+    glass.highlightColor = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.30f);
+    glass.shadowColor = NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.30f);
+    glass.borderColor = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.30f);
+    glass.borderWidth = 1.0f;
+    glass.highlight = 0.45f;
+
+    ctx->GlassRect(panelX, panelY, panelW, panelH, glass);
+
+    ctx->FontFace("default");
+    ctx->TextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+
+    NVGblurStyle titleBlur;
+    titleBlur.radius = 6.0f;
+    titleBlur.strength = 0.7f;
+    titleBlur.steps = 12;
+    titleBlur.rings = 2;
+    titleBlur.color = NVGcolor::RGBA(255, 255, 255, 235);
+
+    ctx->FontSize(30.0f);
+    ctx->TextBlur(panelX + 20.0f, panelY + 20.0f, "Liquid Glass", nullptr, titleBlur);
+
+    NVGblurStyle subBlur = titleBlur;
+    subBlur.radius = 3.0f;
+    subBlur.strength = 0.45f;
+    subBlur.color = NVGcolor::RGBA(200, 220, 255, 200);
+    ctx->FontSize(16.0f);
+    ctx->TextBlur(panelX + 20.0f, panelY + 72.0f, "Blurred text + frosted panel", nullptr, subBlur);
+
+    ctx->FillColor(NVGcolor::RGBA(220, 220, 220, 200));
+    ctx->Text(panelX + 20.0f, panelY + 112.0f, "Backend-agnostic effects demo", nullptr);
+
+    const float glowX = panelX + panelW + 40.0f;
+    const float glowW = rm_max(200.0f, m_size.x - glowX - pad);
+    const float glowH = 140.0f;
+    const float glowY = panelY + 30.0f;
+
+    NVGglowStyle glow;
+    glow.radius = 20.0f;
+    glow.intensity = 0.9f;
+    glow.color = NVGcolor::RGBA(90, 160, 255, 220);
+    ctx->GlowRect(glowX, glowY, glowW, glowH, 18.0f, glow);
+
+    ctx->BeginPath();
+    ctx->RoundedRect(glowX, glowY, glowW, glowH, 18.0f);
+    ctx->FillColor(NVGcolor::RGBA(18, 20, 28, 210));
+    ctx->Fill();
+    ctx->StrokeWidth(1.0f);
+    ctx->StrokeColor(NVGcolor::RGBA(120, 170, 255, 120));
+    ctx->Stroke();
+
+    ctx->FontSize(18.0f);
+    ctx->FillColor(NVGcolor::RGBA(200, 220, 255, 220));
+    ctx->TextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+    ctx->Text(glowX + glowW * 0.5f, glowY + glowH * 0.5f, "Neon Glow", nullptr);
+
+    ctx->TextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+    ctx->FontSize(22.0f);
+    ctx->FillColor(NVGcolor::RGBA(240, 240, 240, 220));
+    ctx->Text(pad, panelY + panelH + 40.0f, "Text Blur", nullptr);
+
+    NVGblurStyle textBlur;
+    textBlur.radius = 5.0f;
+    textBlur.strength = 0.6f;
+    textBlur.steps = 10;
+    textBlur.rings = 2;
+    textBlur.color = NVGcolor::RGBA(255, 200, 160, 220);
+    ctx->FontSize(36.0f);
+    ctx->TextBlur(pad, panelY + panelH + 78.0f, "Soft Blur Effect", nullptr, textBlur);
+  }
+};
 
 void testtrb()
 {
@@ -181,7 +322,7 @@ void test_old(rm_surface* gui)
   static rm_text_input_style style_inp;
   //style_inp.set_text_offsets(10.0f);
   style_inp.set_all_corners_radius(4.f);
-  style_inp.set_border_color(nvgRGB(0, 0, 255));
+  style_inp.set_border_color(NVGcolor::RGB(0, 0, 255));
   style_inp.set_border_width(2.f);
   style_inp.set_rounded_selection(0);
   //style_inp.set_active_bgr_color({ 0,0,0 });
@@ -192,9 +333,9 @@ void test_old(rm_surface* gui)
 
   static rm_checkbox_style style;
   style.set_font_size(14.f);
-  style.set_background_color(nvgRGB(20, 20, 20));
-  style.set_border_color(nvgRGB(80, 80, 80));
-  style.set_mark_color(nvgRGB(111, 111, 255));
+  style.set_background_color(NVGcolor::RGB(20, 20, 20));
+  style.set_border_color(NVGcolor::RGB(80, 80, 80));
+  style.set_mark_color(NVGcolor::RGB(111, 111, 255));
   style.set_border_width(1.f);
 
   //style.set_corner_radius(LEFT_TOP, 4.f);
@@ -270,7 +411,7 @@ void test_old(rm_surface* gui)
 
   //static rm_scroll_style scrollbar_style;
   //scrollbar_style.set_scroll_corner_round(1.f);
-  //scrollbar_style.set_scroll_thumb_color(nvgRGB(90, 90, 90));
+  //scrollbar_style.set_scroll_thumb_color(NVGcolor::RGB(90, 90, 90));
   //scrollbar_style.set_thumb_size(10);
   //rm_scrollbar* pscroll = new rm_scrollbar(pwindow, RM_ORIENT_VERT, &scrollbar_style);
    
@@ -334,6 +475,13 @@ void example_widgets(rm_surface* gui)
   tc::tab* ptab11 = ptabctl->add_tab("Main page asdasda", 0, 10);
   tc::tab* ptab12 = ptabctl->add_tab("Page 2 asdasdasd", 1, 10);
 
+  rm_widget* effects_page = ptab12->get_page_widget();
+  rm_vec2& effects_size = effects_page->get_size();
+  const float effects_pad = 12.0f;
+  const int effects_w = static_cast<int>(rm_max(0.0f, effects_size.x - effects_pad * 2.0f));
+  const int effects_h = static_cast<int>(rm_max(0.0f, effects_size.y - effects_pad * 2.0f));
+  new rm_effects_preview(effects_page, static_cast<int>(effects_pad), static_cast<int>(effects_pad), effects_w, effects_h);
+
   rm_flexbox_layout* pflexlayout = new rm_flexbox_layout();
   pflexlayout->set_dir(rm_flex_direction::Column);
   pflexlayout->set_paddings(10.f);
@@ -357,17 +505,21 @@ void example_widgets(rm_surface* gui)
       printf("checkbox is %s\n", pcheckbox->is_checked() ? "checked" : "unchecked");
       return true;
     });
-  ptabctl->select_tab(0, 0);
+  size_t effects_idx = ptabctl->find_tab_idx_in_row(0, ptab12->get_id());
+  if (!tc::is_valid_tab(effects_idx)) {
+    effects_idx = 0;
+  }
+  ptabctl->select_tab(0, effects_idx);
 
   static rm_radiobutton_style style_rb;
   style_rb.set_all_corners_radius(8.f);
   style_rb.set_border_width_inner(3.f);
   style_rb.set_border_width_outer(1.5f);
-  style_rb.set_border_active_outer(nvgRGB(57, 76, 195));
-  style_rb.set_border_active_inner(nvgRGB(40, 60, 196));
-  style_rb.set_border_inactive(nvgRGB(255, 255, 255));
+  style_rb.set_border_active_outer(NVGcolor::RGB(57, 76, 195));
+  style_rb.set_border_active_inner(NVGcolor::RGB(40, 60, 196));
+  style_rb.set_border_inactive(NVGcolor::RGB(255, 255, 255));
   style_rb.set_border_width_inactive(1.5f);
-  style_rb.set_bg_inner(nvgRGBA(33, 36, 71, 68.85f));
+  style_rb.set_bg_inner(NVGcolor::RGBA(33, 36, 71, 68.85f));
   style_rb.set_circle_radius(9.5f);
 
   new rm_radiobutton(pdiv, 10, 10, 150, 25, &style_rb, "Holding",
@@ -387,9 +539,9 @@ void example_widgets(rm_surface* gui)
   static rm_switch_style style_switch;
   style_switch.set_track_height(30.f);
   style_switch.set_padding(4.f);
-  style_switch.set_track_on(nvgRGB(53, 77, 230));
-  style_switch.set_track_off(nvgRGB(28, 41, 103));
-  style_switch.set_knob_color(nvgRGB(255, 255, 255));
+  style_switch.set_track_on(NVGcolor::RGB(53, 77, 230));
+  style_switch.set_track_off(NVGcolor::RGB(28, 41, 103));
+  style_switch.set_knob_color(NVGcolor::RGB(255, 255, 255));
   style_switch.set_anim_time(0.25f);
   //style_switch->set_shadow_size(12.f);
   style_switch.set_all_corners_radius(style_switch.get_track_height() * 0.5f);
@@ -405,11 +557,11 @@ void example_widgets(rm_surface* gui)
   static rm_slider_style style_slider;
   style_slider.set_track_height(7.f);
   style_slider.set_padding(9.8f);
-  style_slider.set_track_bg(nvgRGB(109, 119, 213));
-  style_slider.set_track_fill(nvgRGB(53, 79, 206));
+  style_slider.set_track_bg(NVGcolor::RGB(109, 119, 213));
+  style_slider.set_track_fill(NVGcolor::RGB(53, 79, 206));
   style_slider.set_thumb_radius(7.f);
-  style_slider.set_thumb_color(nvgRGB(255, 255, 255));
-  style_slider.set_thumb_border_color(nvgRGB(57, 76, 195));
+  style_slider.set_thumb_color(NVGcolor::RGB(255, 255, 255));
+  style_slider.set_thumb_border_color(NVGcolor::RGB(57, 76, 195));
   style_slider.set_thumb_border_width(3.5f);
   style_slider.set_all_corners_radius(style_slider.get_track_height() * 0.5f);
   rm_slider* slider = new rm_slider(pdiv, 10, 160, 400, 40, &style_slider, 0.0f, 100.0f, 50.0f,
@@ -421,10 +573,10 @@ void example_widgets(rm_surface* gui)
   static rm_listview_style lv_style;
   lv_style.set_row_height(30.f);
   lv_style.set_text_padding(12.f);
-  lv_style.set_background_color(nvgRGB(250, 250, 250));
-  lv_style.set_text_color(nvgRGB(30, 30, 30));
-  lv_style.set_hover_color(nvgRGB(230, 230, 255));
-  lv_style.set_selected_color(nvgRGB(180, 200, 255));
+  lv_style.set_background_color(NVGcolor::RGB(250, 250, 250));
+  lv_style.set_text_color(NVGcolor::RGB(30, 30, 30));
+  lv_style.set_hover_color(NVGcolor::RGB(230, 230, 255));
+  lv_style.set_selected_color(NVGcolor::RGB(180, 200, 255));
   lv_style.set_font_size(14.f);
 
   rm_listview *list = new rm_listview(pdiv, 20, 210, 200, 150, &lv_style,
@@ -488,12 +640,12 @@ int main() {
 #if 0
     int w, h;
     glfwGetFramebufferSize(window, &w, &h);
-    nvgBeginFrame(vg, w, h, 1.f);
+    vg->BeginFrame( w, h, 1.f);
     drawBlendish(vg, 0, 0, 400, 400, instance.get_time());
     double mx, my;
     glfwGetCursorPos(window, &mx, &my);
     drawParagraph(vg, 10, 10, w, h, (float)mx, (float)my);
-    nvgEndFrame(vg);
+    vg->EndFrame();
 #endif
     glfwSwapBuffers(g_gui->get_syswindow<GLFWwindow*>());
   }
