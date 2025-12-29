@@ -27,10 +27,6 @@ THE SOFTWARE.
 
 #include "nanovg.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /*
 
 Revision 6 (2014-09-21)
@@ -77,14 +73,6 @@ before including blendish.h, otherwise the file will be in header-only mode.
 // the export level you need
 #ifndef BND_EXPORT
 #define BND_EXPORT
-#endif
-
-// if that typedef is provided elsewhere, you may define
-// BLENDISH_NO_NVG_TYPEDEFS before including the header.
-#ifndef BLENDISH_NO_NVG_TYPEDEFS
-typedef struct NVGcontext NVGcontext;
-typedef struct NVGcolor NVGcolor;
-typedef struct NVGglyphPosition NVGglyphPosition;
 #endif
 
 // describes the theme used to draw a single widget or widget box;
@@ -1087,9 +1075,5 @@ BND_EXPORT void bndNodeArrowDown(NVGcontext *ctx, float x, float y, float s, NVG
 // BND_HOVER indicates selected state,
 // BND_ACTIVE indicates dragged state
 BND_EXPORT NVGcolor bndNodeWireColor(const BNDnodeTheme *theme, BNDwidgetState state);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif // BLENDISH_H_8BF73A5E_CF37_11EA_87D1_AF92B7B29526

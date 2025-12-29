@@ -18,6 +18,8 @@
 #ifndef NANOVG_GL_UTILS_H
 #define NANOVG_GL_UTILS_H
 
+#include "nanovg.h"
+
 struct NVGLUframebuffer {
 	NVGcontext* ctx;
 	GLuint fbo;
@@ -63,7 +65,7 @@ NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* ctx, int w, int h, int imag
 	if (fb == NULL) goto error;
 	memset(fb, 0, sizeof(NVGLUframebuffer));
 
-	fb->image = nvgCreateImageRGBA(ctx, w, h, imageFlags | NVG_IMAGE_FLIPY | NVG_IMAGE_PREMULTIPLIED, NULL);
+	fb->image = ctx->CreateImageRGBA(w, h, imageFlags | NVG_IMAGE_FLIPY | NVG_IMAGE_PREMULTIPLIED, NULL);
 
 #if defined NANOVG_GL2
 	fb->texture = nvglImageHandleGL2(ctx, fb->image);
@@ -139,7 +141,7 @@ void nvgluDeleteFramebuffer(NVGLUframebuffer* fb)
 	if (fb->rbo != 0)
 		glDeleteRenderbuffers(1, &fb->rbo);
 	if (fb->image >= 0)
-		nvgDeleteImage(fb->ctx, fb->image);
+		fb->ctx->DeleteImage(fb->image);
 	fb->ctx = NULL;
 	fb->fbo = 0;
 	fb->rbo = 0;
