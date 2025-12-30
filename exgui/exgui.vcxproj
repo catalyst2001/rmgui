@@ -150,6 +150,8 @@
     <ClCompile Include="vendor\glad\src\glad.c" />
     <ClCompile Include="vendor\nanovg\blendish.cpp" />
     <ClCompile Include="vendor\nanovg\nanovg.cpp" />
+    <ClCompile Include="vendor\nanovg\nanovg_gl.cpp" />
+    <ClCompile Include="vendor\nanovg\nanovg_gl_utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="blendish_test.h" />

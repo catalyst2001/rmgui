@@ -56,6 +56,12 @@
     <ClCompile Include="exgui\backend\rmgui_win32_opnegl33.cpp">
       <Filter>exgui\backend</Filter>
     </ClCompile>
+    <ClCompile Include="vendor\nanovg\nanovg_gl.cpp">
+      <Filter>vendor\nanovg</Filter>
+    </ClCompile>
+    <ClCompile Include="vendor\nanovg\nanovg_gl_utils.cpp">
+      <Filter>vendor\nanovg</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="exgui\rmgui.h">

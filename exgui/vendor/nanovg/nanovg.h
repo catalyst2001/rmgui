@@ -39,7 +39,7 @@ struct NVGcolor {
 	union {
 		float rgba[4];
 		struct {
-			float r,g,b,a;
+			float r, g, b, a;
 		};
 	};
 
@@ -47,9 +47,9 @@ struct NVGcolor {
 	static NVGcolor RGBf(float r, float g, float b);
 	static NVGcolor RGBA(unsigned char r, unsigned char g, unsigned char b, unsigned char a);
 	static NVGcolor RGBAf(float r, float g, float b, float a);
-	static NVGcolor LerpRGBA(NVGcolor c0, NVGcolor c1, float u);
-	static NVGcolor TransRGBA(NVGcolor c0, unsigned char a);
-	static NVGcolor TransRGBAf(NVGcolor c0, float a);
+	static NVGcolor lerpRGBA(NVGcolor c0, NVGcolor c1, float u);
+	static NVGcolor transRGBA(NVGcolor c0, unsigned char a);
+	static NVGcolor transRGBAf(NVGcolor c0, float a);
 	static NVGcolor HSL(float h, float s, float l);
 	static NVGcolor HSLA(float h, float s, float l, unsigned char a);
 	static NVGcolor HSLAf(float h, float s, float l, float a);
@@ -64,10 +64,10 @@ struct NVGpaint {
 	NVGcolor outerColor;
 	int image;
 
-	static NVGpaint LinearGradient(float sx, float sy, float ex, float ey, NVGcolor icol, NVGcolor ocol);
-	static NVGpaint BoxGradient(float x, float y, float w, float h, float r, float f, NVGcolor icol, NVGcolor ocol);
-	static NVGpaint RadialGradient(float cx, float cy, float inr, float outr, NVGcolor icol, NVGcolor ocol);
-	static NVGpaint ImagePattern(float ox, float oy, float ex, float ey, float angle, int image, float alpha);
+	static NVGpaint linearGradient(float sx, float sy, float ex, float ey, NVGcolor icol, NVGcolor ocol);
+	static NVGpaint boxGradient(float x, float y, float w, float h, float r, float f, NVGcolor icol, NVGcolor ocol);
+	static NVGpaint radialGradient(float cx, float cy, float inr, float outr, NVGcolor icol, NVGcolor ocol);
+	static NVGpaint imagePattern(float ox, float oy, float ex, float ey, float angle, int image, float alpha);
 };
 
 enum NVGblurType {
@@ -82,14 +82,14 @@ enum NVGblurType {
 struct NVGblurStyle {
 	float radius;
 	float strength;
-	int steps;
-	int rings;
+	int   steps;
+	int   rings;
 	NVGcolor color;
 	NVGblurType type;
 	float angle;
 	float length;
 	float jitter;
-	int blades;
+	int   blades;
 
 	NVGblurStyle();
 };
@@ -137,27 +137,27 @@ enum NVGlineCap {
 };
 
 enum NVGalign {
-	NVG_ALIGN_LEFT 		= 1<<0,
-	NVG_ALIGN_CENTER 	= 1<<1,
-	NVG_ALIGN_RIGHT 	= 1<<2,
-	NVG_ALIGN_TOP 		= 1<<3,
-	NVG_ALIGN_MIDDLE	= 1<<4,
-	NVG_ALIGN_BOTTOM	= 1<<5,
-	NVG_ALIGN_BASELINE	= 1<<6,
+	NVG_ALIGN_LEFT = 1 << 0,
+	NVG_ALIGN_CENTER = 1 << 1,
+	NVG_ALIGN_RIGHT = 1 << 2,
+	NVG_ALIGN_TOP = 1 << 3,
+	NVG_ALIGN_MIDDLE = 1 << 4,
+	NVG_ALIGN_BOTTOM = 1 << 5,
+	NVG_ALIGN_BASELINE = 1 << 6,
 };
 
 enum NVGblendFactor {
-	NVG_ZERO = 1<<0,
-	NVG_ONE = 1<<1,
-	NVG_SRC_COLOR = 1<<2,
-	NVG_ONE_MINUS_SRC_COLOR = 1<<3,
-	NVG_DST_COLOR = 1<<4,
-	NVG_ONE_MINUS_DST_COLOR = 1<<5,
-	NVG_SRC_ALPHA = 1<<6,
-	NVG_ONE_MINUS_SRC_ALPHA = 1<<7,
-	NVG_DST_ALPHA = 1<<8,
-	NVG_ONE_MINUS_DST_ALPHA = 1<<9,
-	NVG_SRC_ALPHA_SATURATE = 1<<10,
+	NVG_ZERO = 1 << 0,
+	NVG_ONE = 1 << 1,
+	NVG_SRC_COLOR = 1 << 2,
+	NVG_ONE_MINUS_SRC_COLOR = 1 << 3,
+	NVG_DST_COLOR = 1 << 4,
+	NVG_ONE_MINUS_DST_COLOR = 1 << 5,
+	NVG_SRC_ALPHA = 1 << 6,
+	NVG_ONE_MINUS_SRC_ALPHA = 1 << 7,
+	NVG_DST_ALPHA = 1 << 8,
+	NVG_ONE_MINUS_DST_ALPHA = 1 << 9,
+	NVG_SRC_ALPHA_SATURATE = 1 << 10,
 };
 
 enum NVGcompositeOperation {
@@ -202,12 +202,12 @@ struct NVGtextRow {
 typedef struct NVGtextRow NVGtextRow;
 
 enum NVGimageFlags {
-	NVG_IMAGE_GENERATE_MIPMAPS	= 1<<0,
-	NVG_IMAGE_REPEATX			= 1<<1,
-	NVG_IMAGE_REPEATY			= 1<<2,
-	NVG_IMAGE_FLIPY				= 1<<3,
-	NVG_IMAGE_PREMULTIPLIED		= 1<<4,
-	NVG_IMAGE_NEAREST			= 1<<5,
+	NVG_IMAGE_GENERATE_MIPMAPS = 1 << 0,
+	NVG_IMAGE_REPEATX = 1 << 1,
+	NVG_IMAGE_REPEATY = 1 << 2,
+	NVG_IMAGE_FLIPY = 1 << 3,
+	NVG_IMAGE_PREMULTIPLIED = 1 << 4,
+	NVG_IMAGE_NEAREST = 1 << 5,
 };
 
 struct NVGrenderTargetDesc {
@@ -256,11 +256,11 @@ typedef struct NVGblendState NVGblendState;
 
 enum NVGpipelineFlags {
 	NVG_PIPELINE_NONE = 0,
-	NVG_PIPELINE_DEPTH_TEST = 1<<0,
-	NVG_PIPELINE_DEPTH_WRITE = 1<<1,
-	NVG_PIPELINE_CULL_BACK = 1<<2,
-	NVG_PIPELINE_CULL_FRONT = 1<<3,
-	NVG_PIPELINE_SCISSOR = 1<<4,
+	NVG_PIPELINE_DEPTH_TEST = 1 << 0,
+	NVG_PIPELINE_DEPTH_WRITE = 1 << 1,
+	NVG_PIPELINE_CULL_BACK = 1 << 2,
+	NVG_PIPELINE_CULL_FRONT = 1 << 3,
+	NVG_PIPELINE_SCISSOR = 1 << 4,
 };
 
 struct NVGpipelineDesc {
@@ -298,7 +298,7 @@ struct NVGscissor {
 typedef struct NVGscissor NVGscissor;
 
 struct NVGvertex {
-	float x,y,u,v;
+	float x, y, u, v;
 };
 
 typedef struct NVGvertex NVGvertex;
@@ -364,7 +364,7 @@ struct NVGstate {
 typedef struct NVGstate NVGstate;
 
 struct NVGpoint {
-	float x,y;
+	float x, y;
 	float dx, dy;
 	float len;
 	float dmx, dmy;
@@ -400,31 +400,41 @@ class NVGrenderer {
 public:
 	virtual ~NVGrenderer() = default;
 
-	virtual int Create() = 0;
-	virtual int CreateTexture(int type, int w, int h, int imageFlags, const unsigned char* data) = 0;
-	virtual int DeleteTexture(int image) = 0;
-	virtual int UpdateTexture(int image, int x, int y, int w, int h, const unsigned char* data) = 0;
-	virtual int GetTextureSize(int image, int* w, int* h) = 0;
-	virtual void Viewport(float width, float height, float devicePixelRatio) = 0;
-	virtual void Cancel() = 0;
-	virtual void Flush() = 0;
-	virtual void Fill(const NVGpaint& paint, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, float fringe, const float* bounds, const NVGpath* paths, int npaths) = 0;
-	virtual void Stroke(const NVGpaint& paint, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, float fringe, float strokeWidth, const NVGpath* paths, int npaths) = 0;
-	virtual void Triangles(const NVGpaint& paint, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, const NVGvertex* verts, int nverts, float fringe) = 0;
+	virtual int create() = 0;
+	virtual int createTexture(int type, int w, int h, int imageFlags, const unsigned char* data) = 0;
+	virtual int deleteTexture(int image) = 0;
+	virtual int updateTexture(int image, int x, int y, int w, int h, const unsigned char* data) = 0;
+	virtual int getTextureSize(int image, int* w, int* h) = 0;
+	virtual void viewport(float width, float height, float devicePixelRatio) = 0;
+	virtual void cancel() = 0;
+	virtual void flush() = 0;
+	virtual void fill(const NVGpaint& paint, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, float fringe, const float* bounds, const NVGpath* paths, int npaths) = 0;
+	virtual void stroke(const NVGpaint& paint, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, float fringe, float strokeWidth, const NVGpath* paths, int npaths) = 0;
+	virtual void triangles(const NVGpaint& paint, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, const NVGvertex* verts, int nverts, float fringe) = 0;
 	virtual void Delete() = 0;
 
-	virtual int CreateRenderTarget(const NVGrenderTargetDesc& desc) = 0;
-	virtual void DeleteRenderTarget(int target) = 0;
-	virtual void BindRenderTarget(int target) = 0;
-	virtual int RenderTargetImage(int target) = 0;
-	virtual int CreateShader(const NVGshaderDesc& desc) = 0;
-	virtual void DeleteShader(int shader) = 0;
-	virtual int CreatePipeline(const NVGpipelineDesc& desc) = 0;
-	virtual void DeletePipeline(int pipeline) = 0;
-	virtual void RenderCustomTriangles(const NVGcustomDraw& draw, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, const NVGvertex* verts, int nverts, float fringe) = 0;
+	virtual int createRenderTarget(const NVGrenderTargetDesc& desc) = 0;
+	virtual void deleteRenderTarget(int target) = 0;
+	virtual void setRenderTarget(int target) = 0;
+	virtual int getRenderTargetImage(int target) = 0;
+	virtual int createShader(const NVGshaderDesc& desc) = 0;
+	virtual void deleteShader(int shader) = 0;
+	virtual int createPipeline(const NVGpipelineDesc& desc) = 0;
+	virtual void deletePipeline(int pipeline) = 0;
+	virtual void drawCustomTriangles(const NVGcustomDraw& draw, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, const NVGvertex* verts, int nverts, float fringe) = 0;
 };
 
 struct FONScontext;
+
+/**
+* @brief 3x3 transform matrix
+*/
+struct NVGtransform {
+	union {
+		struct { float mat[3][3]; };
+		struct { float v[6]; };
+	};
+};
 
 struct NVGcontext {
 	static std::unique_ptr<NVGcontext> Create(std::unique_ptr<NVGrenderer> renderer, const NVGcontextConfig& config = NVGcontextConfig());
@@ -434,27 +444,27 @@ struct NVGcontext {
 	NVGcontext& operator=(const NVGcontext&) = delete;
 
 	// Frame.
-	void BeginFrame(float windowWidth, float windowHeight, float devicePixelRatio);
-	void BeginFrame(int renderTarget, float windowWidth, float windowHeight, float devicePixelRatio);
-	void CancelFrame();
-	void EndFrame();
+	void beginFrame(float windowWidth, float windowHeight, float devicePixelRatio);
+	void beginFrame(int renderTarget, float windowWidth, float windowHeight, float devicePixelRatio);
+	void cancelFrame();
+	void endFrame();
 
 	// Composite operation.
-	void GlobalCompositeOperation(int op);
-	void GlobalCompositeBlendFunc(int sfactor, int dfactor);
-	void GlobalCompositeBlendFuncSeparate(int srcRGB, int dstRGB, int srcAlpha, int dstAlpha);
+	void globalCompositeOp(int op);
+	void globalCompositeBlendFunc(int sfactor, int dfactor);
+	void globalCompositeBlendFuncSeparate(int srcRGB, int dstRGB, int srcAlpha, int dstAlpha);
 
 	// State handling.
-	void Save();
-	void Restore();
-	void Reset();
+	void save();
+	void restore();
+	void reset();
 
 	// Render styles.
-	void ShapeAntiAlias(int enabled);
-	void StrokeColor(NVGcolor color);
-	void StrokePaint(NVGpaint paint);
-	void FillColor(NVGcolor color);
-	void FillPaint(NVGpaint paint);
+	void shapeAntiAlias(int enabled);
+	void strokeColor(NVGcolor color);
+	void strokePaint(NVGpaint paint);
+	void fillColor(NVGcolor color);
+	void fillPaint(NVGpaint paint);
 	void MiterLimit(float limit);
 	void StrokeWidth(float size);
 	void LineCap(int cap);
@@ -462,14 +472,14 @@ struct NVGcontext {
 	void GlobalAlpha(float alpha);
 
 	// Transforms.
-	void ResetTransform();
-	void Transform(float a, float b, float c, float d, float e, float f);
-	void Translate(float x, float y);
-	void Rotate(float angle);
-	void SkewX(float angle);
-	void SkewY(float angle);
-	void Scale(float x, float y);
-	void CurrentTransform(float* xform);
+	void resetTransform();
+	void transform(float a, float b, float c, float d, float e, float f);
+	void translate(float x, float y);
+	void rotate(float angle);
+	void skewX(float angle);
+	void skewY(float angle);
+	void scale(float x, float y);
+	void getCurrentTransform(float* xform);
 
 	// Transform utils.
 	static void TransformIdentity(float* dst);
@@ -486,87 +496,87 @@ struct NVGcontext {
 	static float RadToDeg(float rad);
 
 	// Images.
-	int CreateImage(const char* filename, int imageFlags);
-	int CreateImageMem(int imageFlags, unsigned char* data, int ndata);
-	int CreateImageRGBA(int w, int h, int imageFlags, const unsigned char* data);
-	void UpdateImage(int image, const unsigned char* data);
-	void ImageSize(int image, int* w, int* h);
-	void DeleteImage(int image);
+	int  createImage(const char* filename, int imageFlags);
+	int  createImageMem(int imageFlags, unsigned char* data, int ndata);
+	int  createImageRGBA(int w, int h, int imageFlags, const unsigned char* data);
+	void updateImage(int image, const unsigned char* data);
+	void getImageSize(int image, int* w, int* h);
+	void deleteImage(int image);
 
 	// Scissoring.
-	void Scissor(float x, float y, float w, float h);
-	void IntersectScissor(float x, float y, float w, float h);
-	void ResetScissor();
+	void scissor(float x, float y, float w, float h);
+	void intersectScissor(float x, float y, float w, float h);
+	void resetScissor();
 
 	// Paths.
-	void BeginPath();
-	void MoveTo(float x, float y);
-	void LineTo(float x, float y);
-	void BezierTo(float c1x, float c1y, float c2x, float c2y, float x, float y);
-	void QuadTo(float cx, float cy, float x, float y);
-	void ArcTo(float x1, float y1, float x2, float y2, float radius);
-	void ClosePath();
-	void PathWinding(int dir);
-	void Arc(float cx, float cy, float r, float a0, float a1, int dir);
-	void Rect(float x, float y, float w, float h);
-	void RoundedRect(float x, float y, float w, float h, float r);
-	void RoundedRectVarying(float x, float y, float w, float h, float radTopLeft, float radTopRight, float radBottomRight, float radBottomLeft);
-	void Ellipse(float cx, float cy, float rx, float ry);
-	void Circle(float cx, float cy, float r);
-	void Fill();
-	void Stroke();
+	void beginPath();
+	void moveTo(float x, float y);
+	void lineTo(float x, float y);
+	void bezierTo(float c1x, float c1y, float c2x, float c2y, float x, float y);
+	void quadTo(float cx, float cy, float x, float y);
+	void arcTo(float x1, float y1, float x2, float y2, float radius);
+	void closePath();
+	void pathWinding(int dir);
+	void arc(float cx, float cy, float r, float a0, float a1, int dir);
+	void rect(float x, float y, float w, float h);
+	void roundedRect(float x, float y, float w, float h, float r);
+	void roundedRectVarying(float x, float y, float w, float h, float radTopLeft, float radTopRight, float radBottomRight, float radBottomLeft);
+	void ellipse(float cx, float cy, float rx, float ry);
+	void circle(float cx, float cy, float r);
+	void fill();
+	void stroke();
 
 	// Text.
-	int CreateFont(const char* name, const char* filename);
-	int CreateFontAtIndex(const char* name, const char* filename, const int fontIndex);
-	int CreateFontMem(const char* name, unsigned char* data, int ndata, int freeData);
-	int CreateFontMemAtIndex(const char* name, unsigned char* data, int ndata, int freeData, const int fontIndex);
-	int FindFont(const char* name);
-	int AddFallbackFontId(int baseFont, int fallbackFont);
-	int AddFallbackFont(const char* baseFont, const char* fallbackFont);
-	void ResetFallbackFontsId(int baseFont);
-	void ResetFallbackFonts(const char* baseFont);
-	void FontSize(float size);
-	void FontBlur(float blur);
-	void TextLetterSpacing(float spacing);
-	void TextLineHeight(float lineHeight);
-	void TextAlign(int align);
-	void FontFaceId(int font);
-	void FontFace(const char* font);
-	float Text(float x, float y, const char* string, const char* end);
-	void TextBox(float x, float y, float breakRowWidth, const char* string, const char* end);
-	float TextBounds(float x, float y, const char* string, const char* end, float* bounds);
-	void TextBoxBounds(float x, float y, float breakRowWidth, const char* string, const char* end, float* bounds);
-	int TextGlyphPositions(float x, float y, const char* string, const char* end, NVGglyphPosition* positions, int maxPositions);
-	void TextMetrics(float* ascender, float* descender, float* lineh);
-	int TextBreakLines(const char* string, const char* end, float breakRowWidth, NVGtextRow* rows, int maxRows);
+	int createFont(const char* name, const char* filename);
+	int createFontAtIndex(const char* name, const char* filename, const int fontIndex);
+	int createFontMem(const char* name, unsigned char* data, int ndata, int freeData);
+	int createFontMemAtIndex(const char* name, unsigned char* data, int ndata, int freeData, const int fontIndex);
+	int findFont(const char* name);
+	int addFallbackFontId(int baseFont, int fallbackFont);
+	int addFallbackFont(const char* baseFont, const char* fallbackFont);
+	void resetFallbackFontsId(int baseFont);
+	void resetFallbackFonts(const char* baseFont);
+	void setFontSize(float size);
+	void setFontBlur(float blur);
+	void setTextLetterSpacing(float spacing);
+	void setTextLineHeight(float lineHeight);
+	void setTextAlign(int align);
+	void setFontFaceId(int font);
+	void setFontFace(const char* font);
+	float text(float x, float y, const char* string, const char* end);
+	void textBox(float x, float y, float breakRowWidth, const char* string, const char* end);
+	float textBounds(float x, float y, const char* string, const char* end, float* bounds);
+	void textBoxBounds(float x, float y, float breakRowWidth, const char* string, const char* end, float* bounds);
+	int textGlyphPositions(float x, float y, const char* string, const char* end, NVGglyphPosition* positions, int maxPositions);
+	void textMetrics(float* ascender, float* descender, float* lineh);
+	int textBreakLines(const char* string, const char* end, float breakRowWidth, NVGtextRow* rows, int maxRows);
 
 	// Effects.
-	void TextBlur(float x, float y, const char* string, const char* end, const NVGblurStyle& style);
-	void GlowRect(float x, float y, float w, float h, float r, const NVGglowStyle& style);
-	void GlassRect(float x, float y, float w, float h, const NVGglassStyle& style);
+	void textBlur(float x, float y, const char* string, const char* end, const NVGblurStyle& style);
+	void glowRect(float x, float y, float w, float h, float r, const NVGglowStyle& style);
+	void glassRect(float x, float y, float w, float h, const NVGglassStyle& style);
 
 	// Custom pipeline.
-	int CreateRenderTarget(const NVGrenderTargetDesc& desc);
-	void DeleteRenderTarget(int target);
-	void BindRenderTarget(int target);
-	int RenderTargetImage(int target);
-	int CreateShader(const NVGshaderDesc& desc);
-	void DeleteShader(int shader);
-	int CreatePipeline(const NVGpipelineDesc& desc);
-	void DeletePipeline(int pipeline);
-	void DrawTriangles(const NVGcustomDraw& draw, const NVGvertex* verts, int nverts);
+	int createRenderTarget(const NVGrenderTargetDesc& desc);
+	void deleteRenderTarget(int target);
+	void setRenderTarget(int target);
+	int getRenderTargetImage(int target);
+	int createShader(const NVGshaderDesc& desc);
+	void deleteShader(int shader);
+	int createPipeline(const NVGpipelineDesc& desc);
+	void deletePipeline(int pipeline);
+	void drawTriangles(const NVGcustomDraw& draw, const NVGvertex* verts, int nverts);
 
 	// Debug.
-	void DebugDumpPathCache();
+	void debugDumpPathCache();
 
 	std::unique_ptr<NVGrenderer> renderer;
 	int rendererCreated;
 	NVGcontextConfig config;
 	float* commands;
-	int ccommands;
-	int ncommands;
-	float commandx, commandy;
+	int    ccommands;
+	int    ncommands;
+	float  commandx, commandy;
 	NVGstate states[NVG_MAX_STATES];
 	int nstates;
 	NVGpathCache* cache;
@@ -576,10 +586,10 @@ struct NVGcontext {
 	float devicePxRatio;
 	float viewWidth;
 	float viewHeight;
-	int boundRenderTarget;
-	int glassRenderTarget;
-	int glassRenderTargetW;
-	int glassRenderTargetH;
+	int   boundRenderTarget;
+	int   glassRenderTarget;
+	int   glassRenderTargetW;
+	int   glassRenderTargetH;
 	float glassRenderTargetRatio;
 	FONScontext* fs;
 	int fontImages[NVG_MAX_FONTIMAGES];
