@@ -507,9 +507,9 @@ void bndSlider(NVGcontext *ctx,
         shade_down = bndOffsetColor(
             bnd_theme.sliderTheme.itemColor, bnd_theme.sliderTheme.shadeTop);
     }
-    ctx->Scissor(x,y,8+(w-8)*bnd_clamp(progress,0,1),h);
+    ctx->scissor(x,y,8+(w-8)*bnd_clamp(progress,0,1),h);
     bndInnerBox(ctx,x,y,w,h,cr[0],cr[1],cr[2],cr[3], shade_top, shade_down);
-    ctx->ResetScissor();
+    ctx->resetScissor();
 
     bndOutlineBox(ctx,x,y,w,h,cr[0],cr[1],cr[2],cr[3],
         bndTransparent(bnd_theme.sliderTheme.outlineColor));
@@ -610,14 +610,14 @@ void bndMenuItem(NVGcontext *ctx,
 
 void bndNodePort(NVGcontext *ctx, float x, float y, BNDwidgetState state,
     NVGcolor color) {
-    ctx->BeginPath();
-    ctx->Circle(x, y, BND_NODE_PORT_RADIUS);
-    ctx->StrokeColor(bnd_theme.nodeTheme.wiresColor);
+    ctx->beginPath();
+    ctx->circle(x, y, BND_NODE_PORT_RADIUS);
+    ctx->strokeColor(bnd_theme.nodeTheme.wiresColor);
     ctx->StrokeWidth(1.0f);
-    ctx->Stroke();
-    ctx->FillColor((state != BND_DEFAULT)?
+    ctx->stroke();
+    ctx->fillColor((state != BND_DEFAULT)?
         bndOffsetColor(color, BND_HOVER_SHADE):color);
-    ctx->Fill();
+    ctx->fill();
 }
 
 void bndColoredNodeWire(NVGcontext *ctx, float x0, float y0, float x1, float y1,
@@ -625,22 +625,22 @@ void bndColoredNodeWire(NVGcontext *ctx, float x0, float y0, float x1, float y1,
     float length = bnd_fmaxf(fabsf(x1 - x0),fabsf(y1 - y0));
     float delta = length*(float)bnd_theme.nodeTheme.noodleCurving/10.0f;
 
-    ctx->BeginPath();
-    ctx->MoveTo(x0, y0);
-    ctx->BezierTo(x0 + delta, y0,
+    ctx->beginPath();
+    ctx->moveTo(x0, y0);
+    ctx->bezierTo(x0 + delta, y0,
         x1 - delta, y1,
         x1, y1);
     NVGcolor colorw = bnd_theme.nodeTheme.wiresColor;
     colorw.a = (color0.a<color1.a)?color0.a:color1.a;
-    ctx->StrokeColor(colorw);
+    ctx->strokeColor(colorw);
     ctx->StrokeWidth(BND_NODE_WIRE_OUTLINE_WIDTH);
-    ctx->Stroke();
-    ctx->StrokePaint(NVGpaint::LinearGradient(
+    ctx->stroke();
+    ctx->strokePaint(NVGpaint::linearGradient(
         x0, y0, x1, y1,
         color0,
         color1));
     ctx->StrokeWidth(BND_NODE_WIRE_WIDTH);
-    ctx->Stroke();
+    ctx->stroke();
 }
 
 void bndNodeWire(NVGcontext *ctx, float x0, float y0, float x1, float y1,
@@ -705,59 +705,59 @@ void bndSplitterWidgets(NVGcontext *ctx, float x, float y, float w, float h) {
     float x2 = x+w;
     float y2 = y+h;
 
-    ctx->BeginPath();
-    ctx->MoveTo(x, y2-13);
-    ctx->LineTo(x+13, y2);
-    ctx->MoveTo(x, y2-9);
-    ctx->LineTo(x+9, y2);
-    ctx->MoveTo(x, y2-5);
-    ctx->LineTo(x+5, y2);
+    ctx->beginPath();
+    ctx->moveTo(x, y2-13);
+    ctx->lineTo(x+13, y2);
+    ctx->moveTo(x, y2-9);
+    ctx->lineTo(x+9, y2);
+    ctx->moveTo(x, y2-5);
+    ctx->lineTo(x+5, y2);
 
-    ctx->MoveTo(x2-11, y);
-    ctx->LineTo(x2, y+11);
-    ctx->MoveTo(x2-7, y);
-    ctx->LineTo(x2, y+7);
-    ctx->MoveTo(x2-3, y);
-    ctx->LineTo(x2, y+3);
+    ctx->moveTo(x2-11, y);
+    ctx->lineTo(x2, y+11);
+    ctx->moveTo(x2-7, y);
+    ctx->lineTo(x2, y+7);
+    ctx->moveTo(x2-3, y);
+    ctx->lineTo(x2, y+3);
 
-    ctx->StrokeColor(insetDark);
-    ctx->Stroke();
+    ctx->strokeColor(insetDark);
+    ctx->stroke();
 
-    ctx->BeginPath();
-    ctx->MoveTo(x, y2-11);
-    ctx->LineTo(x+11, y2);
-    ctx->MoveTo(x, y2-7);
-    ctx->LineTo(x+7, y2);
-    ctx->MoveTo(x, y2-3);
-    ctx->LineTo(x+3, y2);
+    ctx->beginPath();
+    ctx->moveTo(x, y2-11);
+    ctx->lineTo(x+11, y2);
+    ctx->moveTo(x, y2-7);
+    ctx->lineTo(x+7, y2);
+    ctx->moveTo(x, y2-3);
+    ctx->lineTo(x+3, y2);
 
-    ctx->MoveTo(x2-13, y);
-    ctx->LineTo(x2, y+13);
-    ctx->MoveTo(x2-9, y);
-    ctx->LineTo(x2, y+9);
-    ctx->MoveTo(x2-5, y);
-    ctx->LineTo(x2, y+5);
+    ctx->moveTo(x2-13, y);
+    ctx->lineTo(x2, y+13);
+    ctx->moveTo(x2-9, y);
+    ctx->lineTo(x2, y+9);
+    ctx->moveTo(x2-5, y);
+    ctx->lineTo(x2, y+5);
 
-    ctx->StrokeColor(insetLight);
-    ctx->Stroke();
+    ctx->strokeColor(insetLight);
+    ctx->stroke();
 
-    ctx->BeginPath();
-    ctx->MoveTo(x, y2-12);
-    ctx->LineTo(x+12, y2);
-    ctx->MoveTo(x, y2-8);
-    ctx->LineTo(x+8, y2);
-    ctx->MoveTo(x, y2-4);
-    ctx->LineTo(x+4, y2);
+    ctx->beginPath();
+    ctx->moveTo(x, y2-12);
+    ctx->lineTo(x+12, y2);
+    ctx->moveTo(x, y2-8);
+    ctx->lineTo(x+8, y2);
+    ctx->moveTo(x, y2-4);
+    ctx->lineTo(x+4, y2);
 
-    ctx->MoveTo(x2-12, y);
-    ctx->LineTo(x2, y+12);
-    ctx->MoveTo(x2-8, y);
-    ctx->LineTo(x2, y+8);
-    ctx->MoveTo(x2-4, y);
-    ctx->LineTo(x2, y+4);
+    ctx->moveTo(x2-12, y);
+    ctx->lineTo(x2, y+12);
+    ctx->moveTo(x2-8, y);
+    ctx->lineTo(x2, y+8);
+    ctx->moveTo(x2-4, y);
+    ctx->lineTo(x2, y+4);
 
-    ctx->StrokeColor(inset);
-    ctx->Stroke();
+    ctx->strokeColor(inset);
+    ctx->stroke();
 }
 
 void bndJoinAreaOverlay(NVGcontext *ctx, float x, float y, float w, float h,
@@ -804,15 +804,15 @@ void bndJoinAreaOverlay(NVGcontext *ctx, float x, float y, float w, float h,
         { x0,yc-s8 }
     };
 
-    ctx->BeginPath();
+    ctx->beginPath();
     int count = sizeof(points) / (sizeof(float)*2);
-    ctx->MoveTo(x+points[0][vertical&1],y+points[0][(vertical&1)^1]);
+    ctx->moveTo(x+points[0][vertical&1],y+points[0][(vertical&1)^1]);
     for (int i = 1; i < count; ++i) {
-        ctx->LineTo(x+points[i][vertical&1],y+points[i][(vertical&1)^1]);
+        ctx->lineTo(x+points[i][vertical&1],y+points[i][(vertical&1)^1]);
     }
 
-    ctx->FillColor(NVGcolor::RGBAf(0,0,0,0.3));
-    ctx->Fill();
+    ctx->fillColor(NVGcolor::RGBAf(0,0,0,0.3));
+    ctx->fill();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -823,9 +823,9 @@ float bndLabelWidth(NVGcontext *ctx, int iconid, const char *label) {
         w += BND_ICON_SHEET_RES;
     }
     if (label && (bnd_font >= 0)) {
-        ctx->FontFaceId(bnd_font);
-        ctx->FontSize(BND_LABEL_FONT_SIZE);
-        w += ctx->TextBounds(1, 1, label, NULL, NULL);
+        ctx->setFontFaceId(bnd_font);
+        ctx->setFontSize(BND_LABEL_FONT_SIZE);
+        w += ctx->textBounds(1, 1, label, NULL, NULL);
     }
     return w;
 }
@@ -837,10 +837,10 @@ float bndLabelHeight(NVGcontext *ctx, int iconid, const char *label, float width
         width -= BND_ICON_SHEET_RES;
     }
     if (label && (bnd_font >= 0)) {
-        ctx->FontFaceId(bnd_font);
-        ctx->FontSize(BND_LABEL_FONT_SIZE);
+        ctx->setFontFaceId(bnd_font);
+        ctx->setFontSize(BND_LABEL_FONT_SIZE);
         float bounds[4];
-        ctx->TextBoxBounds(1, 1, width, label, NULL, bounds);
+        ctx->textBoxBounds(1, 1, width, label, NULL, bounds);
         int bh = (int)(bounds[3] - bounds[1]) + BND_TEXT_PAD_DOWN;
         if (bh > h)
             h = bh;
@@ -858,12 +858,12 @@ void bndRoundedBox(NVGcontext *ctx, float x, float y, float w, float h,
     h = bnd_fmaxf(0, h);
     d = bnd_fminf(w, h);
 
-    ctx->MoveTo(x,y+h*0.5f);
-    ctx->ArcTo(x,y, x+w,y, bnd_fminf(cr0, d/2));
-    ctx->ArcTo(x+w,y, x+w,y+h, bnd_fminf(cr1, d/2));
-    ctx->ArcTo(x+w,y+h, x,y+h, bnd_fminf(cr2, d/2));
-    ctx->ArcTo(x,y+h, x,y, bnd_fminf(cr3, d/2));
-    ctx->ClosePath();
+    ctx->moveTo(x,y+h*0.5f);
+    ctx->arcTo(x,y, x+w,y, bnd_fminf(cr0, d/2));
+    ctx->arcTo(x+w,y, x+w,y+h, bnd_fminf(cr1, d/2));
+    ctx->arcTo(x+w,y+h, x,y+h, bnd_fminf(cr2, d/2));
+    ctx->arcTo(x,y+h, x,y, bnd_fminf(cr3, d/2));
+    ctx->closePath();
 }
 
 NVGcolor bndTransparent(NVGcolor color) {
@@ -890,21 +890,21 @@ void bndBevel(NVGcontext *ctx, float x, float y, float w, float h) {
     w -= 1;
     h -= 1;
 
-    ctx->BeginPath();
-    ctx->MoveTo(x, y+h);
-    ctx->LineTo(x+w, y+h);
-    ctx->LineTo(x+w, y);
-    ctx->StrokeColor(bndTransparent(
+    ctx->beginPath();
+    ctx->moveTo(x, y+h);
+    ctx->lineTo(x+w, y+h);
+    ctx->lineTo(x+w, y);
+    ctx->strokeColor(bndTransparent(
         bndOffsetColor(bnd_theme.backgroundColor, -BND_BEVEL_SHADE)));
-    ctx->Stroke();
+    ctx->stroke();
 
-    ctx->BeginPath();
-    ctx->MoveTo(x, y+h);
-    ctx->LineTo(x, y);
-    ctx->LineTo(x+w, y);
-    ctx->StrokeColor(bndTransparent(
+    ctx->beginPath();
+    ctx->moveTo(x, y+h);
+    ctx->lineTo(x, y);
+    ctx->lineTo(x+w, y);
+    ctx->strokeColor(bndTransparent(
         bndOffsetColor(bnd_theme.backgroundColor, BND_BEVEL_SHADE)));
-    ctx->Stroke();
+    ctx->stroke();
 }
 
 void bndBevelInset(NVGcontext *ctx, float x, float y, float w, float h,
@@ -916,28 +916,28 @@ void bndBevelInset(NVGcontext *ctx, float x, float y, float w, float h,
     cr2 = bnd_fminf(cr2, d/2);
     cr3 = bnd_fminf(cr3, d/2);
 
-    ctx->BeginPath();
-    ctx->MoveTo(x+w,y+h-cr2);
-    ctx->ArcTo(x+w,y+h, x,y+h, cr2);
-    ctx->ArcTo(x,y+h, x,y, cr3);
+    ctx->beginPath();
+    ctx->moveTo(x+w,y+h-cr2);
+    ctx->arcTo(x+w,y+h, x,y+h, cr2);
+    ctx->arcTo(x,y+h, x,y, cr3);
 
     NVGcolor bevelColor = bndOffsetColor(bnd_theme.backgroundColor,
         BND_INSET_BEVEL_SHADE);
 
     ctx->StrokeWidth(1);
-    ctx->StrokePaint(NVGpaint::LinearGradient(
+    ctx->strokePaint(NVGpaint::linearGradient(
             x,y+h-bnd_fmaxf(cr2,cr3)-1,
             x,y+h-1,
         NVGcolor::RGBAf(bevelColor.r, bevelColor.g, bevelColor.b, 0),
         bevelColor));
-    ctx->Stroke();
+    ctx->stroke();
 }
 
 void bndBackground(NVGcontext *ctx, float x, float y, float w, float h) {
-    ctx->BeginPath();
-    ctx->Rect(x, y, w, h);
-    ctx->FillColor(bnd_theme.backgroundColor);
-    ctx->Fill();
+    ctx->beginPath();
+    ctx->rect(x, y, w, h);
+    ctx->fillColor(bnd_theme.backgroundColor);
+    ctx->fill();
 }
 
 void bndIcon(NVGcontext *ctx, float x, float y, int iconid) {
@@ -949,62 +949,62 @@ void bndIcon(NVGcontext *ctx, float x, float y, int iconid) {
     u = BND_ICON_SHEET_OFFSET_X + ix*BND_ICON_SHEET_GRID;
     v = BND_ICON_SHEET_OFFSET_Y + iy*BND_ICON_SHEET_GRID;
 
-    ctx->BeginPath();
-    ctx->Rect(x,y,BND_ICON_SHEET_RES,BND_ICON_SHEET_RES);
-    ctx->FillPaint(NVGpaint::ImagePattern(x-u,y-v,
+    ctx->beginPath();
+    ctx->rect(x,y,BND_ICON_SHEET_RES,BND_ICON_SHEET_RES);
+    ctx->fillPaint(NVGpaint::imagePattern(x-u,y-v,
         BND_ICON_SHEET_WIDTH,
         BND_ICON_SHEET_HEIGHT,
         0,bnd_icon_image,1));
-    ctx->Fill();
+    ctx->fill();
 }
 
 void bndDropShadow(NVGcontext *ctx, float x, float y, float w, float h,
     float r, float feather, float alpha) {
 
-    ctx->BeginPath();
+    ctx->beginPath();
     y += feather;
     h -= feather;
 
-    ctx->MoveTo(x-feather, y-feather);
-    ctx->LineTo(x, y-feather);
-    ctx->LineTo(x, y+h-feather);
-    ctx->ArcTo(x,y+h,x+r,y+h,r);
-    ctx->ArcTo(x+w,y+h,x+w,y+h-r,r);
-    ctx->LineTo(x+w, y-feather);
-    ctx->LineTo(x+w+feather, y-feather);
-    ctx->LineTo(x+w+feather, y+h+feather);
-    ctx->LineTo(x-feather, y+h+feather);
-    ctx->ClosePath();
+    ctx->moveTo(x-feather, y-feather);
+    ctx->lineTo(x, y-feather);
+    ctx->lineTo(x, y+h-feather);
+    ctx->arcTo(x,y+h,x+r,y+h,r);
+    ctx->arcTo(x+w,y+h,x+w,y+h-r,r);
+    ctx->lineTo(x+w, y-feather);
+    ctx->lineTo(x+w+feather, y-feather);
+    ctx->lineTo(x+w+feather, y+h+feather);
+    ctx->lineTo(x-feather, y+h+feather);
+    ctx->closePath();
 
-    ctx->FillPaint(NVGpaint::BoxGradient(
+    ctx->fillPaint(NVGpaint::boxGradient(
         x - feather*0.5f,y - feather*0.5f,
         w + feather,h+feather,
         r+feather*0.5f,
         feather,
         NVGcolor::RGBAf(0,0,0,alpha*alpha),
         NVGcolor::RGBAf(0,0,0,0)));
-    ctx->Fill();
+    ctx->fill();
 }
 
 void bndInnerBox(NVGcontext *ctx, float x, float y, float w, float h,
     float cr0, float cr1, float cr2, float cr3,
     NVGcolor shade_top, NVGcolor shade_down) {
-    ctx->BeginPath();
+    ctx->beginPath();
     bndRoundedBox(ctx,x+1,y+1,w-2,h-3,bnd_fmaxf(0,cr0-1),
         bnd_fmaxf(0,cr1-1),bnd_fmaxf(0,cr2-1),bnd_fmaxf(0,cr3-1));
-    ctx->FillPaint(((h-2)>w)?
-        NVGpaint::LinearGradient(x,y,x+w,y,shade_top,shade_down):
-        NVGpaint::LinearGradient(x,y,x,y+h,shade_top,shade_down));
-    ctx->Fill();
+    ctx->fillPaint(((h-2)>w)?
+        NVGpaint::linearGradient(x,y,x+w,y,shade_top,shade_down):
+        NVGpaint::linearGradient(x,y,x,y+h,shade_top,shade_down));
+    ctx->fill();
 }
 
 void bndOutlineBox(NVGcontext *ctx, float x, float y, float w, float h,
     float cr0, float cr1, float cr2, float cr3, NVGcolor color) {
-    ctx->BeginPath();
+    ctx->beginPath();
     bndRoundedBox(ctx,x+0.5f,y+0.5f,w-1,h-2,cr0,cr1,cr2,cr3);
-    ctx->StrokeColor(color);
+    ctx->strokeColor(color);
     ctx->StrokeWidth(1);
-    ctx->Stroke();
+    ctx->stroke();
 }
 
 void bndSelectCorners(float *radiuses, float r, int flags) {
@@ -1054,32 +1054,32 @@ void bndIconLabelValue(NVGcontext *ctx, float x, float y, float w, float h,
         }
 
         if (bnd_font < 0) return;
-        ctx->FontFaceId(bnd_font);
-        ctx->FontSize(fontsize);
-        ctx->BeginPath();
-        ctx->FillColor(color);
+        ctx->setFontFaceId(bnd_font);
+        ctx->setFontSize(fontsize);
+        ctx->beginPath();
+        ctx->fillColor(color);
         if (value) {
-            float label_width = ctx->TextBounds(1, 1, label, NULL, NULL);
-            float sep_width = ctx->TextBounds(1, 1,
+            float label_width = ctx->textBounds(1, 1, label, NULL, NULL);
+            float sep_width = ctx->textBounds(1, 1,
                 BND_LABEL_SEPARATOR, NULL, NULL);
 
-            ctx->TextAlign(NVG_ALIGN_LEFT|NVG_ALIGN_BASELINE);
+            ctx->setTextAlign(NVG_ALIGN_LEFT|NVG_ALIGN_BASELINE);
             x += pleft;
             if (align == BND_CENTER) {
                 float width = label_width + sep_width
-                    + ctx->TextBounds(1, 1, value, NULL, NULL);
+                    + ctx->textBounds(1, 1, value, NULL, NULL);
                 x += ((w-BND_PAD_RIGHT-pleft)-width)*0.5f;
             }
             y += BND_WIDGET_HEIGHT-BND_TEXT_PAD_DOWN;
-            ctx->Text(x, y, label, NULL);
+            ctx->text(x, y, label, NULL);
             x += label_width;
-            ctx->Text(x, y, BND_LABEL_SEPARATOR, NULL);
+            ctx->text(x, y, BND_LABEL_SEPARATOR, NULL);
             x += sep_width;
-            ctx->Text(x, y, value, NULL);
+            ctx->text(x, y, value, NULL);
         } else {
-            ctx->TextAlign((align==BND_LEFT)?(NVG_ALIGN_LEFT|NVG_ALIGN_BASELINE):
+            ctx->setTextAlign((align==BND_LEFT)?(NVG_ALIGN_LEFT|NVG_ALIGN_BASELINE):
                 (NVG_ALIGN_CENTER|NVG_ALIGN_BASELINE));
-            ctx->TextBox(x+pleft,y+BND_WIDGET_HEIGHT-BND_TEXT_PAD_DOWN,
+            ctx->textBox(x+pleft,y+BND_WIDGET_HEIGHT-BND_TEXT_PAD_DOWN,
                 w-BND_PAD_RIGHT-pleft,label, NULL);
         }
     } else if (iconid >= 0) {
@@ -1092,17 +1092,17 @@ void bndNodeIconLabel(NVGcontext *ctx, float x, float y, float w, float h,
     int align, float fontsize, const char *label) {
     (void)align; // unused
     if (label && (bnd_font >= 0)) {
-        ctx->FontFaceId(bnd_font);
-        ctx->FontSize(fontsize);
-        ctx->BeginPath();
-        ctx->TextAlign(NVG_ALIGN_LEFT|NVG_ALIGN_BASELINE);
-        ctx->FillColor(shadowColor);
-        ctx->FontBlur(BND_NODE_TITLE_FEATHER);
-        ctx->TextBox(x+1,y+h+3-BND_TEXT_PAD_DOWN,
+        ctx->setFontFaceId(bnd_font);
+        ctx->setFontSize(fontsize);
+        ctx->beginPath();
+        ctx->setTextAlign(NVG_ALIGN_LEFT|NVG_ALIGN_BASELINE);
+        ctx->fillColor(shadowColor);
+        ctx->setFontBlur(BND_NODE_TITLE_FEATHER);
+        ctx->textBox(x+1,y+h+3-BND_TEXT_PAD_DOWN,
             w,label, NULL);
-        ctx->FillColor(color);
-        ctx->FontBlur(0);
-        ctx->TextBox(x,y+h+2-BND_TEXT_PAD_DOWN,
+        ctx->fillColor(color);
+        ctx->setFontBlur(0);
+        ctx->textBox(x,y+h+2-BND_TEXT_PAD_DOWN,
             w,label, NULL);
     }
     if (iconid >= 0) {
@@ -1124,24 +1124,24 @@ int bndIconLabelTextPosition(NVGcontext *ctx, float x, float y, float w, float h
     x += pleft;
     y += BND_WIDGET_HEIGHT - BND_TEXT_PAD_DOWN;
 
-    ctx->FontFaceId(bnd_font);
-    ctx->FontSize(fontsize);
-    ctx->TextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
+    ctx->setFontFaceId(bnd_font);
+    ctx->setFontSize(fontsize);
+    ctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
 
     w -= BND_TEXT_RADIUS + pleft;
 
     float asc, desc, lh;
     static NVGtextRow rows[BND_MAX_ROWS];
-    int nrows = ctx->TextBreakLines(label, NULL, w, rows, BND_MAX_ROWS);
+    int nrows = ctx->textBreakLines(label, NULL, w, rows, BND_MAX_ROWS);
     if (nrows == 0) return 0;
-    ctx->TextBoxBounds(x, y, w, label, NULL, bounds);
-    ctx->TextMetrics(&asc, &desc, &lh);
+    ctx->textBoxBounds(x, y, w, label, NULL, bounds);
+    ctx->textMetrics(&asc, &desc, &lh);
 
     // calculate vertical position
     int row = bnd_clamp((int)((float)(py - bounds[1]) / lh), 0, nrows - 1);
     // search horizontal position
     static NVGglyphPosition glyphs[BND_MAX_GLYPHS];
-    int nglyphs = ctx->TextGlyphPositions(x, y, rows[row].start, rows[row].end + 1, glyphs, BND_MAX_GLYPHS);
+    int nglyphs = ctx->textGlyphPositions(x, y, rows[row].start, rows[row].end + 1, glyphs, BND_MAX_GLYPHS);
     int col, p = 0;
     for (col = 0; col < nglyphs && glyphs[col].x < px; ++col)
         p = glyphs[col].str - label;
@@ -1162,7 +1162,7 @@ static void bndCaretPosition(NVGcontext *ctx, float x, float y,
     *cy = y-lineHeight-desc + r*lineHeight;
     if (nrows == 0) return;
     *cx = rows[r].minx;
-    nglyphs = ctx->TextGlyphPositions(x, y, rows[r].start, rows[r].end+1, glyphs, BND_MAX_GLYPHS);
+    nglyphs = ctx->textGlyphPositions(x, y, rows[r].start, rows[r].end+1, glyphs, BND_MAX_GLYPHS);
     for (int i=0; i < nglyphs; ++i) {
         *cx=glyphs[i].x;
         if (glyphs[i].str == caret) break;
@@ -1185,9 +1185,9 @@ void bndIconLabelCaret(NVGcontext *ctx, float x, float y, float w, float h,
     x+=pleft;
     y+=BND_WIDGET_HEIGHT-BND_TEXT_PAD_DOWN;
 
-    ctx->FontFaceId(bnd_font);
-    ctx->FontSize(fontsize);
-    ctx->TextAlign(NVG_ALIGN_LEFT|NVG_ALIGN_BASELINE);
+    ctx->setFontFaceId(bnd_font);
+    ctx->setFontSize(fontsize);
+    ctx->setTextAlign(NVG_ALIGN_LEFT|NVG_ALIGN_BASELINE);
 
     w -= BND_TEXT_RADIUS+pleft;
 
@@ -1196,88 +1196,88 @@ void bndIconLabelCaret(NVGcontext *ctx, float x, float y, float w, float h,
         float c0x,c0y,c1x,c1y;
         float desc,lh;
         static NVGtextRow rows[BND_MAX_ROWS];
-        int nrows = ctx->TextBreakLines(label, label+cend+1, w, rows, BND_MAX_ROWS);
-        ctx->TextMetrics(NULL, &desc, &lh);
+        int nrows = ctx->textBreakLines(label, label+cend+1, w, rows, BND_MAX_ROWS);
+        ctx->textMetrics(NULL, &desc, &lh);
 
         bndCaretPosition(ctx, x, y, desc, lh, label+cbegin,
             rows, nrows, &c0r, &c0x, &c0y);
         bndCaretPosition(ctx, x, y, desc, lh, label+cend,
             rows, nrows, &c1r, &c1x, &c1y);
 
-        ctx->BeginPath();
+        ctx->beginPath();
         if (cbegin == cend) {
-            ctx->FillColor(NVGcolor::RGBf(0.337,0.502,0.761));
-            ctx->Rect(c0x-1, c0y, 2, lh+1);
+            ctx->fillColor(NVGcolor::RGBf(0.337,0.502,0.761));
+            ctx->rect(c0x-1, c0y, 2, lh+1);
         } else {
-            ctx->FillColor(caretcolor);
+            ctx->fillColor(caretcolor);
             if (c0r == c1r) {
-                ctx->Rect(c0x-1, c0y, c1x-c0x+1, lh+1);
+                ctx->rect(c0x-1, c0y, c1x-c0x+1, lh+1);
             } else {
                 int blk=c1r-c0r-1;
-                ctx->Rect(c0x-1, c0y, x+w-c0x+1, lh+1);
-                ctx->Rect(x, c1y, c1x-x+1, lh+1);
+                ctx->rect(c0x-1, c0y, x+w-c0x+1, lh+1);
+                ctx->rect(x, c1y, c1x-x+1, lh+1);
 
                 if (blk)
-                    ctx->Rect(x, c0y+lh, w, blk*lh+1);
+                    ctx->rect(x, c0y+lh, w, blk*lh+1);
             }
         }
-        ctx->Fill();
+        ctx->fill();
     }
 
-    ctx->BeginPath();
-    ctx->FillColor(color);
-    ctx->TextBox(x,y,w,label, NULL);
+    ctx->beginPath();
+    ctx->fillColor(color);
+    ctx->textBox(x,y,w,label, NULL);
 }
 
 void bndCheck(NVGcontext *ctx, float ox, float oy, NVGcolor color) {
-    ctx->BeginPath();
+    ctx->beginPath();
     ctx->StrokeWidth(2);
-    ctx->StrokeColor(color);
+    ctx->strokeColor(color);
     ctx->LineCap(NVG_BUTT);
     ctx->LineJoin(NVG_MITER);
-    ctx->MoveTo(ox+4,oy+5);
-    ctx->LineTo(ox+7,oy+8);
-    ctx->LineTo(ox+14,oy+1);
-    ctx->Stroke();
+    ctx->moveTo(ox+4,oy+5);
+    ctx->lineTo(ox+7,oy+8);
+    ctx->lineTo(ox+14,oy+1);
+    ctx->stroke();
 }
 
 void bndArrow(NVGcontext *ctx, float x, float y, float s, NVGcolor color) {
-    ctx->BeginPath();
-    ctx->MoveTo(x,y);
-    ctx->LineTo(x-s,y+s);
-    ctx->LineTo(x-s,y-s);
-    ctx->ClosePath();
-    ctx->FillColor(color);
-    ctx->Fill();
+    ctx->beginPath();
+    ctx->moveTo(x,y);
+    ctx->lineTo(x-s,y+s);
+    ctx->lineTo(x-s,y-s);
+    ctx->closePath();
+    ctx->fillColor(color);
+    ctx->fill();
 }
 
 void bndUpDownArrow(NVGcontext *ctx, float x, float y, float s, NVGcolor color) {
     float w;
 
-    ctx->BeginPath();
+    ctx->beginPath();
     w = 1.1f*s;
-    ctx->MoveTo(x,y-1);
-    ctx->LineTo(x+0.5*w,y-s-1);
-    ctx->LineTo(x+w,y-1);
-    ctx->ClosePath();
-    ctx->MoveTo(x,y+1);
-    ctx->LineTo(x+0.5*w,y+s+1);
-    ctx->LineTo(x+w,y+1);
-    ctx->ClosePath();
-    ctx->FillColor(color);
-    ctx->Fill();
+    ctx->moveTo(x,y-1);
+    ctx->lineTo(x+0.5*w,y-s-1);
+    ctx->lineTo(x+w,y-1);
+    ctx->closePath();
+    ctx->moveTo(x,y+1);
+    ctx->lineTo(x+0.5*w,y+s+1);
+    ctx->lineTo(x+w,y+1);
+    ctx->closePath();
+    ctx->fillColor(color);
+    ctx->fill();
 }
 
 void bndNodeArrowDown(NVGcontext *ctx, float x, float y, float s, NVGcolor color) {
     float w;
-    ctx->BeginPath();
+    ctx->beginPath();
     w = 1.0f*s;
-    ctx->MoveTo(x,y);
-    ctx->LineTo(x+0.5*w,y-s);
-    ctx->LineTo(x-0.5*w,y-s);
-    ctx->ClosePath();
-    ctx->FillColor(color);
-    ctx->Fill();
+    ctx->moveTo(x,y);
+    ctx->lineTo(x+0.5*w,y-s);
+    ctx->lineTo(x-0.5*w,y-s);
+    ctx->closePath();
+    ctx->fillColor(color);
+    ctx->fill();
 }
 
 void bndScrollHandleRect(float *x, float *y, float *w, float *h,

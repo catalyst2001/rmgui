@@ -36,12 +36,12 @@ void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float h
   int gutter = 0;
   NVG_NOTUSED(height);
 
-  vg->Save();
+  vg->save();
 
-  vg->FontSize( 18.0f);
-  vg->FontFace( "default");
-  vg->TextAlign( NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-  vg->TextMetrics( NULL, NULL, &lineh);
+  vg->setFontSize( 18.0f);
+  vg->setFontFace( "default");
+  vg->setTextAlign( NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+  vg->textMetrics( NULL, NULL, &lineh);
 
   // The text break API can be used to fill a large buffer of rows,
   // or to iterate over the text just few lines (or just one) at a time.
@@ -49,7 +49,7 @@ void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float h
   start = text;
   end = text + strlen(text);
   for (;;) {
-    nrows = vg->TextBreakLines(start, end, width, rows, 3);
+    nrows = vg->textBreakLines(start, end, width, rows, 3);
     if (nrows <= 0) {
       break;
     }
@@ -57,18 +57,18 @@ void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float h
       struct NVGtextRow* row = &rows[i];
       int hit = mx > x && mx < (x + width) && my >= y && my < (y + lineh);
 
-      vg->BeginPath();
-      vg->FillColor( NVGcolor::RGBA(255, 255, 255, hit ? 64 : 16));
-      vg->Rect( x, y, row->width, lineh);
-      vg->Fill();
+      vg->beginPath();
+      vg->fillColor( NVGcolor::RGBA(255, 255, 255, hit ? 64 : 16));
+      vg->rect( x, y, row->width, lineh);
+      vg->fill();
 
-      vg->FillColor( NVGcolor::RGBA(255, 255, 255, 255));
-      vg->Text( x, y, row->start, row->end);
+      vg->fillColor( NVGcolor::RGBA(255, 255, 255, 255));
+      vg->text( x, y, row->start, row->end);
 
       if (hit) {
         caretx = (mx < x + row->width / 2) ? x : x + row->width;
         px = x;
-        nglyphs = vg->TextGlyphPositions( x, y, row->start, row->end, glyphs, 100);
+        nglyphs = vg->textGlyphPositions( x, y, row->start, row->end, glyphs, 100);
         for (j = 0; j < nglyphs; j++) {
           float x0 = glyphs[j].x;
           float x1 = (j + 1 < nglyphs) ? glyphs[j + 1].x : x + row->width;
@@ -77,10 +77,10 @@ void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float h
             caretx = glyphs[j].x;
           px = tgx;
         }
-        vg->BeginPath();
-        vg->FillColor( NVGcolor::RGBA(255, 192, 0, 255));
-        vg->Rect( caretx, y, 1, lineh);
-        vg->Fill();
+        vg->beginPath();
+        vg->fillColor( NVGcolor::RGBA(255, 192, 0, 255));
+        vg->rect( caretx, y, 1, lineh);
+        vg->fill();
 
         gutter = lnum + 1;
         gx = x - 10;
@@ -97,32 +97,32 @@ void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float h
   {
     char txt[16];
     snprintf(txt, sizeof(txt), "%d", gutter);
-    vg->FontSize( 13.0f);
-    vg->TextAlign( NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
+    vg->setFontSize( 13.0f);
+    vg->setTextAlign( NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
 
-    vg->TextBounds( gx, gy, txt, NULL, bounds);
+    vg->textBounds( gx, gy, txt, NULL, bounds);
 
-    vg->BeginPath();
-    vg->FillColor( NVGcolor::RGBA(255, 192, 0, 255));
-    vg->RoundedRect( round(bounds[0]) - 4.0f
+    vg->beginPath();
+    vg->fillColor( NVGcolor::RGBA(255, 192, 0, 255));
+    vg->roundedRect( round(bounds[0]) - 4.0f
       , round(bounds[1]) - 2.0f
       , round(bounds[2] - bounds[0]) + 8.0f
       , round(bounds[3] - bounds[1]) + 4.0f
       , (round(bounds[3] - bounds[1]) + 4.0f) / 2.0f - 1.0f
     );
-    vg->Fill();
+    vg->fill();
 
-    vg->FillColor( NVGcolor::RGBA(32, 32, 32, 255));
-    vg->Text( gx, gy, txt, NULL);
+    vg->fillColor( NVGcolor::RGBA(32, 32, 32, 255));
+    vg->text( gx, gy, txt, NULL);
   }
 
   y += 20.0f;
 
-  vg->FontSize( 13.0f);
-  vg->TextAlign( NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-  vg->TextLineHeight( 1.2f);
+  vg->setFontSize( 13.0f);
+  vg->setTextAlign( NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+  vg->setTextLineHeight( 1.2f);
 
-  vg->TextBoxBounds( x, y, 150, "Hover your mouse over the text to see calculated caret position.", NULL, bounds);
+  vg->textBoxBounds( x, y, 150, "Hover your mouse over the text to see calculated caret position.", NULL, bounds);
 
   // Fade the tooltip out when close to it.
   gx = abs((mx - (bounds[0] + bounds[2]) * 0.5f) / (bounds[0] - bounds[2]));
@@ -131,24 +131,24 @@ void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float h
   a = rm_clamp(a, 0.0f, 1.0f);
   vg->GlobalAlpha( a);
 
-  vg->BeginPath();
-  vg->FillColor( NVGcolor::RGBA(220, 220, 220, 255));
-  vg->RoundedRect( round(bounds[0] - 2.0f)
+  vg->beginPath();
+  vg->fillColor( NVGcolor::RGBA(220, 220, 220, 255));
+  vg->roundedRect( round(bounds[0] - 2.0f)
     , round(bounds[1] - 2.0f)
     , round(bounds[2] - bounds[0]) + 4.0f
     , round(bounds[3] - bounds[1]) + 4.0f
     , 3.0f
   );
   px = float((int)((bounds[2] + bounds[0]) / 2));
-  vg->MoveTo( px, bounds[1] - 10);
-  vg->LineTo( px + 7, bounds[1] + 1);
-  vg->LineTo( px - 7, bounds[1] + 1);
-  vg->Fill();
+  vg->moveTo( px, bounds[1] - 10);
+  vg->lineTo( px + 7, bounds[1] + 1);
+  vg->lineTo( px - 7, bounds[1] + 1);
+  vg->fill();
 
-  vg->FillColor( NVGcolor::RGBA(0, 0, 0, 220));
-  vg->TextBox( x, y, 150, "Hover your mouse over the text to see calculated caret position.", NULL);
+  vg->fillColor( NVGcolor::RGBA(0, 0, 0, 220));
+  vg->textBox( x, y, 150, "Hover your mouse over the text to see calculated caret position.", NULL);
 
-  vg->Restore();
+  vg->restore();
 }
 #pragma endregion
 

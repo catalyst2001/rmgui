@@ -506,7 +506,7 @@ public:
   inline void from_HSLA(float h, float s, float l, float a) { 
     *this = NVGcolor::HSLAf(h, s, l, a); }//TODO: K.D. optimize stack costs!!
   inline rm_color& lerp(rm_color &color, float u) {
-    *this = NVGcolor::LerpRGBA(*this, color, u);//TODO: K.D. optimize stack costs!!
+    *this = NVGcolor::lerpRGBA(*this, color, u);//TODO: K.D. optimize stack costs!!
     return *this;
   }
   static inline NVGcolor lerp(const NVGcolor& from_color, const NVGcolor& to_color, float factor) { // NOTE: added by d2
@@ -518,7 +518,7 @@ public:
     };
   }
   inline rm_color& set_transp(uint8_t alpha) {
-    *this = NVGcolor::TransRGBA(*this, alpha);//TODO: K.D. optimize stack costs!!
+    *this = NVGcolor::transRGBA(*this, alpha);//TODO: K.D. optimize stack costs!!
     return *this;
   }
   inline rm_color negative() const {

@@ -208,13 +208,13 @@ void rm_surface::draw_recursive(rm_widget* pwidget, float dt)
   rm_vec2& size = pwidget->get_size();
   rm_rect& content = pwidget->get_content_area();
 
-  m_pctx->Save();
+  m_pctx->save();
 
   /* disabled scissoring? */
   if (!pwidget->get_elem_flags().is_set(RM_FLAG_DISABLE_SCISSOR))
-    m_pctx->Scissor( abs_pos.x, abs_pos.y, size.x, size.y);
+    m_pctx->scissor( abs_pos.x, abs_pos.y, size.x, size.y);
 
-  m_pctx->Translate( abs_pos.x + content.x, abs_pos.y + content.y);
+  m_pctx->translate( abs_pos.x + content.x, abs_pos.y + content.y);
   pwidget->on_draw(m_pctx.get());
 
   /* element has childs? */
@@ -226,8 +226,8 @@ void rm_surface::draw_recursive(rm_widget* pwidget, float dt)
     }
   }
   //m_pctx->ResetTransform();
-  m_pctx->ResetScissor();
-  m_pctx->Restore();
+  m_pctx->resetScissor();
+  m_pctx->restore();
 
 #ifdef RMGUI_DEBUG_DRAW
   /* draw absolute position for debug */
@@ -266,9 +266,9 @@ void rm_surface::draw_recursive(rm_widget* pwidget, float dt)
 void rm_surface::draw(float dt)
 {
   m_delta_time = dt;
-  m_pctx->BeginFrame( m_size.x, m_size.y, m_device_pixel_ratio);
+  m_pctx->beginFrame( m_size.x, m_size.y, m_device_pixel_ratio);
   draw_recursive(this, dt);
-  m_pctx->EndFrame();
+  m_pctx->endFrame();
 }
 
 void rm_surface::keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
@@ -296,21 +296,21 @@ void rm_surface::mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, int 
 rm_image rm_surface::load_image_from_memory(const void* psrc, size_t srclen, int flags)
 {
   rm_image handle;
-  set_handle_value(handle, m_pctx->CreateImageMem( flags, (uint8_t*)psrc, (int)srclen));
+  set_handle_value(handle, m_pctx->createImageMem( flags, (uint8_t*)psrc, (int)srclen));
   return handle;
 }
 
 rm_image rm_surface::load_image(const char* pfilename, int flags)
 {
   rm_image handle;
-  set_handle_value(handle, m_pctx->CreateImage( pfilename, flags));
+  set_handle_value(handle, m_pctx->createImage( pfilename, flags));
   return handle;
 }
 
 void rm_surface::free_image(rm_image& image)
 {
   if (image.is_valid()) {
-    m_pctx->DeleteImage( image.get_handle());
+    m_pctx->deleteImage( image.get_handle());
     set_handle_value(image, image.get_invalid()); //NOTE: K.D. invalidate
   }
 }
@@ -319,7 +319,7 @@ rm_font rm_surface::load_font_from_memory(const void* psrc_ttf_mem, size_t srcle
 {
   rm_font font = find_font(pfontname);
   if (!font.is_valid())
-    set_handle_value(font, m_pctx->CreateFontMem( pfontname, (uint8_t * )psrc_ttf_mem, static_cast<int>(srclen), 0));
+    set_handle_value(font, m_pctx->createFontMem( pfontname, (uint8_t * )psrc_ttf_mem, static_cast<int>(srclen), 0));
 
   return font;
 }
@@ -328,7 +328,7 @@ rm_font rm_surface::load_font(const char* pfilename, const char* pfontname)
 {
   rm_font font = find_font(pfontname);
   if (!font.is_valid())
-    set_handle_value(font, m_pctx->CreateFont( pfontname, pfilename));
+    set_handle_value(font, m_pctx->createFont( pfontname, pfilename));
 
   return font;
 }
@@ -336,7 +336,7 @@ rm_font rm_surface::load_font(const char* pfilename, const char* pfontname)
 rm_font rm_surface::find_font(const char* pfontname)
 {
   rm_font font;
-  set_handle_value(font, m_pctx->FindFont( pfontname));
+  set_handle_value(font, m_pctx->findFont( pfontname));
   return font;
 }
 
@@ -362,10 +362,10 @@ void rm_surface::get_text_bounds(rm_bbox& dst,
 {
   NVGcontext* pctx = get_context();
   assert(pctx && "pctx was nullptr!");
-  pctx->Save();
-  pctx->FontFaceId( hfont);
-  pctx->TextBounds( start.x, start.y, ptext, nullptr, dst.array);
-  pctx->Restore();
+  pctx->save();
+  pctx->setFontFaceId( hfont);
+  pctx->textBounds( start.x, start.y, ptext, nullptr, dst.array);
+  pctx->restore();
 }
 
 float rm_surface::get_text_width(const char* ptext, rm_font hfont, rm_vec2 start)
@@ -485,13 +485,13 @@ void rm_window::on_draw(NVGcontext* pctx)
   rm_utl::draw_shadow(pctx, pos, m_size, rm_vec2(0.f, 1.f), 5.0f, shadow_color, 8.f, get_style()->get_corner_radius(LEFT_TOP));
 
   /* draw window background */
-  pctx->BeginPath();
-  pctx->FillColor( p_style->get_background_color(b_is_active));
-  pctx->RoundedRectVarying(
+  pctx->beginPath();
+  pctx->fillColor( p_style->get_background_color(b_is_active));
+  pctx->roundedRectVarying(
     0.f, 0.f, m_size.x, m_size.y,
     p_style->get_corner_radius(LEFT_TOP), p_style->get_corner_radius(RIGHT_TOP),
     p_style->get_corner_radius(RIGHT_BOTTOM), p_style->get_corner_radius(LEFT_BOTTOM));
-  pctx->Fill();
+  pctx->fill();
 }
 
 bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
@@ -1038,27 +1038,27 @@ void rm_utl::draw_frame(NVGcontext* pctx, rm_vec2& pos, rm_vec2& size,
   const NVGcolor& scolor = colors[RM_BFRM_MODE_SUNKEN];
   const NVGcolor& sdwcolor = colors[RM_BFRM_MODE_RAISED];
   /* paint background */
-  pctx->BeginPath();
-  pctx->Save(); //TODO: K.D. save state for store old scissor
-  pctx->FillColor( background);
-  pctx->StrokeColor( stroke);
-  pctx->RoundedRectVarying( pos.x, pos.y, size.x, size.y,
+  pctx->beginPath();
+  pctx->save(); //TODO: K.D. save state for store old scissor
+  pctx->fillColor( background);
+  pctx->strokeColor( stroke);
+  pctx->roundedRectVarying( pos.x, pos.y, size.x, size.y,
     pcstyle->get_top_left(), pcstyle->get_top_right(),
     pcstyle->get_bottom_right(), pcstyle->get_bottom_left()
   );
-  pctx->Fill();
-  pctx->Stroke();
+  pctx->fill();
+  pctx->stroke();
   //pctx->Scissor( pos.x, pos.y, size.x - stroke_width, size.y- stroke_width);
 
-  pctx->FillColor( background);
-  pctx->StrokeColor( stroke);
-  pctx->RoundedRectVarying( pos.x+ sign, pos.y + sign, size.x, size.y,
+  pctx->fillColor( background);
+  pctx->strokeColor( stroke);
+  pctx->roundedRectVarying( pos.x+ sign, pos.y + sign, size.x, size.y,
     pcstyle->get_top_left(), pcstyle->get_top_right(),
     pcstyle->get_bottom_right(), pcstyle->get_bottom_left()
   );
-  pctx->Stroke();
+  pctx->stroke();
 
-  pctx->Restore();
+  pctx->restore();
 }
 
 void rm_utl::draw_shadow(NVGcontext* pctx, rm_vec2 pos, rm_vec2 &size, rm_vec2 dir, float offset_scale,
@@ -1069,7 +1069,7 @@ void rm_utl::draw_shadow(NVGcontext* pctx, rm_vec2 pos, rm_vec2 &size, rm_vec2 d
   float offx = nd.x * offset_scale;
   float offy = nd.y * offset_scale;
 
-  NVGpaint paint = NVGpaint::BoxGradient(
+  NVGpaint paint = NVGpaint::boxGradient(
     pos.x + offx,
     pos.y + offy,
     size.x,
@@ -1080,50 +1080,50 @@ void rm_utl::draw_shadow(NVGcontext* pctx, rm_vec2 pos, rm_vec2 &size, rm_vec2 d
     rm_utl::get_transparent()
   );
 
-  pctx->Save();
+  pctx->save();
   pctx->StrokeWidth( 0.f);
-  pctx->ResetScissor();
+  pctx->resetScissor();
 
-  pctx->BeginPath();
-  pctx->Rect(
+  pctx->beginPath();
+  pctx->rect(
     pos.x - shadow_size + offx,
     pos.y - shadow_size + offy,
     size.x + 2 * shadow_size,
     size.y + 2 * shadow_size);
 
-  pctx->RoundedRect( pos.x+1.0f, pos.y + 1.0f, size.x - 1.0f*2.f, size.y - 1.0f * 2.f, corner_radius);
+  pctx->roundedRect( pos.x+1.0f, pos.y + 1.0f, size.x - 1.0f*2.f, size.y - 1.0f * 2.f, corner_radius);
   if (!draw_shadow_center)
-    pctx->PathWinding( NVG_HOLE);
+    pctx->pathWinding( NVG_HOLE);
 
-  pctx->FillPaint( paint);
-  pctx->Fill();
-  pctx->Restore();
+  pctx->fillPaint( paint);
+  pctx->fill();
+  pctx->restore();
 }
 
 void rm_utl::draw_edge(NVGcontext* pctx, rm_vec2 pos, rm_vec2& size,
   const rm_corners_style* pcstyle, const rm_color& suncolor, const rm_color& shadowcolor)
 {
   /* light */
-  pctx->BeginPath();
-  pctx->StrokeColor( suncolor);
-  pctx->RoundedRectVarying(
+  pctx->beginPath();
+  pctx->strokeColor( suncolor);
+  pctx->roundedRectVarying(
     pos.x, pos.y + 1.f, size.x, size.y,
     pcstyle->get_top_left(),
     pcstyle->get_top_right(),
     pcstyle->get_bottom_right(),
     pcstyle->get_bottom_left());
-  pctx->Stroke();
+  pctx->stroke();
 
   /* light */
-  pctx->BeginPath();
-  pctx->StrokeColor( shadowcolor);
-  pctx->RoundedRectVarying(
+  pctx->beginPath();
+  pctx->strokeColor( shadowcolor);
+  pctx->roundedRectVarying(
     pos.x, pos.y, size.x, size.y,
     pcstyle->get_top_left(),
     pcstyle->get_top_right(),
     pcstyle->get_bottom_right(),
     pcstyle->get_bottom_left());
-  pctx->Stroke();
+  pctx->stroke();
 }
 
 rm_flexbox_layout::rm_flexbox_layout(rm_flex_direction dir,

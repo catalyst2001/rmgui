@@ -33,7 +33,7 @@ void rm_effects::resize(float width, float height) {
 
 void rm_effects::release_background(NVGcontext* ctx) {
   if (m_bgImage != 0 && ctx != nullptr) {
-    ctx->DeleteImage(m_bgImage);
+    ctx->deleteImage(m_bgImage);
   }
   m_bgImage = 0;
   m_bgWidth = 0;
@@ -46,7 +46,7 @@ void rm_effects::ensure_background(NVGcontext* ctx)
     return;
 
   if (m_bgDirty && m_bgImage != 0) {
-    ctx->DeleteImage(m_bgImage);
+    ctx->deleteImage(m_bgImage);
     m_bgImage = 0;
   }
 
@@ -80,7 +80,7 @@ void rm_effects::ensure_background(NVGcontext* ctx)
       }
     }
 
-    m_bgImage = ctx->CreateImageRGBA(w, h, NVG_IMAGE_REPEATX | NVG_IMAGE_REPEATY, pixels.data());
+    m_bgImage = ctx->createImageRGBA(w, h, NVG_IMAGE_REPEATX | NVG_IMAGE_REPEATY, pixels.data());
     m_bgWidth = w;
     m_bgHeight = h;
     m_bgDirty = false;
@@ -100,10 +100,10 @@ void rm_effects::draw_glass_showcase(NVGcontext* ctx, float x, float y, float w,
   glass.borderWidth = 1.0f;
   glass.highlight = 0.55f;
 
-  ctx->GlassRect(x, y, w, h, glass);
+  ctx->glassRect(x, y, w, h, glass);
 
-  ctx->FontFace("default");
-  ctx->TextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+  ctx->setFontFace("default");
+  ctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
 
   NVGblurStyle titleBlur;
   titleBlur.type = NVG_BLUR_LIQUID;
@@ -114,8 +114,8 @@ void rm_effects::draw_glass_showcase(NVGcontext* ctx, float x, float y, float w,
   titleBlur.jitter = 0.35f;
   titleBlur.color = NVGcolor::RGBA(255, 255, 255, 235);
 
-  ctx->FontSize(30.0f);
-  ctx->TextBlur(x + 20.0f, y + 20.0f, "Liquid Glass", nullptr, titleBlur);
+  ctx->setFontSize(30.0f);
+  ctx->textBlur(x + 20.0f, y + 20.0f, "Liquid Glass", nullptr, titleBlur);
 
   NVGblurStyle subBlur = titleBlur;
   subBlur.type = NVG_BLUR_GAUSSIAN;
@@ -123,11 +123,11 @@ void rm_effects::draw_glass_showcase(NVGcontext* ctx, float x, float y, float w,
   subBlur.strength = 0.45f;
   subBlur.jitter = 0.0f;
   subBlur.color = NVGcolor::RGBA(200, 220, 255, 200);
-  ctx->FontSize(16.0f);
-  ctx->TextBlur(x + 20.0f, y + 72.0f, "Blurred text + frosted panel", nullptr, subBlur);
+  ctx->setFontSize(16.0f);
+  ctx->textBlur(x + 20.0f, y + 72.0f, "Blurred text + frosted panel", nullptr, subBlur);
 
-  ctx->FillColor(NVGcolor::RGBA(220, 220, 220, 200));
-  ctx->Text(x + 20.0f, y + 112.0f, "Backend-agnostic effects demo", nullptr);
+  ctx->fillColor(NVGcolor::RGBA(220, 220, 220, 200));
+  ctx->text(x + 20.0f, y + 112.0f, "Backend-agnostic effects demo", nullptr);
 }
 
 void rm_effects::draw_blur_gallery(NVGcontext* ctx, float x, float y, float w) {
@@ -155,11 +155,11 @@ void rm_effects::draw_blur_gallery(NVGcontext* ctx, float x, float y, float w) {
   const float colW = (columns == 2) ? (w * 0.5f) : w;
   const float rowH = 44.0f;
 
-  ctx->FontFace("default");
-  ctx->TextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-  ctx->FontSize(14.0f);
-  ctx->FillColor(NVGcolor::RGBA(240, 240, 240, 200));
-  ctx->Text(x, y - 22.0f, "Text blur types", nullptr);
+  ctx->setFontFace("default");
+  ctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+  ctx->setFontSize(14.0f);
+  ctx->fillColor(NVGcolor::RGBA(240, 240, 240, 200));
+  ctx->text(x, y - 22.0f, "Text blur types", nullptr);
 
   for (int i = 0; i < (int)(sizeof(samples) / sizeof(samples[0])); ++i) {
     const int col = i % columns;
@@ -179,8 +179,8 @@ void rm_effects::draw_blur_gallery(NVGcontext* ctx, float x, float y, float w) {
     blur.blades = samples[i].blades;
     blur.color = samples[i].color;
 
-    ctx->FontSize(22.0f);
-    ctx->TextBlur(sx, sy, samples[i].label, nullptr, blur);
+    ctx->setFontSize(22.0f);
+    ctx->textBlur(sx, sy, samples[i].label, nullptr, blur);
   }
 }
 
@@ -190,11 +190,11 @@ void rm_effects::on_draw(NVGcontext* ctx) {
     return;
   }
 
-  NVGpaint bg = NVGpaint::ImagePattern(0.0f, 0.0f, m_size.x, m_size.y, 0.0f, m_bgImage, 1.0f);
-  ctx->BeginPath();
-  ctx->Rect(0.0f, 0.0f, m_size.x, m_size.y);
-  ctx->FillPaint(bg);
-  ctx->Fill();
+  NVGpaint bg = NVGpaint::imagePattern(0.0f, 0.0f, m_size.x, m_size.y, 0.0f, m_bgImage, 1.0f);
+  ctx->beginPath();
+  ctx->rect(0.0f, 0.0f, m_size.x, m_size.y);
+  ctx->fillPaint(bg);
+  ctx->fill();
 
   const float pad = 24.0f;
   const float panelW = rm_min(420.0f, m_size.x - pad * 2.0f);
@@ -218,22 +218,22 @@ void rm_effects::on_draw(NVGcontext* ctx) {
     glow.radius = 20.0f;
     glow.intensity = 0.9f;
     glow.color = NVGcolor::RGBA(90, 160, 255, 220);
-    ctx->GlowRect(glowX, glowY, glowW, glowH, 18.0f, glow);
+    ctx->glowRect(glowX, glowY, glowW, glowH, 18.0f, glow);
 
-    ctx->BeginPath();
-    ctx->RoundedRect(glowX, glowY, glowW, glowH, 18.0f);
-    ctx->FillColor(NVGcolor::RGBA(18, 20, 28, 210));
-    ctx->Fill();
+    ctx->beginPath();
+    ctx->roundedRect(glowX, glowY, glowW, glowH, 18.0f);
+    ctx->fillColor(NVGcolor::RGBA(18, 20, 28, 210));
+    ctx->fill();
     ctx->StrokeWidth(1.0f);
-    ctx->StrokeColor(NVGcolor::RGBA(120, 170, 255, 120));
-    ctx->Stroke();
+    ctx->strokeColor(NVGcolor::RGBA(120, 170, 255, 120));
+    ctx->stroke();
 
-    ctx->FontSize(18.0f);
-    ctx->FillColor(NVGcolor::RGBA(200, 220, 255, 220));
-    ctx->TextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-    ctx->Text(glowX + glowW * 0.5f, glowY + glowH * 0.5f, "Neon Glow", nullptr);
+    ctx->setFontSize(18.0f);
+    ctx->fillColor(NVGcolor::RGBA(200, 220, 255, 220));
+    ctx->setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+    ctx->text(glowX + glowW * 0.5f, glowY + glowH * 0.5f, "Neon Glow", nullptr);
   }
 
-  ctx->TextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+  ctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
   draw_blur_gallery(ctx, pad, panelY + panelH + 64.0f, m_size.x - pad * 2.0f);
 }
