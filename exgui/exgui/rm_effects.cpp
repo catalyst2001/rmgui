@@ -90,15 +90,15 @@ void rm_effects::draw_glass_showcase(NVGcontext* ctx, float x, float y, float w,
   NVGglassStyle glass;
   glass.backgroundImage = m_bgImage;
   glass.backgroundAlpha = 1.0f;
-  glass.blur = 8.0f;
-  glass.blurSamples = 14;
+  glass.blur = 18.0f;
+  glass.blurSamples = 24;
   glass.radius = 18.0f;
-  glass.tint = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.10f);
-  glass.highlightColor = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.32f);
-  glass.shadowColor = NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.32f);
-  glass.borderColor = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.30f);
+  glass.tint = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.14f);
+  glass.highlightColor = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.48f);
+  glass.shadowColor = NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.18f);
+  glass.borderColor = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.42f);
   glass.borderWidth = 1.0f;
-  glass.highlight = 0.45f;
+  glass.highlight = 0.55f;
 
   ctx->GlassRect(x, y, w, h, glass);
 

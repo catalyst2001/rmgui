@@ -3209,12 +3209,18 @@ void NVGcontext::GlassRect(float x, float y, float w, float h, const NVGglassSty
 
 	const float radius = nvg__minf(nvg__maxf(style.radius, 0.0f), nvg__minf(w, h) * 0.5f);
 	const float bgAlpha = nvg__clampf(style.backgroundAlpha, 0.0f, 1.0f);
+	const float blur = nvg__maxf(style.blur, 0.0f);
+	const int samples = nvg__maxi(1, style.blurSamples);
+	// Padding is critical to avoid dark/dirty edges when blur samples go out-of-bounds.
+	const float pad = nvg__maxf(2.0f, blur * 2.0f + 2.0f);
 	int glassImage = 0;
 
 	if (style.backgroundImage > 0 && bgAlpha > 0.0f && renderer) {
 		const float ratio = devicePxRatio > 0.0f ? devicePxRatio : 1.0f;
-		const int rtW = nvg__maxi(1, (int)ceilf(w * ratio));
-		const int rtH = nvg__maxi(1, (int)ceilf(h * ratio));
+		const float rtViewW = w + pad * 2.0f;
+		const float rtViewH = h + pad * 2.0f;
+		const int rtW = nvg__maxi(1, (int)ceilf(rtViewW * ratio));
+		const int rtH = nvg__maxi(1, (int)ceilf(rtViewH * ratio));
 
 		if (glassRenderTarget == 0 || rtW != glassRenderTargetW || rtH != glassRenderTargetH || glassRenderTargetRatio != ratio) {
 			if (glassRenderTarget != 0)
@@ -3224,7 +3230,7 @@ void NVGcontext::GlassRect(float x, float y, float w, float h, const NVGglassSty
 			desc.width = rtW;
 			desc.height = rtH;
 			desc.devicePixelRatio = ratio;
-			desc.flags = NVG_IMAGE_PREMULTIPLIED | NVG_IMAGE_FLIPY;
+			desc.flags = NVG_IMAGE_PREMULTIPLIED | NVG_IMAGE_FLIPY | NVG_IMAGE_REPEATX | NVG_IMAGE_REPEATY;
 			glassRenderTarget = CreateRenderTarget(desc);
 			glassRenderTargetW = rtW;
 			glassRenderTargetH = rtH;
@@ -3241,9 +3247,9 @@ void NVGcontext::GlassRect(float x, float y, float w, float h, const NVGglassSty
 
 			renderer->Flush();
 			BindRenderTarget(glassRenderTarget);
-			renderer->Viewport(w, h, ratio);
-			viewWidth = w;
-			viewHeight = h;
+			renderer->Viewport(rtViewW, rtViewH, ratio);
+			viewWidth = rtViewW;
+			viewHeight = rtViewH;
 			nvg__setDevicePixelRatio(this, ratio);
 
 			Save();
@@ -3251,30 +3257,29 @@ void NVGcontext::GlassRect(float x, float y, float w, float h, const NVGglassSty
 
 			GlobalCompositeOperation(NVG_COPY);
 			BeginPath();
-			Rect(0.0f, 0.0f, w, h);
+			Rect(0.0f, 0.0f, rtViewW, rtViewH);
 			FillColor(NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.0f));
 			Fill();
 			GlobalCompositeOperation(NVG_SOURCE_OVER);
 
-			const float blur = nvg__maxf(style.blur, 0.0f);
-			const int samples = nvg__maxi(1, style.blurSamples);
+			// Render blurred backdrop into the padded RT.
 			if (blur > 0.0f && samples > 1) {
 				const float sampleAlpha = bgAlpha / (float)samples;
 				for (int i = 0; i < samples; ++i) {
 					const float a = ((float)i / (float)samples) * NVG_PI * 2.0f;
 					const float dx = nvg__cosf(a) * blur;
 					const float dy = nvg__sinf(a) * blur;
-					NVGpaint img = NVGpaint::ImagePattern(-x - dx, -y - dy, patternW, patternH, 0.0f, style.backgroundImage, sampleAlpha);
+					NVGpaint img = NVGpaint::ImagePattern(-x + pad - dx, -y + pad - dy, patternW, patternH, 0.0f, style.backgroundImage, sampleAlpha);
 					BeginPath();
-					Rect(0.0f, 0.0f, w, h);
+					Rect(0.0f, 0.0f, rtViewW, rtViewH);
 					FillPaint(img);
 					Fill();
 				}
 			}
 			else {
-				NVGpaint img = NVGpaint::ImagePattern(-x, -y, patternW, patternH, 0.0f, style.backgroundImage, bgAlpha);
+				NVGpaint img = NVGpaint::ImagePattern(-x + pad, -y + pad, patternW, patternH, 0.0f, style.backgroundImage, bgAlpha);
 				BeginPath();
-				Rect(0.0f, 0.0f, w, h);
+				Rect(0.0f, 0.0f, rtViewW, rtViewH);
 				FillPaint(img);
 				Fill();
 			}
@@ -3292,42 +3297,68 @@ void NVGcontext::GlassRect(float x, float y, float w, float h, const NVGglassSty
 		}
 	}
 
-	if (style.shadowColor.a > 0.0f) {
-		const float shadowSize = nvg__maxf(style.blur * 0.5f, 6.0f);
-		const float outerRadius = radius + shadowSize;
-		NVGcolor outer = style.shadowColor;
-		outer.a = 0.0f;
-		NVGpaint shadow = NVGpaint::BoxGradient(
-			x, y, w, h,
-			radius, shadowSize,
-			style.shadowColor, outer);
-
-		BeginPath();
-		RoundedRect(x - shadowSize, y - shadowSize, w + shadowSize * 2.0f, h + shadowSize * 2.0f, outerRadius);
-		RoundedRect(x, y, w, h, radius);
-		PathWinding(NVG_HOLE);
-		FillPaint(shadow);
-		Fill();
-	}
-
 	if (glassImage != 0) {
-		const float patternW = viewWidth > 0.0f ? viewWidth : w;
-		const float patternH = viewHeight > 0.0f ? viewHeight : h;
-		NVGpaint img = NVGpaint::ImagePattern(x, y, patternW, patternH, 0.0f, glassImage, 1.0f);
+		NVGpaint img = NVGpaint::ImagePattern(x - pad, y - pad, w + pad * 2.0f, h + pad * 2.0f, 0.0f, glassImage, 1.0f);
 		BeginPath();
 		RoundedRect(x, y, w, h, radius);
 		FillPaint(img);
 		Fill();
 	}
 
+	// Vibrancy/detail pass: re-add a touch of unblurred backdrop to avoid the “flat tinted panel” look.
+	// (iOS glass keeps some local contrast, especially near edges.)
+	if (style.backgroundImage > 0 && bgAlpha > 0.0f) {
+		const float viewW = viewWidth > 0.0f ? viewWidth : w;
+		const float viewH = viewHeight > 0.0f ? viewHeight : h;
+		const float detailA = nvg__clampf(bgAlpha * 0.18f, 0.0f, 1.0f);
+		NVGpaint detail = NVGpaint::ImagePattern(0.0f, 0.0f, viewW, viewH, 0.0f, style.backgroundImage, detailA);
+		BeginPath();
+		RoundedRect(x, y, w, h, radius);
+		FillPaint(detail);
+		Fill();
+	}
+
+	// Soft inner rim highlight (iOS-like edge sheen). Kept subtle and driven by highlightColor.
+	if (style.highlightColor.a > 0.0f) {
+		const float rimSize = nvg__minf(nvg__maxf(6.0f, blur * 0.8f), nvg__minf(w, h) * 0.35f);
+		NVGcolor rimInner = style.highlightColor;
+		rimInner.a = nvg__clampf(rimInner.a * 0.28f, 0.0f, 1.0f);
+		NVGcolor rimOuter = rimInner;
+		rimOuter.a = 0.0f;
+		NVGpaint rim = NVGpaint::BoxGradient(x, y, w, h, radius, rimSize, rimInner, rimOuter);
+		BeginPath();
+		RoundedRect(x, y, w, h, radius);
+		RoundedRect(x + rimSize, y + rimSize, w - rimSize * 2.0f, h - rimSize * 2.0f, nvg__maxf(radius - rimSize, 0.0f));
+		PathWinding(NVG_HOLE);
+		FillPaint(rim);
+		Fill();
+	}
+
 	NVGcolor tintTop = style.tint;
 	NVGcolor tintBottom = style.tint;
-	tintBottom.a *= 0.6f;
+	tintBottom.a *= 0.75f;
 	NVGpaint tint = NVGpaint::LinearGradient(x, y, x, y + h, tintTop, tintBottom);
 	BeginPath();
 	RoundedRect(x, y, w, h, radius);
 	FillPaint(tint);
 	Fill();
+
+	// Specular highlights (subtle “glass sheen”).
+	if (style.highlightColor.a > 0.0f) {
+		NVGcolor s0 = style.highlightColor;
+		NVGcolor s1 = style.highlightColor;
+		s0.a = nvg__clampf(s0.a * 0.22f, 0.0f, 1.0f);
+		s1.a = 0.0f;
+		const float cx = x + w * 0.28f;
+		const float cy = y + h * 0.18f;
+		const float inr = nvg__maxf(2.0f, radius * 0.15f);
+		const float outr = nvg__maxf(w, h) * 0.75f;
+		NVGpaint spec = NVGpaint::RadialGradient(cx, cy, inr, outr, s0, s1);
+		BeginPath();
+		RoundedRect(x, y, w, h, radius);
+		FillPaint(spec);
+		Fill();
+	}
 
 	if (style.highlightColor.a > 0.0f && style.highlight > 0.0f) {
 		const float highlightFrac = nvg__clampf(style.highlight, 0.0f, 1.0f);
@@ -3362,6 +3393,28 @@ void NVGcontext::GlassRect(float x, float y, float w, float h, const NVGglassSty
 		BeginPath();
 		RoundedRect(x + bw * 0.5f, y + bw * 0.5f, w - bw, h - bw, nvg__maxf(radius - bw * 0.5f, 0.0f));
 		Stroke();
+	}
+
+	// Drop shadow behind the panel (avoid dark edge fringe by drawing behind existing content).
+	if (style.shadowColor.a > 0.0f) {
+		Save();
+		GlobalCompositeOperation(NVG_DESTINATION_OVER);
+		const float shadowSize = nvg__maxf(blur * 0.75f, 10.0f);
+		const float outerRadius = radius + shadowSize;
+		NVGcolor inner = style.shadowColor;
+		inner.a = 0.0f;
+		NVGcolor outer = style.shadowColor;
+		NVGpaint shadow = NVGpaint::BoxGradient(
+			x, y, w, h,
+			radius, shadowSize,
+			inner, outer);
+		BeginPath();
+		RoundedRect(x - shadowSize, y - shadowSize, w + shadowSize * 2.0f, h + shadowSize * 2.0f, outerRadius);
+		RoundedRect(x, y, w, h, radius);
+		PathWinding(NVG_HOLE);
+		FillPaint(shadow);
+		Fill();
+		Restore();
 	}
 
 	Restore();
