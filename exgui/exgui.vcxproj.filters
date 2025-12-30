@@ -38,6 +38,9 @@
     <ClCompile Include="exgui\rmgui_controls.cpp">
       <Filter>exgui</Filter>
     </ClCompile>
+    <ClCompile Include="exgui\rm_effects.cpp">
+      <Filter>exgui</Filter>
+    </ClCompile>
     <ClCompile Include="vendor\glad\src\glad.c">
       <Filter>vendor\glad</Filter>
     </ClCompile>
@@ -77,6 +80,9 @@
       <Filter>vendor\stb</Filter>
     </ClInclude>
     <ClInclude Include="exgui\rmgui_controls.h">
+      <Filter>exgui</Filter>
+    </ClInclude>
+    <ClInclude Include="exgui\rm_effects.h">
       <Filter>exgui</Filter>
     </ClInclude>
     <ClInclude Include="vendor\glad\include\glad\glad.h">

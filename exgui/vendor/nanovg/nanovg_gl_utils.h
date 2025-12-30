@@ -62,7 +62,11 @@ NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* ctx, int w, int h, int imag
 	glGetIntegerv(GL_RENDERBUFFER_BINDING, &defaultRBO);
 
 	fb = (NVGLUframebuffer*)malloc(sizeof(NVGLUframebuffer));
-	if (fb == NULL) goto error;
+	if (fb == NULL) {
+		glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
+		glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
+		return NULL;
+	}
 	memset(fb, 0, sizeof(NVGLUframebuffer));
 
 	fb->image = ctx->CreateImageRGBA(w, h, imageFlags | NVG_IMAGE_FLIPY | NVG_IMAGE_PREMULTIPLIED, NULL);
@@ -100,19 +104,20 @@ NVGLUframebuffer* nvgluCreateFramebuffer(NVGcontext* ctx, int w, int h, int imag
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fb->texture, 0);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, fb->rbo);
 
-		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
 #endif // GL_DEPTH24_STENCIL8
-			goto error;
+			glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
+			glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
+			nvgluDeleteFramebuffer(fb);
+			return NULL;
+#ifdef GL_DEPTH24_STENCIL8
+		}
+#endif
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
 	glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
 	return fb;
-error:
-	glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
-	glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
-	nvgluDeleteFramebuffer(fb);
-	return NULL;
 #else
 	NVG_NOTUSED(ctx);
 	NVG_NOTUSED(w);

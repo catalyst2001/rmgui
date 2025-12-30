@@ -902,13 +902,27 @@ static int glnvg__renderCreateRenderTarget(GLNVGcontext* gl, const NVGrenderTarg
 	glGetIntegerv(GL_RENDERBUFFER_BINDING, &defaultRBO);
 
 	target = glnvg__allocRenderTarget(gl);
-	if (target == NULL) goto error;
+	if (target == NULL) {
+		glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
+		glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
+		return 0;
+	}
 
 	target->image = glnvg__renderCreateTexture(gl, NVG_TEXTURE_RGBA, desc.width, desc.height, imageFlags, NULL);
-	if (target->image == 0) goto error;
+	if (target->image == 0) {
+		glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
+		glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
+		glnvg__deleteRenderTarget(gl, target->id);
+		return 0;
+	}
 
 	tex = glnvg__findTexture(gl, target->image);
-	if (tex == NULL) goto error;
+	if (tex == NULL) {
+		glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
+		glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
+		glnvg__deleteRenderTarget(gl, target->id);
+		return 0;
+	}
 
 	target->texture = tex->tex;
 	target->width = desc.width;
@@ -934,21 +948,21 @@ static int glnvg__renderCreateRenderTarget(GLNVGcontext* gl, const NVGrenderTarg
 		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, desc.width, desc.height);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, target->texture, 0);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, target->rbo);
-		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
 #endif
-			goto error;
+			glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
+			glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
+			glnvg__deleteRenderTarget(gl, target->id);
+			return 0;
+#ifdef GL_DEPTH24_STENCIL8
+		}
+#endif
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
 	glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
 
 	return target->id;
-error:
-	glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
-	glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
-	if (target != NULL)
-		glnvg__deleteRenderTarget(gl, target->id);
-	return 0;
 #else
 	NVG_NOTUSED(gl);
 	NVG_NOTUSED(desc);
@@ -1521,11 +1535,17 @@ static void glnvg__renderFill(GLNVGcontext* gl, const NVGpaint* paint, NVGcompos
 	int i, maxverts, offset;
 
 	if (call == NULL) return;
+	auto rollbackCall = [&]() {
+		if (gl->ncalls > 0) gl->ncalls--;
+	};
 
 	call->type = GLNVG_FILL;
 	call->triangleCount = 4;
 	call->pathOffset = glnvg__allocPaths(gl, npaths);
-	if (call->pathOffset == -1) goto error;
+	if (call->pathOffset == -1) {
+		rollbackCall();
+		return;
+	}
 	call->pathCount = npaths;
 	call->image = paint->image;
 	call->blendFunc = glnvg__blendCompositeOperation(compositeOperation);
@@ -1539,7 +1559,10 @@ static void glnvg__renderFill(GLNVGcontext* gl, const NVGpaint* paint, NVGcompos
 	// Allocate vertices for all the paths.
 	maxverts = glnvg__maxVertCount(paths, npaths) + call->triangleCount;
 	offset = glnvg__allocVerts(gl, maxverts);
-	if (offset == -1) goto error;
+	if (offset == -1) {
+		rollbackCall();
+		return;
+	}
 
 	for (i = 0; i < npaths; i++) {
 		GLNVGpath* copy = &gl->paths[call->pathOffset + i];
@@ -1570,7 +1593,10 @@ static void glnvg__renderFill(GLNVGcontext* gl, const NVGpaint* paint, NVGcompos
 		glnvg__vset(&quad[3], bounds[0], bounds[1], 0.5f, 1.0f);
 
 		call->uniformOffset = glnvg__allocFragUniforms(gl, 2);
-		if (call->uniformOffset == -1) goto error;
+		if (call->uniformOffset == -1) {
+			rollbackCall();
+			return;
+		}
 		// Simple shader for stencil
 		frag = nvg__fragUniformPtr(gl, call->uniformOffset);
 		memset(frag, 0, sizeof(*frag));
@@ -1580,17 +1606,15 @@ static void glnvg__renderFill(GLNVGcontext* gl, const NVGpaint* paint, NVGcompos
 		glnvg__convertPaint(gl, nvg__fragUniformPtr(gl, call->uniformOffset + gl->fragSize), paint, scissor, fringe, fringe, -1.0f);
 	} else {
 		call->uniformOffset = glnvg__allocFragUniforms(gl, 1);
-		if (call->uniformOffset == -1) goto error;
+		if (call->uniformOffset == -1) {
+			rollbackCall();
+			return;
+		}
 		// Fill shader
 		glnvg__convertPaint(gl, nvg__fragUniformPtr(gl, call->uniformOffset), paint, scissor, fringe, fringe, -1.0f);
 	}
 
 	return;
-
-error:
-	// We get here if call alloc was ok, but something else is not.
-	// Roll back the last call to prevent drawing it.
-	if (gl->ncalls > 0) gl->ncalls--;
 }
 
 static void glnvg__renderStroke(GLNVGcontext* gl, const NVGpaint* paint, NVGcompositeOperationState compositeOperation, const NVGscissor* scissor, float fringe,
@@ -1600,10 +1624,16 @@ static void glnvg__renderStroke(GLNVGcontext* gl, const NVGpaint* paint, NVGcomp
 	int i, maxverts, offset;
 
 	if (call == NULL) return;
+	auto rollbackCall = [&]() {
+		if (gl->ncalls > 0) gl->ncalls--;
+	};
 
 	call->type = GLNVG_STROKE;
 	call->pathOffset = glnvg__allocPaths(gl, npaths);
-	if (call->pathOffset == -1) goto error;
+	if (call->pathOffset == -1) {
+		rollbackCall();
+		return;
+	}
 	call->pathCount = npaths;
 	call->image = paint->image;
 	call->blendFunc = glnvg__blendCompositeOperation(compositeOperation);
@@ -1611,7 +1641,10 @@ static void glnvg__renderStroke(GLNVGcontext* gl, const NVGpaint* paint, NVGcomp
 	// Allocate vertices for all the paths.
 	maxverts = glnvg__maxVertCount(paths, npaths);
 	offset = glnvg__allocVerts(gl, maxverts);
-	if (offset == -1) goto error;
+	if (offset == -1) {
+		rollbackCall();
+		return;
+	}
 
 	for (i = 0; i < npaths; i++) {
 		GLNVGpath* copy = &gl->paths[call->pathOffset + i];
@@ -1628,7 +1661,10 @@ static void glnvg__renderStroke(GLNVGcontext* gl, const NVGpaint* paint, NVGcomp
 	if (gl->flags & NVG_STENCIL_STROKES) {
 		// Fill shader
 		call->uniformOffset = glnvg__allocFragUniforms(gl, 2);
-		if (call->uniformOffset == -1) goto error;
+		if (call->uniformOffset == -1) {
+			rollbackCall();
+			return;
+		}
 
 		glnvg__convertPaint(gl, nvg__fragUniformPtr(gl, call->uniformOffset), paint, scissor, strokeWidth, fringe, -1.0f);
 		glnvg__convertPaint(gl, nvg__fragUniformPtr(gl, call->uniformOffset + gl->fragSize), paint, scissor, strokeWidth, fringe, 1.0f - 0.5f/255.0f);
@@ -1636,16 +1672,14 @@ static void glnvg__renderStroke(GLNVGcontext* gl, const NVGpaint* paint, NVGcomp
 	} else {
 		// Fill shader
 		call->uniformOffset = glnvg__allocFragUniforms(gl, 1);
-		if (call->uniformOffset == -1) goto error;
+		if (call->uniformOffset == -1) {
+			rollbackCall();
+			return;
+		}
 		glnvg__convertPaint(gl, nvg__fragUniformPtr(gl, call->uniformOffset), paint, scissor, strokeWidth, fringe, -1.0f);
 	}
 
 	return;
-
-error:
-	// We get here if call alloc was ok, but something else is not.
-	// Roll back the last call to prevent drawing it.
-	if (gl->ncalls > 0) gl->ncalls--;
 }
 
 static void glnvg__renderTriangles(GLNVGcontext* gl, const NVGpaint* paint, NVGcompositeOperationState compositeOperation, const NVGscissor* scissor,
@@ -1655,6 +1689,9 @@ static void glnvg__renderTriangles(GLNVGcontext* gl, const NVGpaint* paint, NVGc
 	GLNVGfragUniforms* frag;
 
 	if (call == NULL) return;
+	auto rollbackCall = [&]() {
+		if (gl->ncalls > 0) gl->ncalls--;
+	};
 
 	call->type = GLNVG_TRIANGLES;
 	call->image = paint->image;
@@ -1662,24 +1699,25 @@ static void glnvg__renderTriangles(GLNVGcontext* gl, const NVGpaint* paint, NVGc
 
 	// Allocate vertices for all the paths.
 	call->triangleOffset = glnvg__allocVerts(gl, nverts);
-	if (call->triangleOffset == -1) goto error;
+	if (call->triangleOffset == -1) {
+		rollbackCall();
+		return;
+	}
 	call->triangleCount = nverts;
 
 	memcpy(&gl->verts[call->triangleOffset], verts, sizeof(NVGvertex) * nverts);
 
 	// Fill shader
 	call->uniformOffset = glnvg__allocFragUniforms(gl, 1);
-	if (call->uniformOffset == -1) goto error;
+	if (call->uniformOffset == -1) {
+		rollbackCall();
+		return;
+	}
 	frag = nvg__fragUniformPtr(gl, call->uniformOffset);
 	glnvg__convertPaint(gl, frag, paint, scissor, 1.0f, fringe, -1.0f);
 	frag->type = NSVG_SHADER_IMG;
 
 	return;
-
-error:
-	// We get here if call alloc was ok, but something else is not.
-	// Roll back the last call to prevent drawing it.
-	if (gl->ncalls > 0) gl->ncalls--;
 }
 
 static void glnvg__renderDelete(GLNVGcontext* gl)

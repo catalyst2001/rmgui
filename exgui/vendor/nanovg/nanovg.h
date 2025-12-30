@@ -52,6 +52,7 @@ struct NVGcolor {
 	static NVGcolor TransRGBAf(NVGcolor c0, float a);
 	static NVGcolor HSL(float h, float s, float l);
 	static NVGcolor HSLA(float h, float s, float l, unsigned char a);
+	static NVGcolor HSLAf(float h, float s, float l, float a);
 };
 
 struct NVGpaint {
@@ -69,12 +70,26 @@ struct NVGpaint {
 	static NVGpaint ImagePattern(float ox, float oy, float ex, float ey, float angle, int image, float alpha);
 };
 
+enum NVGblurType {
+	NVG_BLUR_GAUSSIAN = 0,
+	NVG_BLUR_MOTION,
+	NVG_BLUR_RADIAL,
+	NVG_BLUR_LINEAR,
+	NVG_BLUR_BOKEH,
+	NVG_BLUR_LIQUID,
+};
+
 struct NVGblurStyle {
 	float radius;
 	float strength;
 	int steps;
 	int rings;
 	NVGcolor color;
+	NVGblurType type;
+	float angle;
+	float length;
+	float jitter;
+	int blades;
 
 	NVGblurStyle();
 };
@@ -559,6 +574,13 @@ struct NVGcontext {
 	float distTol;
 	float fringeWidth;
 	float devicePxRatio;
+	float viewWidth;
+	float viewHeight;
+	int boundRenderTarget;
+	int glassRenderTarget;
+	int glassRenderTargetW;
+	int glassRenderTargetH;
+	float glassRenderTargetRatio;
 	FONScontext* fs;
 	int fontImages[NVG_MAX_FONTIMAGES];
 	int fontImageIdx;

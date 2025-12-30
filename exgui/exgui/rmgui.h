@@ -504,7 +504,7 @@ public:
   inline void from_HSL(float h, float s, float l) { 
     *this = NVGcolor::HSL(h, s, l); }//TODO: K.D. optimize stack costs!!
   inline void from_HSLA(float h, float s, float l, float a) { 
-    *this = NVGcolor::HSLA(h, s, l, a); }//TODO: K.D. optimize stack costs!!
+    *this = NVGcolor::HSLAf(h, s, l, a); }//TODO: K.D. optimize stack costs!!
   inline rm_color& lerp(rm_color &color, float u) {
     *this = NVGcolor::LerpRGBA(*this, color, u);//TODO: K.D. optimize stack costs!!
     return *this;
@@ -522,7 +522,7 @@ public:
     return *this;
   }
   inline rm_color negative() const {
-    return rm_color(1.f-r, 1.f-g, 1.f-b, 1.f);
+    return rm_color(NVGcolor::RGBAf(1.f - r, 1.f - g, 1.f - b, 1.f));
   }
   rm_color() { r=0.f, g=0.f, b=0.f, a=1.f; }
   rm_color(uint8_t _r, uint8_t _g, uint8_t _b) { from_RGB(_r, _g, _b); }
@@ -548,7 +548,7 @@ public:
 class irmgui_widget
 {
 public:
-  //virtual     ~irmgui_widget() = 0;
+  virtual ~irmgui_widget() = default;
   virtual bool on_event(RM_EVENT event, rm_widget *p_from, rm_event_data *pevent_data) = 0;
   virtual void on_draw(NVGcontext* pctx) = 0;
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) = 0;
@@ -953,6 +953,28 @@ public:
     }
     m_elem_flags = flags;
     m_user_flags = uflags;
+    m_pos_of_parent.init(static_cast<float>(x), static_cast<float>(y));
+    m_size.init(static_cast<float>(width), static_cast<float>(height));
+    m_bbox.init(m_pos_of_parent, m_size);
+    m_content_area.init(0.f, 0.f, m_size.x, m_size.y);
+
+    /* set font from root */
+    if (m_proot)
+      set_font(((rm_widget *)m_proot)->get_font());
+
+    set_classname(p_classname);
+  }
+  rm_widget(float x, float y, float width, float height, rm_widget *p_parent, const char *p_classname,
+    uint32_t flags = RM_FLAG_DEFAULT, uint32_t uflags = 0, void *p_userptr = nullptr) : m_proot(nullptr),
+    m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_playout(nullptr)/*, m_zindex(0)*/ {
+    rm_vec2 parent_coord;
+    if (m_pparent) {
+      parent_coord = m_pparent->get_pos_of_parent();
+      m_pparent->add_child(this);
+      grab_globals_from(m_pparent);
+    }
+    m_elem_flags = flags;
+    m_user_flags = uflags;
     m_pos_of_parent.init(x, y);
     m_size.init(width, height);
     m_bbox.init(m_pos_of_parent, m_size);
@@ -964,7 +986,7 @@ public:
 
     set_classname(p_classname);
   }
-  ~rm_widget() {}
+  virtual ~rm_widget() = default;
 
   /* layouts */
   inline void        set_layout(irm_layout* playout) { m_playout = playout; }
@@ -1025,7 +1047,7 @@ public:
   virtual void       resize(float width, float height);
   inline void        resize(rm_vec2 newsize) { resize(newsize.x, newsize.y); }
 
-  inline  void       move(int newx, int newy) { move_to(this, newx, newy); }
+  inline  void       move(int newx, int newy) { move_to(this, static_cast<float>(newx), static_cast<float>(newy)); }
   virtual void       move(rm_vec2 newpos) { move_to(this, newpos.x, newpos.y); }
   virtual void       move_relative(rm_vec2& delta);
 

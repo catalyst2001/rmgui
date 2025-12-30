@@ -1,13 +1,16 @@
 ﻿#include "backend/rmgui_glfw_opnegl33.h"
 #include "rmgui_controls.h"
+#include "rm_effects.h"
 #define NANOVG_GL3_IMPLEMENTATION
 #include "nanovg_gl.h"
 #include <iostream>
-#include <vector>
 #include <cmath>
 #include "blendish_test.h"
 
 #define NOMINMAX
+#ifdef APIENTRY
+#undef APIENTRY
+#endif
 #include <Windows.h> //for Sleep
 #ifdef RGB
 #undef RGB
@@ -21,7 +24,7 @@ void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float h
 {
   struct NVGtextRow rows[3];
   struct NVGglyphPosition glyphs[100];
-  const char* text = "This is longer chunk of text.\n  \n  Would have used lorem ipsum but she    was busy jumping over the lazy dog with the fox and all the men who came to the aid of the party.🎉";
+  const char* text = "This is longer chunk of text.\n  \n  Would have used lorem ipsum but she    was busy jumping over the lazy dog with the fox and all the men who came to the aid of the party.";
   const char* start;
   const char* end;
   int nrows, i, nglyphs, j, lnum = 0;
@@ -45,8 +48,11 @@ void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float h
   // The "next" variable of the last returned item tells where to continue.
   start = text;
   end = text + strlen(text);
-  for (nrows = vg->TextBreakLines( start, end, width, rows, 3); 0 != nrows; nrows = vg->TextBreakLines( start, end, width, rows, 3))
-  {
+  for (;;) {
+    nrows = vg->TextBreakLines(start, end, width, rows, 3);
+    if (nrows <= 0) {
+      break;
+    }
     for (i = 0; i < nrows; i++) {
       struct NVGtextRow* row = &rows[i];
       int hit = mx > x && mx < (x + width) && my >= y && my < (y + lineh);
@@ -146,145 +152,6 @@ void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float h
 }
 #pragma endregion
 
-class rm_effects_preview : public rm_widget {
-  int m_bgImage;
-
-  void ensure_background(NVGcontext* ctx) {
-    if (m_bgImage != 0 || ctx == nullptr) {
-      return;
-    }
-
-    const int w = 512;
-    const int h = 512;
-    std::vector<unsigned char> pixels(w * h * 4);
-    for (int y = 0; y < h; ++y) {
-      for (int x = 0; x < w; ++x) {
-        const float fx = x / (float)(w - 1);
-        const float fy = y / (float)(h - 1);
-        const float wave = 0.5f + 0.5f * sinf(fx * 8.0f + fy * 4.0f);
-        const unsigned int seed = (unsigned int)(x * 1973u + y * 9277u) ^ 0x68bc21u;
-        const float noise = ((float)(seed & 255u) / 255.0f) - 0.5f;
-
-        float r = 20.0f + 120.0f * fx + 60.0f * wave + 18.0f * noise;
-        float g = 18.0f + 90.0f * fy + 40.0f * wave + 14.0f * noise;
-        float b = 40.0f + 140.0f * (1.0f - fx) + 50.0f * wave + 12.0f * noise;
-
-        r = rm_clamp(r, 0.0f, 255.0f);
-        g = rm_clamp(g, 0.0f, 255.0f);
-        b = rm_clamp(b, 0.0f, 255.0f);
-
-        const int idx = (y * w + x) * 4;
-        pixels[idx + 0] = static_cast<unsigned char>(r);
-        pixels[idx + 1] = static_cast<unsigned char>(g);
-        pixels[idx + 2] = static_cast<unsigned char>(b);
-        pixels[idx + 3] = 255;
-      }
-    }
-
-    m_bgImage = ctx->CreateImageRGBA(w, h, NVG_IMAGE_REPEATX | NVG_IMAGE_REPEATY, pixels.data());
-  }
-
-public:
-  rm_effects_preview(rm_widget* p_parent, int x, int y, int width, int height)
-    : rm_widget(x, y, width, height, p_parent, "effects_preview"),
-      m_bgImage(0) {}
-
-  void on_draw(NVGcontext* ctx) override {
-    ensure_background(ctx);
-    if (m_bgImage == 0) {
-      return;
-    }
-
-    NVGpaint bg = NVGpaint::ImagePattern(0.0f, 0.0f, m_size.x, m_size.y, 0.0f, m_bgImage, 1.0f);
-    ctx->BeginPath();
-    ctx->Rect(0.0f, 0.0f, m_size.x, m_size.y);
-    ctx->FillPaint(bg);
-    ctx->Fill();
-
-    const float pad = 24.0f;
-    const float panelW = rm_min(380.0f, m_size.x - pad * 2.0f);
-    const float panelH = 200.0f;
-    const float panelX = pad;
-    const float panelY = pad;
-
-    NVGglassStyle glass;
-    glass.backgroundImage = m_bgImage;
-    glass.backgroundAlpha = 1.0f;
-    glass.blur = 7.0f;
-    glass.blurSamples = 12;
-    glass.radius = 18.0f;
-    glass.tint = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.10f);
-    glass.highlightColor = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.30f);
-    glass.shadowColor = NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.30f);
-    glass.borderColor = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.30f);
-    glass.borderWidth = 1.0f;
-    glass.highlight = 0.45f;
-
-    ctx->GlassRect(panelX, panelY, panelW, panelH, glass);
-
-    ctx->FontFace("default");
-    ctx->TextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-
-    NVGblurStyle titleBlur;
-    titleBlur.radius = 6.0f;
-    titleBlur.strength = 0.7f;
-    titleBlur.steps = 12;
-    titleBlur.rings = 2;
-    titleBlur.color = NVGcolor::RGBA(255, 255, 255, 235);
-
-    ctx->FontSize(30.0f);
-    ctx->TextBlur(panelX + 20.0f, panelY + 20.0f, "Liquid Glass", nullptr, titleBlur);
-
-    NVGblurStyle subBlur = titleBlur;
-    subBlur.radius = 3.0f;
-    subBlur.strength = 0.45f;
-    subBlur.color = NVGcolor::RGBA(200, 220, 255, 200);
-    ctx->FontSize(16.0f);
-    ctx->TextBlur(panelX + 20.0f, panelY + 72.0f, "Blurred text + frosted panel", nullptr, subBlur);
-
-    ctx->FillColor(NVGcolor::RGBA(220, 220, 220, 200));
-    ctx->Text(panelX + 20.0f, panelY + 112.0f, "Backend-agnostic effects demo", nullptr);
-
-    const float glowX = panelX + panelW + 40.0f;
-    const float glowW = rm_max(200.0f, m_size.x - glowX - pad);
-    const float glowH = 140.0f;
-    const float glowY = panelY + 30.0f;
-
-    NVGglowStyle glow;
-    glow.radius = 20.0f;
-    glow.intensity = 0.9f;
-    glow.color = NVGcolor::RGBA(90, 160, 255, 220);
-    ctx->GlowRect(glowX, glowY, glowW, glowH, 18.0f, glow);
-
-    ctx->BeginPath();
-    ctx->RoundedRect(glowX, glowY, glowW, glowH, 18.0f);
-    ctx->FillColor(NVGcolor::RGBA(18, 20, 28, 210));
-    ctx->Fill();
-    ctx->StrokeWidth(1.0f);
-    ctx->StrokeColor(NVGcolor::RGBA(120, 170, 255, 120));
-    ctx->Stroke();
-
-    ctx->FontSize(18.0f);
-    ctx->FillColor(NVGcolor::RGBA(200, 220, 255, 220));
-    ctx->TextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-    ctx->Text(glowX + glowW * 0.5f, glowY + glowH * 0.5f, "Neon Glow", nullptr);
-
-    ctx->TextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-    ctx->FontSize(22.0f);
-    ctx->FillColor(NVGcolor::RGBA(240, 240, 240, 220));
-    ctx->Text(pad, panelY + panelH + 40.0f, "Text Blur", nullptr);
-
-    NVGblurStyle textBlur;
-    textBlur.radius = 5.0f;
-    textBlur.strength = 0.6f;
-    textBlur.steps = 10;
-    textBlur.rings = 2;
-    textBlur.color = NVGcolor::RGBA(255, 200, 160, 220);
-    ctx->FontSize(36.0f);
-    ctx->TextBlur(pad, panelY + panelH + 78.0f, "Soft Blur Effect", nullptr, textBlur);
-  }
-};
-
 void testtrb()
 {
   auto gen_rand_string = []() -> const char* {
@@ -379,7 +246,7 @@ void test_old(rm_surface* gui)
 
   rm_vec2& size = pwindow->get_size();
   rm_output_text* potext = new rm_output_text(pwindow,
-    1.f, size.y - 200.f - 10.f, pwindow->get_size().x, 200.f);
+    1.0f, size.y - 210.0f, pwindow->get_size().x, 200.0f);
 #if 0
   rm_treeview* tree = new rm_treeview(290, 230, 200, 200, pwindow,
     [](rm_treeview* tv, rm_tree_node* node) {
@@ -478,9 +345,9 @@ void example_widgets(rm_surface* gui)
   rm_widget* effects_page = ptab12->get_page_widget();
   rm_vec2& effects_size = effects_page->get_size();
   const float effects_pad = 12.0f;
-  const int effects_w = static_cast<int>(rm_max(0.0f, effects_size.x - effects_pad * 2.0f));
-  const int effects_h = static_cast<int>(rm_max(0.0f, effects_size.y - effects_pad * 2.0f));
-  new rm_effects_preview(effects_page, static_cast<int>(effects_pad), static_cast<int>(effects_pad), effects_w, effects_h);
+  const float effects_w = rm_max(0.0f, effects_size.x - effects_pad * 2.0f);
+  const float effects_h = rm_max(0.0f, effects_size.y - effects_pad * 2.0f);
+  new rm_effects(effects_page, effects_pad, effects_pad, effects_w, effects_h);
 
   rm_flexbox_layout* pflexlayout = new rm_flexbox_layout();
   pflexlayout->set_dir(rm_flex_direction::Column);
@@ -519,7 +386,7 @@ void example_widgets(rm_surface* gui)
   style_rb.set_border_active_inner(NVGcolor::RGB(40, 60, 196));
   style_rb.set_border_inactive(NVGcolor::RGB(255, 255, 255));
   style_rb.set_border_width_inactive(1.5f);
-  style_rb.set_bg_inner(NVGcolor::RGBA(33, 36, 71, 68.85f));
+  style_rb.set_bg_inner(NVGcolor::RGBAf(33.0f / 255.0f, 36.0f / 255.0f, 71.0f / 255.0f, 0.27f));
   style_rb.set_circle_radius(9.5f);
 
   new rm_radiobutton(pdiv, 10, 10, 150, 25, &style_rb, "Holding",
@@ -632,9 +499,7 @@ int main() {
     last_time = current_time;
     current_time = g_gui->get_sysdf()->get_time();
     float dt = current_time - last_time;
-    float sinabs = fabsf(sinf(current_time));
-    float percent = sinabs * 100.f;
-    g_gui->resize(fbWidth, fbHeight);
+    g_gui->resize(static_cast<float>(fbWidth), static_cast<float>(fbHeight));
     g_gui->draw(dt);
 
 #if 0

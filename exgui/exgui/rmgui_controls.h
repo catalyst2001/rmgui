@@ -693,6 +693,7 @@ protected:
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
   rm_output_text(rm_widget* p_parent, int x, int y, int width, int height, float line_height=16.f, size_t num_lines=16);
+  rm_output_text(rm_widget* p_parent, float x, float y, float width, float height, float line_height=16.f, size_t num_lines=16);
   virtual ~rm_output_text() {}
 
   inline void print(const std::string& text) { m_linesbuf.append_text(text); }
@@ -724,8 +725,6 @@ protected:
 public:
   rm_number_input(rm_widget* p_parent, int x, int y, int width, int height, 
     input_type type = type_float, float value = 0.f, float step = 0.1f, float minval = 0.f, float maxval = 100.f);
-  rm_number_input(rm_widget* p_parent, int x, int y, int width, int height,
-    input_type type, int value = 0, int step = 1, int minval = 0, int maxval = 100);
 
   inline input_type           get_type() const { return m_type; }
   template<class _type> _type get_value() const { return static_cast<_type>(m_value); }
@@ -1092,7 +1091,7 @@ class rm_radiobutton_style : public rm_corners_style {
   NVGcolor  m_border_inactive;
   float     m_border_width_inactive;
   NVGcolor  m_mark_color;
-  int       m_circle_radius;
+  float     m_circle_radius;
   float     m_font_size;
   float     m_shadow_offset;
   float     m_shadow_size;
@@ -1106,9 +1105,9 @@ public:
     m_border_width_inner(1.f),
     m_border_inactive(NVGcolor::RGBA(255, 255, 255, 192)),
     m_border_width_inactive(2.f),
-    m_mark_color(NVGcolor::RGB(255, 255, 255)), m_circle_radius(8), m_font_size(18.f),
+    m_mark_color(NVGcolor::RGB(255, 255, 255)), m_circle_radius(8.0f), m_font_size(18.f),
     m_shadow_offset(5.f), m_shadow_size(6.f),
-    m_shadow_color(NVGcolor::RGBA(0, 0, 0, 63.75f)) {}
+    m_shadow_color(NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.25f)) {}
 
   /* selectors */
   inline const rm_vec2& get_text_offset()       const { return m_text_offset; }
@@ -1121,7 +1120,7 @@ public:
   inline NVGcolor       get_border_inactive()   const { return m_border_inactive; }
   inline float          get_border_width_inactive() const { return m_border_width_inactive; }
   inline NVGcolor       get_mark_color()        const { return m_mark_color; }
-  inline int            get_circle_radius()     const { return m_circle_radius; }
+  inline float          get_circle_radius()     const { return m_circle_radius; }
   inline float          get_font_size()         const { return m_font_size; }
   inline float          get_shadow_offset() const { return m_shadow_offset; }
   inline float          get_shadow_size()   const { return m_shadow_size; }
@@ -1138,7 +1137,7 @@ public:
   inline void set_border_inactive(NVGcolor c) { m_border_inactive = c; }
   inline void set_border_width_inactive(float w) { m_border_width_inactive = w; }
   inline void set_mark_color(NVGcolor c) { m_mark_color = c; }
-  inline void set_circle_radius(int r) { m_circle_radius = r; }
+  inline void set_circle_radius(float r) { m_circle_radius = r; }
   inline void set_font_size(float s) { m_font_size = s; }
   inline void set_shadow_offset(float offset) { m_shadow_offset = offset; }
   inline void set_shadow_size(float size) { m_shadow_size = size; }
@@ -1200,7 +1199,7 @@ public:
     m_track_on(NVGcolor::RGB(57, 76, 195)), m_track_off(NVGcolor::RGBA(200, 200, 200, 128)), 
     m_knob_color(NVGcolor::RGB(255, 255, 255)), m_knob_radius(11.f),
     m_shadow_offset(5.f), m_shadow_size(7.f),
-    m_shadow_color(NVGcolor::RGBA(0, 0, 0, 63.75f)) {
+    m_shadow_color(NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.25f)) {
   }
 
   /* selectors */

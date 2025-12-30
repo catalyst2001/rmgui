@@ -1441,6 +1441,12 @@ rm_output_text::rm_output_text(rm_widget* p_parent, int x, int y, int width, int
   m_textbuf.resize(8096);
 }
 
+rm_output_text::rm_output_text(rm_widget* p_parent, float x, float y, float width, float height, float line_height, size_t num_lines) :
+  rm_widget(x, y, width, height, p_parent, "ui_outputtext", RM_FLAG_DEFAULT), m_linesbuf(num_lines, 512, num_lines), m_line_height(line_height)
+{
+  m_textbuf.resize(8096);
+}
+
 void rm_output_text::printf(const char* pformat, ...)
 {
   va_list argptr;
@@ -1469,13 +1475,6 @@ bool rm_number_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE sta
 
 rm_number_input::rm_number_input(rm_widget* p_parent, int x, int y, int width, int height, 
   input_type type, float value, float step, float minval, float maxval) :
-  rm_widget(x, y, width, height, p_parent, "ui_outputtext", RM_FLAG_DEFAULT),
-  m_type(type), m_value(value), m_step(step), m_minval(minval), m_maxval(maxval)
-{
-}
-
-rm_number_input::rm_number_input(rm_widget* p_parent, int x, int y, int width, int height, 
-  input_type type, int value, int step, int minval, int maxval) :
   rm_widget(x, y, width, height, p_parent, "ui_outputtext", RM_FLAG_DEFAULT),
   m_type(type), m_value(value), m_step(step), m_minval(minval), m_maxval(maxval)
 {
@@ -2172,7 +2171,8 @@ void rm_menu::hide_all_submenus_except(rm_menu* psubmenu)
 }
 
 rm_menu::rm_menu(rm_widget* p_parent, int height, const char* pname) :
-  rm_widget(0.f, 0.f, 0.f, height, p_parent, "ui_menu", RM_FLAG_DEFAULT|RM_FLAG_GLOBAL), m_text(pname ? pname : ""), m_max_text_width(0.f), m_proot_menu(nullptr)
+  rm_widget(0, 0, 0, height, p_parent, "ui_menu", RM_FLAG_DEFAULT|RM_FLAG_GLOBAL),
+  m_text(pname ? pname : ""), m_max_text_width(0.f), m_proot_menu(nullptr)
 {
   /* detect menu level from parent */
   assert(p_parent && "p_parent was nullptr!");
