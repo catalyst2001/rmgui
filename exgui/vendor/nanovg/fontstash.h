@@ -307,8 +307,8 @@ struct FONScontext
 	int nverts;
 	unsigned char* scratch;
 	int nscratch;
-	FONSstate states[FONS_MAX_STATES];
-	int nstates;
+	FONSstate m_states[FONS_MAX_STATES];
+	int m_nstates;
 	void (*handleError)(void* uptr, int error, int val);
 	void* errorUptr;
 #ifdef FONS_USE_FREETYPE
@@ -834,7 +834,7 @@ FONScontext* fonsCreateInternal(FONSparams* params)
 
 static FONSstate* fons__getState(FONScontext* stash)
 {
-	return &stash->states[stash->nstates-1];
+	return &stash->m_states[stash->m_nstates-1];
 }
 
 int fonsAddFallbackFont(FONScontext* stash, int base, int fallback)
@@ -890,24 +890,24 @@ void fonsSetFont(FONScontext* stash, int font)
 
 void fonsPushState(FONScontext* stash)
 {
-	if (stash->nstates >= FONS_MAX_STATES) {
+	if (stash->m_nstates >= FONS_MAX_STATES) {
 		if (stash->handleError)
 			stash->handleError(stash->errorUptr, FONS_STATES_OVERFLOW, 0);
 		return;
 	}
-	if (stash->nstates > 0)
-		memcpy(&stash->states[stash->nstates], &stash->states[stash->nstates-1], sizeof(FONSstate));
-	stash->nstates++;
+	if (stash->m_nstates > 0)
+		memcpy(&stash->m_states[stash->m_nstates], &stash->m_states[stash->m_nstates-1], sizeof(FONSstate));
+	stash->m_nstates++;
 }
 
 void fonsPopState(FONScontext* stash)
 {
-	if (stash->nstates <= 1) {
+	if (stash->m_nstates <= 1) {
 		if (stash->handleError)
 			stash->handleError(stash->errorUptr, FONS_STATES_UNDERFLOW, 0);
 		return;
 	}
-	stash->nstates--;
+	stash->m_nstates--;
 }
 
 void fonsClearState(FONScontext* stash)

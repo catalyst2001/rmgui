@@ -20,7 +20,7 @@
 static rm_surface* g_gui = nullptr;
 
 #pragma region TEMPLATE1
-void drawParagraph(struct NVGcontext* vg, float x, float y, float width, float height, float mx, float my)
+void drawParagraph(NVGcontext* vg, float x, float y, float width, float height, float mx, float my)
 {
   struct NVGtextRow rows[3];
   struct NVGglyphPosition glyphs[100];

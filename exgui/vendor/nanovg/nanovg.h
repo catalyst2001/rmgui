@@ -1,4 +1,28 @@
 //
+// Copyright (c) 2025 NanoVG-cpp
+// 
+// Mikko Mononen memon@inside.org
+// Kirill Deryabin "catalyst" kd@allalg.ru
+// Daniil Runin "Daniluk2"
+// 
+// This software is provided 'as-is', without any express or implied
+// warranty.  In no event will the authors be held liable for any damages
+// arising from the use of this software.
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+// 1. The origin of this software must not be misrepresented; you must not
+//    claim that you wrote the original software. If you use this software
+//    in a product, an acknowledgment in the product documentation would be
+//    appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//    misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+// 
+// Original license:
+//
+
+//
 // Copyright (c) 2013 Mikko Mononen memon@inside.org
 //
 // This software is provided 'as-is', without any express or implied
@@ -23,6 +47,7 @@
 #include <cstdint>
 #include <memory>
 #include <utility>
+#include <stdexcept>
 
 #ifdef RGB
 #undef RGB
@@ -436,8 +461,67 @@ struct NVGtransform {
 	};
 };
 
-struct NVGcontext {
-	static std::unique_ptr<NVGcontext> Create(std::unique_ptr<NVGrenderer> renderer, const NVGcontextConfig& config = NVGcontextConfig());
+class NVGcontext {
+protected:
+	std::unique_ptr<NVGrenderer> m_renderer;
+	int m_rendererCreated;
+	NVGcontextConfig m_config;
+	float* m_commands;
+	int    m_ccommands;
+	int    m_ncommands;
+	float  m_commandx, m_commandy;
+	NVGstate m_states[NVG_MAX_STATES];
+	int m_nstates;
+	NVGpathCache* m_pcache;
+	float m_tessTol;
+	float m_distTol;
+	float m_fringeWidth;
+	float m_devicePxRatio;
+	float m_viewWidth;
+	float m_viewHeight;
+
+	int   m_boundRenderTarget;
+	int   m_glassRenderTarget;
+	int   m_glassRenderTargetW;
+	int   m_glassRenderTargetH;
+	float m_glassRenderTargetRatio;
+
+	FONScontext* m_fs;
+	int m_fontImages[NVG_MAX_FONTIMAGES];
+	int m_fontImageIdx;
+	int m_drawCallCount;
+	int m_fillTriCount;
+	int m_strokeTriCount;
+	int m_textTriCount;
+
+private:
+	void nvg__deletePathCache(NVGpathCache* c);
+	NVGpathCache* nvg__allocPathCache(void);
+	void nvg__setDevicePixelRatio(NVGcontext* ctx, float ratio);
+	NVGstate* nvg__getState(NVGcontext* ctx);
+	void nvg__appendCommands(NVGcontext* ctx, float* vals, int nvals);
+	void nvg__clearPathCache(NVGcontext* ctx);
+	NVGpath* nvg__lastPath(NVGcontext* ctx);
+	void nvg__addPath(NVGcontext* ctx);
+	NVGpoint* nvg__lastPoint(NVGcontext* ctx);
+	void nvg__addPoint(NVGcontext* ctx, float x, float y, int flags);
+	void nvg__closePath(NVGcontext* ctx);
+	void nvg__pathWinding(NVGcontext* ctx, int winding);
+	NVGvertex* nvg__allocTempVerts(NVGcontext* ctx, int nverts);
+	void nvg__tesselateBezier(NVGcontext* ctx,
+		float x1, float y1, float x2, float y2,
+		float x3, float y3, float x4, float y4,
+		int level, int type);
+	void nvg__flattenPaths(NVGcontext* ctx);
+	void nvg__calculateJoins(NVGcontext* ctx, float w, int lineJoin, float miterLimit);
+	int nvg__expandStroke(NVGcontext* ctx, float w, float fringe, int lineCap, int lineJoin, float miterLimit);
+	int nvg__expandFill(NVGcontext* ctx, float w, int lineJoin, float miterLimit);
+	void nvg__destroyContext(NVGcontext* ctx);
+	void nvg__flushTextTexture(NVGcontext* ctx);
+	int  nvg__allocTextAtlas(NVGcontext* ctx);
+	void nvg__renderText(NVGcontext* ctx, NVGvertex* verts, int nverts);
+public:
+	NVGcontext(std::unique_ptr<NVGrenderer> m_renderer, const NVGcontextConfig& m_config);
 	~NVGcontext();
 
 	NVGcontext(const NVGcontext&) = delete;
@@ -527,13 +611,14 @@ struct NVGcontext {
 	void stroke();
 
 	// Text.
-	int createFont(const char* name, const char* filename);
-	int createFontAtIndex(const char* name, const char* filename, const int fontIndex);
-	int createFontMem(const char* name, unsigned char* data, int ndata, int freeData);
-	int createFontMemAtIndex(const char* name, unsigned char* data, int ndata, int freeData, const int fontIndex);
-	int findFont(const char* name);
-	int addFallbackFontId(int baseFont, int fallbackFont);
-	int addFallbackFont(const char* baseFont, const char* fallbackFont);
+	int  createFont(const char* name, const char* filename);
+	int  createFontAtIndex(const char* name, const char* filename, const int fontIndex);
+	int  createFontMem(const char* name, unsigned char* data, int ndata, int freeData);
+	int  createFontMemAtIndex(const char* name, unsigned char* data, int ndata, int freeData, const int fontIndex);
+	int  findFont(const char* name);
+	int  addFallbackFontId(int baseFont, int fallbackFont);
+	int  addFallbackFont(const char* baseFont, const char* fallbackFont);
+	int  deleteFont(int font);
 	void resetFallbackFontsId(int baseFont);
 	void resetFallbackFonts(const char* baseFont);
 	void setFontSize(float size);
@@ -570,37 +655,7 @@ struct NVGcontext {
 	// Debug.
 	void debugDumpPathCache();
 
-	std::unique_ptr<NVGrenderer> renderer;
-	int rendererCreated;
-	NVGcontextConfig config;
-	float* commands;
-	int    ccommands;
-	int    ncommands;
-	float  commandx, commandy;
-	NVGstate states[NVG_MAX_STATES];
-	int nstates;
-	NVGpathCache* cache;
-	float tessTol;
-	float distTol;
-	float fringeWidth;
-	float devicePxRatio;
-	float viewWidth;
-	float viewHeight;
-	int   boundRenderTarget;
-	int   glassRenderTarget;
-	int   glassRenderTargetW;
-	int   glassRenderTargetH;
-	float glassRenderTargetRatio;
-	FONScontext* fs;
-	int fontImages[NVG_MAX_FONTIMAGES];
-	int fontImageIdx;
-	int drawCallCount;
-	int fillTriCount;
-	int strokeTriCount;
-	int textTriCount;
-
-private:
-	NVGcontext();
+	NVGrenderer* getRenderer() { return m_renderer.get(); }
 };
 
 #ifdef _MSC_VER

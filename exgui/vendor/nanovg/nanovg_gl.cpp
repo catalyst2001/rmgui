@@ -1712,10 +1712,10 @@ std::unique_ptr<NVGcontext> nvgCreateGLES2(int flags)
 std::unique_ptr<NVGcontext> nvgCreateGLES3(int flags)
 #endif
 {
-	std::unique_ptr<GLNVGrenderer> renderer(new GLNVGrenderer(flags));
-	NVGcontextConfig config;
-	config.edgeAntiAlias = (flags & NVG_ANTIALIAS) ? 1 : 0;
-	return NVGcontext::Create(std::move(renderer), config);
+	std::unique_ptr<GLNVGrenderer> m_renderer(new GLNVGrenderer(flags));
+	NVGcontextConfig m_config;
+	m_config.edgeAntiAlias = (flags & NVG_ANTIALIAS) ? 1 : 0;
+	return std::unique_ptr<NVGcontext>(new NVGcontext(std::move(m_renderer), m_config));
 }
 
 // 
@@ -1732,11 +1732,11 @@ int nvglCreateImageFromHandleGLES2(NVGcontext* ctx, GLuint textureId, int w, int
 int nvglCreateImageFromHandleGLES3(NVGcontext* ctx, GLuint textureId, int w, int h, int imageFlags)
 #endif
 {
-	GLNVGrenderer* renderer = ctx != NULL ? static_cast<GLNVGrenderer*>(ctx->renderer.get()) : NULL;
-	if (!renderer)
+	GLNVGrenderer* m_renderer = ctx != NULL ? static_cast<GLNVGrenderer*>(ctx->getRenderer()) : NULL;
+	if (!m_renderer)
 		return 0;
 
-	GLNVGtexture* tex = renderer->glnvg__allocTexture(); //HACK KD: access to internal function
+	GLNVGtexture* tex = m_renderer->glnvg__allocTexture(); //HACK KD: access to internal function
 	if (tex == NULL)
 		return 0;
 
@@ -1759,10 +1759,10 @@ GLuint nvglImageHandleGLES2(NVGcontext* ctx, int image)
 GLuint nvglImageHandleGLES3(NVGcontext* ctx, int image)
 #endif
 {
-	GLNVGrenderer* renderer = ctx != NULL ? static_cast<GLNVGrenderer*>(ctx->renderer.get()) : NULL;
-	if (!renderer)
+	GLNVGrenderer* m_renderer = ctx != NULL ? static_cast<GLNVGrenderer*>(ctx->getRenderer()) : NULL;
+	if (!m_renderer)
 		return 0;
 
-	GLNVGtexture* tex = renderer->glnvg__findTexture(image); //HACK KD: access to internal function
+	GLNVGtexture* tex = m_renderer->glnvg__findTexture(image); //HACK KD: access to internal function
 	return tex != NULL ? tex->tex : 0;
 }
