@@ -48,6 +48,8 @@
 #include <memory>
 #include <utility>
 #include <stdexcept>
+#include <algorithm>
+#include <cassert>
 
 #ifdef RGB
 #undef RGB
@@ -452,26 +454,265 @@ public:
 struct FONScontext;
 
 /**
-* @brief 3x3 transform matrix
+* @brief transform matrix
 */
 struct NVGtransform {
 	union {
-		struct { float mat[3][3]; };
-		struct { float v[6]; };
+		struct { float mat[3][2]; };
+		struct { float v[3 * 2]; };
 	};
 };
 
+/**
+* memory allocation overrides for debug and tracking
+*/
+#ifdef _DEBUG
+void* nvg__alloc(size_t size, const char* file, int line);
+void  nvg__free(void* ptr, const char* file, int line);
+
+#define NVG_OVERRIDE_ALLOC() \
+    static void* operator new(size_t size) { return nvg__alloc(size, "<not provided>", 0); } \
+    static void  operator delete(void* ptr) noexcept { nvg__free(ptr, "<not provided>", 0); } \
+    static void* operator new[](size_t size) { return nvg__alloc(size, "<not provided>", 0); } \
+    static void  operator delete[](void* ptr) noexcept { nvg__free(ptr, "<not provided>", 0); } \
+    static void  operator delete(void* ptr, size_t) noexcept { nvg__free(ptr, "<not provided>", 0); } \
+    static void  operator delete[](void* ptr, size_t) noexcept { nvg__free(ptr, "<not provided>", 0); } \
+    static void* operator new(size_t size, const char* file, int line) { return nvg__alloc(size, file, line); } \
+    static void  operator delete(void* ptr, const char* file, int line) noexcept { nvg__free(ptr, file, line); } \
+    static void* operator new[](size_t size, const char* file, int line) { return nvg__alloc(size, file, line); } \
+    static void  operator delete[](void* ptr, const char* file, int line) noexcept { nvg__free(ptr, file, line); }
+#else
+void* nvg__alloc(size_t size);
+void  nvg__free(void* ptr);
+
+#define NVG_OVERRIDE_ALLOC() \
+    static void* operator new(size_t size) { return nvg__alloc(size); } \
+    static void  operator delete(void* ptr) noexcept { nvg__free(ptr); } \
+    static void* operator new[](size_t size) { return nvg__alloc(size); } \
+    static void  operator delete[](void* ptr) noexcept { nvg__free(ptr); } \
+    static void  operator delete(void* ptr, size_t) noexcept { nvg__free(ptr); } \
+    static void  operator delete[](void* ptr, size_t) noexcept { nvg__free(ptr); }
+#endif
+
+#include <algorithm>
+#include <cstddef>
+
+/**
+* @brief A simple dynamic buffer for NanoVG commands and data.
+*/
+template<typename _type, size_t _limit = 0>
+class NVGbuffer {
+public:
+	NVG_OVERRIDE_ALLOC();
+private:
+	size_t m_capacity = 0;
+	size_t m_size = 0;
+	_type* m_pdata = nullptr;
+public:
+	NVGbuffer() = default;
+
+	explicit NVGbuffer(size_t cap) : m_capacity(cap), m_size(0) {
+		if (m_capacity < _limit) m_capacity = _limit;
+		m_pdata = (m_capacity ? new _type[m_capacity] : nullptr);
+	}
+
+	~NVGbuffer() {
+		if (m_pdata) {
+			delete[] m_pdata;
+			m_pdata = nullptr;
+		}
+	}
+
+	NVGbuffer(const NVGbuffer&) = delete;
+	NVGbuffer& operator=(const NVGbuffer&) = delete;
+
+	NVGbuffer(NVGbuffer&& other) noexcept
+		: m_capacity(other.m_capacity), m_size(other.m_size), m_pdata(other.m_pdata) {
+		other.m_capacity = 0;
+		other.m_size = 0;
+		other.m_pdata = nullptr;
+	}
+
+	NVGbuffer& operator=(NVGbuffer&& other) noexcept {
+		if (this == &other) return *this;
+		delete[] m_pdata;
+		m_capacity = other.m_capacity;
+		m_size = other.m_size;
+		m_pdata = other.m_pdata;
+		other.m_capacity = 0;
+		other.m_size = 0;
+		other.m_pdata = nullptr;
+		return *this;
+	}
+
+	inline _type* getData() { return m_pdata; }
+	inline size_t getSize() const { return m_size; }
+	inline size_t getCapacity() const { return m_capacity; }
+
+	bool availCapacity(size_t needed) {
+		// overflow guard
+		const size_t required = m_size + needed;
+		if (required < m_size)
+			return false;
+
+		// already enough + meets minimal limit (if any)
+		const size_t minCap = (_limit > 0 ? _limit : 0);
+		if (required <= m_capacity && m_capacity >= minCap)
+			return true;
+
+		// target is at least required and at least _limit
+		size_t target = std::max(required, minCap);
+
+		// grow-by-1.5 from previous capacity (or just target if capacity==0)
+		size_t grown = (m_capacity > 0) ? (m_capacity + m_capacity / 2) : target;
+
+		// ensure we don't end up smaller than target
+		size_t newCap = std::max(target, grown);
+		_type* newData = new _type[newCap];
+		for (size_t i = 0; i < m_size; ++i)
+			newData[i] = m_pdata[i];
+
+		delete[] m_pdata;
+		m_pdata = newData;
+		m_capacity = newCap;
+		return true;
+	}
+
+	void clear() {
+		m_size = 0;
+	}
+
+	void shrinkToFit() {
+		if (m_size == m_capacity)
+			return;
+
+		_type* newData = (m_size ? new _type[m_size] : nullptr);
+		for (size_t i = 0; i < m_size; ++i)
+			newData[i] = m_pdata[i];
+
+		delete[] m_pdata;
+		m_pdata = newData;
+		m_capacity = m_size;
+	}
+
+	bool appendBack(const _type* pdata, size_t count) {
+		if (!availCapacity(count))
+			return false;
+
+		for (size_t i = 0; i < count; ++i)
+			m_pdata[m_size + i] = pdata[i];
+
+		m_size += count;
+		return true;
+	}
+
+	inline _type &operator[](size_t index) {
+#ifdef _DEBUG
+		if(index >= m_size)
+			throw std::out_of_range("NVGbuffer index out of range");
+#endif
+		return m_pdata[index];
+	}
+
+	inline bool isEmpty() const {
+		return (m_size == 0);
+	}
+};
+
+/**
+* @brief A simple fixed-capacity stack for NanoVG state handling.
+*/
+template<typename _type, size_t _capacity>
+class NVGstackFixed {
+	static_assert(_capacity > 0, "_capacity is 0!");
+	size_t m_pos;
+	_type  m_data[_capacity]{};
+public:
+	NVGstackFixed() : m_pos(0) {}
+
+	/**
+	* @brief Clears the stack.
+	*/
+	void clear() { m_pos = 0; }
+
+	/**
+	* @brief Pushes a value to top of the stack.
+	* @param val Value to push.
+	* @return true if succeeded, false if stack is full.
+	*/
+	bool push(const _type& val) {
+		if (m_pos < _capacity) {
+			m_data[m_pos++] = val;
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	* @brief Reserve value to top of the stack. Clear value if it needed.
+	* @return true if succeeded, false if stack is full.
+	*/
+	bool push() {
+		if (m_pos < _capacity) {
+			m_pos++;
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	* @brief Retreives the top value of the stack.
+	* @return Reference to the top value.
+	*/
+	_type &top() {
+		assert(m_pos > 0 && "NVGstackFixed::top() called on empty stack!");
+		return m_data[m_pos - 1];
+	}
+
+	/**
+	* @brief Pops the top value off the stack.
+	* @return true if succeeded, false if stack is empty.
+	*/
+	bool pop() { 
+		if (m_pos > 0) {
+			--m_pos;
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	* @brief Gets current size of the stack.
+	* @return Current size of the stack.
+	*/
+	inline size_t getSize() const { return m_pos; }
+
+	/**
+	* @brief Gets maximum capacity of the stack.
+	* @return Maximum capacity of the stack.
+	*/
+	inline size_t getCapacity() const { return _capacity; }
+
+	/**
+	* @brief Checks whether the stack is empty.
+	* @return true if the stack is empty
+	*/
+	inline bool isEmpty() const { return (m_pos == 0); }
+};
+
+/**
+* @brief NanoVG context.
+*/
 class NVGcontext {
+public:
+	NVG_OVERRIDE_ALLOC();
 protected:
 	std::unique_ptr<NVGrenderer> m_renderer;
-	int m_rendererCreated;
+	int              m_rendererCreated;
 	NVGcontextConfig m_config;
-	float* m_commands;
-	int    m_ccommands;
-	int    m_ncommands;
+	NVGbuffer<float> m_commandsBuffer;
 	float  m_commandx, m_commandy;
-	NVGstate m_states[NVG_MAX_STATES];
-	int m_nstates;
+	NVGstackFixed<NVGstate, NVG_MAX_STATES> m_states;
 	NVGpathCache* m_pcache;
 	float m_tessTol;
 	float m_distTol;
@@ -496,9 +737,9 @@ protected:
 
 private:
 	void nvg__deletePathCache(NVGpathCache* c);
-	NVGpathCache* nvg__allocPathCache(void);
-	void nvg__setDevicePixelRatio(NVGcontext* ctx, float ratio);
-	NVGstate* nvg__getState(NVGcontext* ctx);
+	NVGpathCache* allocPathCache(void);
+	void setDevicePixelRatio(float ratio);
+	NVGstate* getState(NVGcontext* ctx);
 	void nvg__appendCommands(NVGcontext* ctx, float* vals, int nvals);
 	void nvg__clearPathCache(NVGcontext* ctx);
 	NVGpath* nvg__lastPath(NVGcontext* ctx);
@@ -514,9 +755,8 @@ private:
 		int level, int type);
 	void nvg__flattenPaths(NVGcontext* ctx);
 	void nvg__calculateJoins(NVGcontext* ctx, float w, int lineJoin, float miterLimit);
-	int nvg__expandStroke(NVGcontext* ctx, float w, float fringe, int lineCap, int lineJoin, float miterLimit);
-	int nvg__expandFill(NVGcontext* ctx, float w, int lineJoin, float miterLimit);
-	void nvg__destroyContext(NVGcontext* ctx);
+	int  nvg__expandStroke(NVGcontext* ctx, float w, float fringe, int lineCap, int lineJoin, float miterLimit);
+	int  nvg__expandFill(NVGcontext* ctx, float w, int lineJoin, float miterLimit);
 	void nvg__flushTextTexture(NVGcontext* ctx);
 	int  nvg__allocTextAtlas(NVGcontext* ctx);
 	void nvg__renderText(NVGcontext* ctx, NVGvertex* verts, int nverts);
@@ -529,7 +769,8 @@ public:
 
 	// Frame.
 	void beginFrame(float windowWidth, float windowHeight, float devicePixelRatio);
-	void beginFrame(int renderTarget, float windowWidth, float windowHeight, float devicePixelRatio);
+	void beginFrame(int renderTarget, float windowWidth,
+		float windowHeight, float devicePixelRatio);
 	void cancelFrame();
 	void endFrame();
 
@@ -574,7 +815,7 @@ public:
 	static void TransformSkewY(float* dst, float a);
 	static void TransformMultiply(float* dst, const float* src);
 	static void TransformPremultiply(float* dst, const float* src);
-	static int TransformInverse(float* dst, const float* src);
+	static int  TransformInverse(float* dst, const float* src);
 	static void TransformPoint(float* dstx, float* dsty, const float* xform, float srcx, float srcy);
 	static float DegToRad(float deg);
 	static float RadToDeg(float rad);
@@ -642,20 +883,20 @@ public:
 	void glassRect(float x, float y, float w, float h, const NVGglassStyle& style);
 
 	// Custom pipeline.
-	int createRenderTarget(const NVGrenderTargetDesc& desc);
+	int  createRenderTarget(const NVGrenderTargetDesc& desc);
 	void deleteRenderTarget(int target);
 	void setRenderTarget(int target);
-	int getRenderTargetImage(int target);
-	int createShader(const NVGshaderDesc& desc);
+	int  getRenderTargetImage(int target);
+	int  createShader(const NVGshaderDesc& desc);
 	void deleteShader(int shader);
-	int createPipeline(const NVGpipelineDesc& desc);
+	int  createPipeline(const NVGpipelineDesc& desc);
 	void deletePipeline(int pipeline);
 	void drawTriangles(const NVGcustomDraw& draw, const NVGvertex* verts, int nverts);
 
 	// Debug.
 	void debugDumpPathCache();
 
-	NVGrenderer* getRenderer() { return m_renderer.get(); }
+	inline NVGrenderer* getRenderer() { return m_renderer.get(); }
 };
 
 #ifdef _MSC_VER

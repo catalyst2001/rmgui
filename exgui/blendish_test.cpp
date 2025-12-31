@@ -6,7 +6,7 @@
 
 #define BX_COUNTOF(x) (sizeof(x) / sizeof(x[0]))
 
-void drawBlendish(struct NVGcontext* _vg, float _x, float _y, float _w, float _h, float _t)
+void drawBlendish(NVGcontext* _vg, float _x, float _y, float _w, float _h, float _t)
 {
 	float x = _x;
 	float y = _y;
