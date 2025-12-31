@@ -494,24 +494,23 @@ static void nvg__setPaintColor(NVGpaint* p, NVGcolor color)
 // State handling
 void NVGcontext::save()
 {
-	if (m_states.getSize() <= 1) {
-		printf("NVGcontext::save(): state stack size is invalid!\n");
+	/* push copy of last state */
+	if (m_states.getSize() > 0) {
+		if (!m_states.push(m_states.top())) {
+			//printf("NVGcontext::save(): state stack overflowed!\n");
+		}
 		return;
 	}
 
-	if (!m_states.push(m_states.top())) {
-		printf("NVGcontext::save(): state stack overflowed!\n");
-		return;
-	}
+	/* push uninitialized state */
+	m_states.push();
 }
 
 void NVGcontext::restore()
 {
-	if (m_states.getSize() <= 1) {
-		printf("NVGcontext::restore(): state stack is empty!\n");
-		return;
+	if (!m_states.pop()) {
+		//printf("NVGcontext::restore(): state stack underflowed!\n");
 	}
-	m_states.pop();
 }
 
 void NVGcontext::reset()
@@ -3465,7 +3464,7 @@ NVGcontext::NVGcontext(std::unique_ptr<NVGrenderer> renderer, const NVGcontextCo
 	m_config = config;
 	for (int i = 0; i < NVG_MAX_FONTIMAGES; ++i)
 		m_fontImages[i] = 0;
-	
+
 	FONSparams fontParams;
 	if (!m_renderer)
 		throw std::invalid_argument("renderer is null");
@@ -3498,7 +3497,6 @@ NVGcontext::NVGcontext(std::unique_ptr<NVGrenderer> renderer, const NVGcontextCo
 		throw std::bad_alloc();
 
 	m_fontImageIdx = 0;
-	m_states.push(); //allocate empty base state
 }
 
 NVGcontext::~NVGcontext()
