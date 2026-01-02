@@ -1072,15 +1072,10 @@ public:
 		free(m_calls);
 	}
 
-	int create() override //TODO KD: REMOVE THIS
-	{
-		return 1;
-	}
-
-	int createTexture(int type, int w, int h, int imageFlags, const unsigned char* data) override {
+	NVGhandle createTexture(int type, int w, int h, int imageFlags, const unsigned char* data) override {
 		GLNVGtexture* tex = glnvg__allocTexture();
 		if (tex == NULL)
-			return 0;
+			return NVGhandle();
 
 #ifdef NANOVG_GLES2
 		// Check for non-power of 2.
@@ -1183,7 +1178,7 @@ public:
 		return tex->id;
 	}
 
-	int deleteTexture(int image) override {
+	int deleteTexture(NVGhandle image) override {
 		int i;
 		for (i = 0; i < m_ntextures; i++) {
 			if (m_textures[i].id == image) {
@@ -1196,7 +1191,7 @@ public:
 		return 0;
 	}
 
-	int updateTexture(int image, int x, int y, int w, int h, const unsigned char* data) override {
+	int updateTexture(NVGhandle image, int x, int y, int w, int h, const unsigned char* data) override {
 		GLNVGtexture* tex = glnvg__findTexture(image);
 		if (tex == NULL)
 			return 0;
@@ -1236,7 +1231,7 @@ public:
 		return 1;
 	}
 
-	int getTextureSize(int image, int* w, int* h) override {
+	int getTextureSize(NVGhandle image, int* w, int* h) override {
 		GLNVGtexture* tex = glnvg__findTexture(image);
 		if (tex == NULL)
 			return 0;
@@ -1538,12 +1533,7 @@ public:
 		frag->type = NSVG_SHADER_IMG;
 	}
 
-
-	void Delete() override //FIXME KD: REMOVE THIS
-	{
-	}
-
-	int createRenderTarget(const NVGrenderTargetDesc& desc) override
+	NVGhandle reateRenderTarget(const NVGrenderTargetDesc& desc) override
 	{
 #ifdef NANOVG_FBO_VALID
 		GLNVGrenderTarget* target = NULL;
@@ -1622,7 +1612,7 @@ public:
 #endif
 	}
 
-	void deleteRenderTarget(int target) override
+	void deleteRenderTarget(NVGhandle target) override
 	{
 		int i;
 		for (i = 0; i < m_ntargets; i++) {
@@ -1640,7 +1630,7 @@ public:
 		return; //FAIL
 	}
 
-	void setRenderTarget(int target) override {
+	void setRenderTarget(NVGhandle target) override {
 #ifdef NANOVG_FBO_VALID
 		if (m_defaultFBO == -1) {
 			glGetIntegerv(GL_FRAMEBUFFER_BINDING, &m_defaultFBO);
@@ -1657,36 +1647,23 @@ public:
 #endif
 	}
 
-	int getRenderTargetImage(int target) override
+	int getRenderTargetImage(NVGhandle target) override
 	{
 		GLNVGrenderTarget* rt = glnvg__findRenderTarget(target);
 		return rt != NULL ? rt->image : 0;
 	}
 
 	//TODO KD: implement shader API
-	int createShader(const NVGshaderDesc& desc) override
+	NVGhandle createShader(const NVGshaderDesc& desc) override
 	{
 		NVG_NOTUSED(desc);
 		return 0;
 	}
 
 	//TODO KD: implement shader API
-	void deleteShader(int shader) override
+	void deleteShader(NVGhandle shader) override
 	{
 		NVG_NOTUSED(shader);
-	}
-
-	//TODO KD: implement pipline API
-	int createPipeline(const NVGpipelineDesc& desc) override
-	{
-		NVG_NOTUSED(desc);
-		return 0;
-	}
-
-	//TODO KD: implement pipline API
-	void deletePipeline(int pipeline) override
-	{
-		NVG_NOTUSED(pipeline);
 	}
 
 	//TODO KD: implement drawCustomTriangles XD

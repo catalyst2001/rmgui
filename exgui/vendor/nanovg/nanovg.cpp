@@ -829,7 +829,7 @@ NVGpaint NVGpaint::boxGradient(float x, float y, float w, float h, float r, floa
 
 
 NVGpaint NVGpaint::imagePattern(float cx, float cy, float w, float h, float angle,
-	int image, float alpha)
+	NVGhandle image, float alpha)
 {
 	NVGpaint p;
 	memset(&p, 0, sizeof(p));
@@ -3389,7 +3389,7 @@ void NVGcontext::glassRect(float x, float y, float w, float h, const NVGglassSty
 
 int NVGcontext::createRenderTarget(const NVGrenderTargetDesc& desc)
 {
-	return m_renderer ? m_renderer->createRenderTarget(desc) : 0;
+	return m_renderer ? m_renderer->reateRenderTarget(desc) : 0;
 }
 
 void NVGcontext::deleteRenderTarget(int target)

@@ -82,6 +82,175 @@ struct NVGcolor {
 	static NVGcolor HSLAf(float h, float s, float l, float a);
 };
 
+#define NVG_INVALID_HANDLE (-1)
+
+/**
+* @brief A generic handle type used for images, fonts, shaders, pipelines, render targets, etc.
+*/
+struct NVGhandle {
+public:
+#if defined(_M_IX86) || defined(__i386__)
+	using _handle_type = uint32_t;
+	using _half_type = uint16_t;
+#elif defined(_M_X64) || defined(__x86_64__) || defined(__aarch64__)
+	using _handle_type = uint64_t;
+	using _half_type = uint32_t;
+#endif
+	static constexpr _handle_type kInvalidValue = static_cast<_handle_type>(-1);
+protected:
+	union {
+		struct {
+			_half_type idx;
+			_half_type gen;
+		} u;
+		_handle_type value;
+	};
+	static_assert(sizeof(u) == sizeof(value), "handle value");
+public:
+	NVGhandle() : value(kInvalidValue) {}
+	explicit NVGhandle(_half_type index, _half_type generation)
+		: value(kInvalidValue) {
+		u.idx = index;
+		u.gen = generation;
+	}
+	explicit NVGhandle(_handle_type val) : value(val) {}
+
+	/**
+	* @brief Check if handle is valid.
+	* @return True if handle is valid, false otherwise.
+	*/
+	inline bool isValid() const {
+		return value != kInvalidValue;
+	}
+	/**
+	* @brief Get index part of the handle.
+	* @return Index part of the handle.
+	*/
+	inline _half_type getIndex() const {
+		return u.idx;
+	}
+	/**
+	* @brief Get generation part of the handle.
+	* @return Generation part of the handle.
+	*/
+	inline _half_type getGeneration() const {
+		return u.gen;
+	}
+	/**
+	* @brief Get raw handle value.
+	* @return Raw handle value.
+	*/
+	inline _handle_type getValue() const {
+		return value;
+	}
+};
+
+/**
+* @brief A simple fixed-size handle allocator.
+*/
+template<typename _type, size_t _capacity>
+class NVGhandleAllocatorFixed {
+	NVGhandle::_half_type m_gens[_capacity];
+	_type                 m_pool[_capacity];
+	size_t                m_allocated;
+public:
+	NVGhandleAllocatorFixed() {
+		std::memset(m_gens, 0, sizeof(m_gens));
+		new (m_pool) _type[_capacity];
+	}
+
+	/**
+	* @brief Get number of currently allocated handles.
+	* @return Number of allocated handles.
+	*/
+	inline size_t getNumAllocatedHandles() const { return m_allocated; }
+
+	/**
+	* @brief Get maximum number of handles that can be allocated.
+	* @return Maximum number of handles.
+	*/
+	inline size_t getMaxHandles() const { return _capacity; }
+	
+	/**
+	* @brief Allocate a new handle.
+	* @return Allocated handle or invalid handle if allocation failed.
+	*/
+	NVGhandle alloc() {
+		if (m_allocated >= _capacity)
+			return NVGhandle(); //return invalid handle
+		
+		for (size_t i = 0; i < _capacity; i++) {
+			if (m_gens[i] & 1) {
+				m_gens[i]++;
+				m_allocated++;
+				return NVGhandle(i, m_gens[i]);
+			}
+		}
+		return NVGhandle();
+	}
+
+	/**
+	* @brief Check if handle is valid.
+	* @param handle Handle to check.
+	* @return True if handle is valid, false otherwise.
+	*/
+	bool isValid(const NVGhandle& handle) const {
+		if (!handle.isValid())
+			return false;
+		size_t idx = handle.getIndex();
+		if (idx >= _capacity)
+			return false;
+
+		return m_gens[idx] == handle.getGeneration();
+	}
+
+	/**
+	* @brief Get data associated with the handle.
+	* @param handle Handle to get data for.
+	* @return Pointer to the data or nullptr if handle is invalid.
+	*/
+	_type* getData(const NVGhandle& handle) {
+		if (!isValid(handle))
+			return nullptr;
+		return &m_pool[handle.getIndex()];
+	}
+
+	/**
+	* @brief Get data associated with the handle without checking validity.
+	* @param handle Handle to get data for.
+	* @return Reference to the data.
+	*/
+	_type &getDataNoCheck(const NVGhandle& handle) {
+		assert(isValid(handle) && "getDataNoCheck() accepted invalid handle!");
+		return m_pool[handle.getIndex()];
+	}
+
+	/**
+	* @brief Get data associated with the handle.
+	* @param handle Handle to get data for.
+	* @return Reference to the data.
+	* 
+	* @note This operator does not check handle validity! Use with caution.
+	*/
+	_type &operator[](const NVGhandle& handle) {
+		return getDataNoCheck(handle);
+	}
+
+	/**
+	* @brief Free the handle.
+	* @param handle Handle to free.
+	* @return True if handle was freed, false if handle was invalid.
+	*/
+	bool free(const NVGhandle& handle) {
+		if (!isValid(handle))
+			return false;
+
+		m_gens[handle.getIndex()]++;
+		m_allocated--;
+		return true;
+	}
+};
+
 struct NVGpaint {
 	float xform[6];
 	float extent[2];
@@ -89,12 +258,13 @@ struct NVGpaint {
 	float feather;
 	NVGcolor innerColor;
 	NVGcolor outerColor;
-	int image;
+	NVGhandle image;
+	NVGhandle shader;
 
 	static NVGpaint linearGradient(float sx, float sy, float ex, float ey, NVGcolor icol, NVGcolor ocol);
 	static NVGpaint boxGradient(float x, float y, float w, float h, float r, float f, NVGcolor icol, NVGcolor ocol);
 	static NVGpaint radialGradient(float cx, float cy, float inr, float outr, NVGcolor icol, NVGcolor ocol);
-	static NVGpaint imagePattern(float ox, float oy, float ex, float ey, float angle, int image, float alpha);
+	static NVGpaint imagePattern(float ox, float oy, float ex, float ey, float angle, NVGhandle image, float alpha);
 };
 
 enum NVGblurType {
@@ -130,18 +300,17 @@ struct NVGglowStyle {
 };
 
 struct NVGglassStyle {
-	float radius;
-	float blur;
-	int blurSamples;
-	float highlight;
-	float borderWidth;
-	int backgroundImage;
-	float backgroundAlpha;
+	float    radius;
+	float    blur;
+	int      blurSamples;
+	float    highlight;
+	float    borderWidth;
+	int      backgroundImage;
+	float    backgroundAlpha;
 	NVGcolor tint;
 	NVGcolor highlightColor;
 	NVGcolor shadowColor;
 	NVGcolor borderColor;
-
 	NVGglassStyle();
 };
 
@@ -256,7 +425,7 @@ enum NVGshaderStage {
 };
 
 enum NVGshaderCodeType {
-	NVG_SHADER_CODE_TEXT = 0,
+	NVG_SHADER_CODE_SRC = 0,
 	NVG_SHADER_CODE_BINARY = 1,
 };
 
@@ -268,49 +437,7 @@ struct NVGshaderDesc {
 	NVGshaderStage stage;
 	NVGshaderCodeType codeType;
 };
-
 typedef struct NVGshaderDesc NVGshaderDesc;
-
-struct NVGblendState {
-	int enabled;
-	int srcRGB;
-	int dstRGB;
-	int srcAlpha;
-	int dstAlpha;
-};
-
-typedef struct NVGblendState NVGblendState;
-
-enum NVGpipelineFlags {
-	NVG_PIPELINE_NONE = 0,
-	NVG_PIPELINE_DEPTH_TEST = 1 << 0,
-	NVG_PIPELINE_DEPTH_WRITE = 1 << 1,
-	NVG_PIPELINE_CULL_BACK = 1 << 2,
-	NVG_PIPELINE_CULL_FRONT = 1 << 3,
-	NVG_PIPELINE_SCISSOR = 1 << 4,
-};
-
-struct NVGpipelineDesc {
-	int vertexShader;
-	int fragmentShader;
-	NVGblendState blend;
-	unsigned int flags;
-	const void* payload;
-	size_t payloadSize;
-	unsigned int payloadType;
-};
-
-typedef struct NVGpipelineDesc NVGpipelineDesc;
-
-struct NVGcustomDraw {
-	int pipeline;
-	int image;
-	const void* uniforms;
-	size_t uniformSize;
-	unsigned int uniformSlot;
-};
-
-typedef struct NVGcustomDraw NVGcustomDraw;
 
 enum NVGtexture {
 	NVG_TEXTURE_ALPHA = 0x01,
@@ -370,22 +497,22 @@ enum NVGpointFlags {
 
 struct NVGstate {
 	NVGcompositeOperationState compositeOperation;
-	int shapeAntiAlias;
+	int      shapeAntiAlias;
 	NVGpaint fill;
 	NVGpaint stroke;
-	float strokeWidth;
-	float miterLimit;
-	int lineJoin;
-	int lineCap;
-	float alpha;
-	float xform[6];
+	float    strokeWidth;
+	float    miterLimit;
+	int      lineJoin;
+	int      lineCap;
+	float    alpha;
+	float    xform[6];
 	NVGscissor scissor;
-	float fontSize;
-	float letterSpacing;
-	float lineHeight;
-	float fontBlur;
-	int textAlign;
-	int fontId;
+	float    fontSize;
+	float    letterSpacing;
+	float    lineHeight;
+	float    fontBlur;
+	int      textAlign;
+	int      fontId;
 };
 
 typedef struct NVGstate NVGstate;
@@ -404,9 +531,11 @@ struct NVGpathCache {
 	NVGpoint* points;
 	int npoints;
 	int cpoints;
+
 	NVGpath* paths;
 	int npaths;
 	int cpaths;
+
 	NVGvertex* verts;
 	int nverts;
 	int cverts;
@@ -417,21 +546,32 @@ typedef struct NVGpathCache NVGpathCache;
 
 struct NVGcontextConfig {
 	int edgeAntiAlias;
-
 	NVGcontextConfig()
 		: edgeAntiAlias(1) {
 	}
+};
+
+struct NVGcustomDraw {
+	NVGhandle image;
+	const void* uniforms;
+	size_t uniformSize;
+	unsigned int uniformSlot;
+};
+
+enum NVGuniformDataType {
+	NVG_UNIFORM_FLOAT = 0,
+	NVG_UNIFORM_INT = 1,
+	NVG_UNIFORM_UINT = 2
 };
 
 class NVGrenderer {
 public:
 	virtual ~NVGrenderer() = default;
 
-	virtual int create() = 0;
-	virtual int createTexture(int type, int w, int h, int imageFlags, const unsigned char* data) = 0;
-	virtual int deleteTexture(int image) = 0;
-	virtual int updateTexture(int image, int x, int y, int w, int h, const unsigned char* data) = 0;
-	virtual int getTextureSize(int image, int* w, int* h) = 0;
+	virtual NVGhandle createTexture(int type, int w, int h, int imageFlags, const unsigned char* data) = 0;
+	virtual int deleteTexture(NVGhandle image) = 0;
+	virtual int updateTexture(NVGhandle image, int x, int y, int w, int h, const unsigned char* data) = 0;
+	virtual int getTextureSize(NVGhandle image, int* w, int* h) = 0;
 	virtual void viewport(float width, float height, float devicePixelRatio) = 0;
 	virtual void cancel() = 0;
 	virtual void flush() = 0;
@@ -440,15 +580,22 @@ public:
 	virtual void triangles(const NVGpaint& paint, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, const NVGvertex* verts, int nverts, float fringe) = 0;
 	virtual void Delete() = 0;
 
-	virtual int createRenderTarget(const NVGrenderTargetDesc& desc) = 0;
-	virtual void deleteRenderTarget(int target) = 0;
-	virtual void setRenderTarget(int target) = 0;
-	virtual int getRenderTargetImage(int target) = 0;
-	virtual int createShader(const NVGshaderDesc& desc) = 0;
-	virtual void deleteShader(int shader) = 0;
-	virtual int createPipeline(const NVGpipelineDesc& desc) = 0;
-	virtual void deletePipeline(int pipeline) = 0;
-	virtual void drawCustomTriangles(const NVGcustomDraw& draw, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, const NVGvertex* verts, int nverts, float fringe) = 0;
+	virtual NVGhandle reateRenderTarget(const NVGrenderTargetDesc& desc) = 0;
+	virtual void deleteRenderTarget(NVGhandle target) = 0;
+	virtual void setRenderTarget(NVGhandle target) = 0;
+	virtual int  getRenderTargetImage(NVGhandle target) = 0;
+	virtual NVGhandle createShader(const NVGshaderDesc& desc) = 0;
+	virtual void deleteShader(NVGhandle shader) = 0;
+	virtual NVGhandle getShader() = 0;
+	virtual void      setShader(NVGhandle shader) = 0;
+	virtual NVGhandle createUniform(NVGhandle shader, const char* pname, NVGuniformDataType type, uint32_t size=1) = 0;
+	virtual void deleteUniform(NVGhandle uniform) = 0;
+	virtual void setUniformData(NVGhandle uniform, const void* data, size_t size) = 0;
+	virtual void drawCustomTriangles(const NVGcustomDraw& draw,
+		NVGcompositeOperationState compositeOperation,
+		const NVGscissor& scissor,
+		const NVGvertex* verts, int nverts,
+		float fringe) = 0;
 };
 
 struct FONScontext;
@@ -889,8 +1036,6 @@ public:
 	int  getRenderTargetImage(int target);
 	int  createShader(const NVGshaderDesc& desc);
 	void deleteShader(int shader);
-	int  createPipeline(const NVGpipelineDesc& desc);
-	void deletePipeline(int pipeline);
 	void drawTriangles(const NVGcustomDraw& draw, const NVGvertex* verts, int nverts);
 
 	// Debug.
