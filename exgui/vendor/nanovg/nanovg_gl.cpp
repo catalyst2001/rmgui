@@ -214,7 +214,7 @@ struct GLNVGshader {
 typedef struct GLNVGshader GLNVGshader;
 
 struct GLNVGtexture {
-	int id;
+	NVGhandle handle;
 	GLuint tex;
 	int width, height;
 	int type;
@@ -223,7 +223,7 @@ struct GLNVGtexture {
 typedef struct GLNVGtexture GLNVGtexture;
 
 struct GLNVGrenderTarget {
-	int id;
+	NVGhandle handle;
 	GLuint fbo;
 	GLuint rbo;
 	GLuint texture;
@@ -252,7 +252,7 @@ enum GLNVGcallType {
 
 struct GLNVGcall {
 	int type;
-	int image;
+	NVGhandle image;
 	int pathOffset;
 	int pathCount;
 	int triangleOffset;
@@ -329,14 +329,17 @@ static unsigned int glnvg__nearestPow2(unsigned int num)
 
 class GLNVGrenderer : public NVGrenderer {
 	GLNVGshader m_shader;
-	GLNVGtexture* m_textures;
-	GLNVGrenderTarget* m_targets;
+	//GLNVGtexture* m_textures;
+	//GLNVGrenderTarget* m_targets;
+	NVGhandleAllocatorFixed<GLNVGtexture, 512> m_textures;
+	NVGhandleAllocatorFixed<GLNVGrenderTarget, 64> m_targets;
+
 	float m_view[2];
-	int m_ntextures;
-	int m_ctextures;
+	//int m_ntextures;
+	//int m_ctextures;
 	int m_textureId;
-	int m_ntargets;
-	int m_ctargets;
+	//int m_ntargets;
+	//int m_ctargets;
 	int m_targetId;
 	GLuint m_vertBuf; //NOTE KD: VBO
 #if defined NANOVG_GL3
@@ -375,7 +378,7 @@ class GLNVGrenderer : public NVGrenderer {
 	GLuint m_stencilFuncMask;
 	GLNVGblend m_blendFunc;
 #endif
-	int m_dummyTex;
+	NVGhandle m_dummyTex;
 	GLint m_defaultFBO;
 private:
 
@@ -508,7 +511,7 @@ private:
 		return c;
 	}
 
-	int glnvg__convertPaint(GLNVGfragUniforms* frag, const NVGpaint* paint,
+	int convertPaint(GLNVGfragUniforms* frag, const NVGpaint* paint,
 		const NVGscissor* scissor, float width, float fringe, float strokeThr)
 	{
 		GLNVGtexture* tex = NULL;
@@ -539,9 +542,11 @@ private:
 		frag->strokeMult = (width * 0.5f + fringe * 0.5f) / fringe;
 		frag->strokeThr = strokeThr;
 
-		if (paint->image != 0) {
-			tex = glnvg__findTexture(paint->image);
-			if (tex == NULL) return 0;
+		if (paint->image.isValid()) {
+			tex = m_textures.getData(paint->image);
+			if (!tex)
+				return 0;
+
 			if ((tex->flags & NVG_IMAGE_FLIPY) != 0) {
 				float m1[6], m2[6];
 				NVGcontext::TransformTranslate(m1, 0.0f, frag->extent[1] * 0.5f);
@@ -582,7 +587,7 @@ private:
 		return 1;
 	}
 
-	void glnvg__setUniforms(int uniformOffset, int image)
+	void glnvg__setUniforms(int uniformOffset, NVGhandle image)
 	{
 		GLNVGtexture* tex = NULL;
 #if NANOVG_GL_USE_UNIFORMBUFFER
@@ -592,12 +597,10 @@ private:
 		glUniform4fv(m_shader.loc[GLNVG_LOC_FRAG], NANOVG_GL_UNIFORMARRAY_SIZE, &(frag->uniformArray[0][0]));
 #endif
 
-		if (image != 0) {
-			tex = glnvg__findTexture(image);
-		}
+		tex = m_textures.getData(image);
 		// If no image is set, use empty texture
 		if (tex == NULL) {
-			tex = glnvg__findTexture(m_dummyTex);
+			tex = m_textures.getData(m_dummyTex);
 		}
 		glnvg__bindTexture(tex != NULL ? tex->tex : 0);
 		glnvg__checkError("tex paint tex");
@@ -615,7 +618,7 @@ private:
 		glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 
 		// set bindpoint for solid loc
-		glnvg__setUniforms(call->uniformOffset, 0);
+		glnvg__setUniforms(call->uniformOffset, NVGhandle());
 		glnvg__checkError("fill simple");
 
 		glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_KEEP, GL_INCR_WRAP);
@@ -920,87 +923,18 @@ private:
 	//nanovg_gl_utils.h requires this function
 	/* BEGIN HACK ** BEGIN HACK ** BEGIN HACK ** BEGIN HACK ** BEGIN HACK */
 public:
-	GLNVGtexture* glnvg__allocTexture()
-	{
-		GLNVGtexture* tex = NULL;
-		int i;
-
-		for (i = 0; i < m_ntextures; i++) {
-			if (m_textures[i].id == 0) {
-				tex = &m_textures[i];
-				break;
-			}
+	GLNVGtexture* glnvg__allocTexture() {
+		GLNVGtexture* tex;
+		NVGhandle htex = m_textures.alloc(&tex);
+		if (htex.isValid()) {
+			tex->handle = htex;
+			return tex;
 		}
-		if (tex == NULL) {
-			if (m_ntextures + 1 > m_ctextures) {
-				GLNVGtexture* textures;
-				int ctextures = glnvg__maxi(m_ntextures + 1, 4) + m_ctextures / 2; // 1.5x Overallocate
-				textures = (GLNVGtexture*)realloc(m_textures, sizeof(GLNVGtexture) * ctextures);
-				if (textures == NULL)
-					return NULL;
-
-				m_textures = textures;
-				m_ctextures = ctextures;
-			}
-			tex = &m_textures[m_ntextures++];
-		}
-
-		memset(tex, 0, sizeof(*tex));
-		tex->id = ++m_textureId;
-
-		return tex;
-	}
-
-	GLNVGtexture* glnvg__findTexture(int id)
-	{
-		int i;
-		for (i = 0; i < m_ntextures; i++)
-			if (m_textures[i].id == id)
-				return &m_textures[i];
-		return NULL;
+		return nullptr;
 	}
 	/* END HACK ** END HACK ** END HACK ** END HACK */
 
 private:
-	GLNVGrenderTarget* glnvg__allocRenderTarget()
-	{
-		GLNVGrenderTarget* target = NULL;
-		int i;
-
-		for (i = 0; i < m_ntargets; i++) {
-			if (m_targets[i].id == 0) {
-				target = &m_targets[i];
-				break;
-			}
-		}
-		if (target == NULL) {
-			if (m_ntargets + 1 > m_ctargets) {
-				GLNVGrenderTarget* targets;
-				int ctargets = glnvg__maxi(m_ntargets + 1, 4) + m_ctargets / 2;
-				targets = (GLNVGrenderTarget*)realloc(m_targets, sizeof(GLNVGrenderTarget) * ctargets);
-				if (targets == NULL)
-					return NULL;
-
-				m_targets = targets;
-				m_ctargets = ctargets;
-			}
-			target = &m_targets[m_ntargets++];
-		}
-
-		memset(target, 0, sizeof(*target));
-		target->id = ++m_targetId;
-
-		return target;
-	}
-
-	GLNVGrenderTarget* glnvg__findRenderTarget(int id)
-	{
-		int i;
-		for (i = 0; i < m_ntargets; i++)
-			if (m_targets[i].id == id)
-				return &m_targets[i];
-		return NULL;
-	}
 
 public:
 	//FIXME KD: initialize all members in constructor!
@@ -1063,9 +997,6 @@ public:
 			if (m_textures[i].tex != 0 && (m_textures[i].flags & NVG_IMAGE_NODELETE) == 0)
 				glDeleteTextures(1, &m_textures[i].tex);
 		}
-		free(m_textures);
-		free(m_targets);
-
 		free(m_paths);
 		free(m_verts);
 		free(m_uniforms);
@@ -1175,7 +1106,7 @@ public:
 #endif
 		glnvg__checkError("create tex");
 		glnvg__bindTexture(0);
-		return tex->id;
+		return tex->handle;
 	}
 
 	int deleteTexture(NVGhandle image) override {
@@ -1416,7 +1347,7 @@ public:
 			frag->strokeThr = -1.0f;
 			frag->type = NSVG_SHADER_SIMPLE;
 			// Fill shader
-			glnvg__convertPaint(nvg__fragUniformPtr(call->uniformOffset + m_fragSize), &paint, &scissor, fringe, fringe, -1.0f);
+			convertPaint(nvg__fragUniformPtr(call->uniformOffset + m_fragSize), &paint, &scissor, fringe, fringe, -1.0f);
 		}
 		else {
 			call->uniformOffset = glnvg__allocFragUniforms(1);
@@ -1425,7 +1356,7 @@ public:
 				return;
 			}
 			// Fill shader
-			glnvg__convertPaint(nvg__fragUniformPtr(call->uniformOffset), &paint, &scissor, fringe, fringe, -1.0f);
+			convertPaint(nvg__fragUniformPtr(call->uniformOffset), &paint, &scissor, fringe, fringe, -1.0f);
 		}
 
 		return;
@@ -1482,8 +1413,8 @@ public:
 				return;
 			}
 
-			glnvg__convertPaint(nvg__fragUniformPtr(call->uniformOffset), &paint, &scissor, strokeWidth, fringe, -1.0f);
-			glnvg__convertPaint(nvg__fragUniformPtr(call->uniformOffset + m_fragSize), &paint, &scissor, strokeWidth, fringe, 1.0f - 0.5f / 255.0f);
+			convertPaint(nvg__fragUniformPtr(call->uniformOffset), &paint, &scissor, strokeWidth, fringe, -1.0f);
+			convertPaint(nvg__fragUniformPtr(call->uniformOffset + m_fragSize), &paint, &scissor, strokeWidth, fringe, 1.0f - 0.5f / 255.0f);
 		}
 		else {
 			// Fill shader
@@ -1492,7 +1423,7 @@ public:
 				rollbackCall();
 				return;
 			}
-			glnvg__convertPaint(nvg__fragUniformPtr(call->uniformOffset), &paint, &scissor, strokeWidth, fringe, -1.0f);
+			convertPaint(nvg__fragUniformPtr(call->uniformOffset), &paint, &scissor, strokeWidth, fringe, -1.0f);
 		}
 		return;
 	}
@@ -1529,7 +1460,7 @@ public:
 			return;
 		}
 		frag = nvg__fragUniformPtr(call->uniformOffset);
-		glnvg__convertPaint(frag, &paint, &scissor, 1.0f, fringe, -1.0f);
+		convertPaint(frag, &paint, &scissor, 1.0f, fringe, -1.0f);
 		frag->type = NSVG_SHADER_IMG;
 	}
 
@@ -1647,7 +1578,7 @@ public:
 #endif
 	}
 
-	int getRenderTargetImage(NVGhandle target) override
+	NVGhandle getRenderTargetImage(NVGhandle target) override
 	{
 		GLNVGrenderTarget* rt = glnvg__findRenderTarget(target);
 		return rt != NULL ? rt->image : 0;
