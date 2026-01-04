@@ -472,12 +472,12 @@ int main() {
   set_vsync(g_gui);
 
   rm_font default_font = g_gui->load_font("Verdana.ttf", "default");
-  if (!default_font.is_valid()) {
+  if (!default_font.isValid()) {
     printf("can't load font!\n");
   }
 
   rm_image image_pat = g_gui->load_image("ipat.png", NVG_IMAGE_REPEATX);
-  if (!image_pat.is_valid()) {
+  if (!image_pat.isValid()) {
     printf("can't load image\n");
   }
 

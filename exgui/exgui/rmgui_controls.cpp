@@ -16,7 +16,7 @@
 *
 * source 'https://github.com/memononen/nanovg/issues/348'
 */
-void drawSprite(NVGcontext* vg, int image, float alpha,
+void drawSprite(NVGcontext* vg, NVGhandle image, float alpha,
 	float sx, float sy, float sw, float sh, // sprite location on texture
 	float x, float y, float w, float h, // position and size of the sprite rectangle on screen
 	float lt, float rt, float lb, float rb)
@@ -39,7 +39,7 @@ void drawSprite(NVGcontext* vg, int image, float alpha,
 	vg->fill();
 }
 
-rmgui_image::rmgui_image() : imageId(-1), width(0), height(0), channels(0) {}
+rmgui_image::rmgui_image() : imageId(), width(0), height(0), channels(0) {}
 rmgui_image::~rmgui_image() {}
 
 bool rmgui_image::load(const std::string& filename, NVGcontext* ctx) {
@@ -51,7 +51,7 @@ bool rmgui_image::load(const std::string& filename, NVGcontext* ctx) {
 	int flags = NVG_IMAGE_NEAREST;
 	imageId = ctx->createImageRGBA(width, height, flags, data);
 	stbi_image_free(data);
-	if (imageId == 0) {
+	if (!imageId.isValid()) {
 		std::cerr << "Failed to create NVG image from: " << filename << std::endl;
 		return false;
 	}
@@ -74,7 +74,7 @@ rm_image_button::rm_image_button(rm_widget* p_parent, int x, int y, int width, i
 rm_image_button::~rm_image_button() {
 	if (m_image) {
 		rm_surface* surface = dynamic_cast<rm_surface*>(get_root());
-		if (surface && m_image->imageId != -1) {
+		if (surface && m_image->imageId.isValid()) {
 			surface->get_context()->deleteImage(m_image->imageId);
 		}
 		delete m_image;
@@ -88,7 +88,7 @@ void rm_image_button::on_draw(NVGcontext* pctx) {
 	//pctx->FillColor( NVGcolor::RGBA(200, 200, 200, 255));
 	//pctx->Fill();
 
-	if (m_image && m_image->imageId != -1) {
+	if (m_image && m_image->imageId.isValid()) {
 		NVGpaint imgPaint = NVGpaint::imagePattern(
 			0.f, 0.f,
 			m_size.x, m_size.y,
@@ -118,7 +118,7 @@ rm_button::~rm_button() {}
 
 void rm_button::on_draw(NVGcontext* pctx) {
 	//m_bbox.from_rect(m_absolute);  //NOTE: K.D. commented this
-	pctx->setFontFaceId(get_font());
+	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 	pctx->setFontSize(20.0f);
 
 	pctx->beginPath();
@@ -153,7 +153,7 @@ rm_label::rm_label(rm_widget* p_parent, int x, int y, const std::string& text)
 rm_label::~rm_label() {}
 
 void rm_label::on_draw(NVGcontext* pctx) {
-	pctx->setFontFaceId(get_font());
+	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 	pctx->setFontSize(18.0f);
 	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 	pctx->fillColor(NVGcolor::RGBA(255, 255, 255, 255));
@@ -179,7 +179,7 @@ void rm_text_input::on_draw(NVGcontext* pctx) {
 	std::vector<std::string> lines;
 	std::vector<size_t>      starts;
 
-	pctx->setFontFaceId(get_font());
+	pctx->setFontFaceId(((int)get_font().getValue()));
 	pctx->setFontSize(m_pstyle->get_font_size());
 	pctx->textMetrics(&m_asc, &desc, &m_line_h);
 
@@ -564,7 +564,7 @@ rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkb
 	set_callback(pcallback);
 	assert(m_proot && "m_proot was nullptr! solve this later");
 	m_icon_font = m_proot->find_font("fontawesome");
-	assert(m_icon_font.is_valid() && "'fontawesome' not loaded");
+	assert(m_icon_font.isValid() && "'fontawesome' not loaded");
 }
 
 rm_checkbox::~rm_checkbox() {}
@@ -572,7 +572,7 @@ rm_checkbox::~rm_checkbox() {}
 void rm_checkbox::on_draw(NVGcontext* pctx) {
 	float xo, yo;
 	//m_bbox.from_rect(m_absolute); //NOTE: K.D. commented this
-	pctx->setFontFaceId(get_font());
+	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 
 	/* paint background */
 	pctx->beginPath();
@@ -591,7 +591,7 @@ void rm_checkbox::on_draw(NVGcontext* pctx) {
 
 	if (m_checked) {
 		/* draw mark */
-		pctx->setFontFaceId(m_icon_font);
+		pctx->setFontFaceId(((int)m_icon_font.getValue())); //FIXME: wait fontstash refactoring!
 		pctx->setFontSize(16.f);
 		pctx->setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
 		pctx->fillColor(m_pstyle->get_mark_color());
@@ -600,7 +600,7 @@ void rm_checkbox::on_draw(NVGcontext* pctx) {
 		pctx->text(xo, yo, ICON_FA_CHECK, nullptr);
 	}
 
-	pctx->setFontFaceId(get_font());
+	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 	pctx->setFontSize(m_pstyle->get_font_size());
 	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 	pctx->fillColor(m_pstyle->get_text_color());
@@ -652,7 +652,7 @@ size_t rm_combobox::find_item(const char* pitem)
 
 void rm_combobox::on_draw(NVGcontext* pctx) {
 	//m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
-	pctx->setFontFaceId(get_font());
+	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 
 	//bgr
 	pctx->beginPath();
@@ -1162,7 +1162,7 @@ void rm_tabcontrol::get_tabcontrol_size(rm_vec2& dst)
 
 void rm_tabcontrol::on_draw(NVGcontext* pctx) {
 	//m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
-	pctx->setFontFaceId(get_font());
+	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 
 	// background
 	//pctx->BeginPath();
@@ -1272,7 +1272,7 @@ void rm_tabcontrol::get_one_tab_size(rm_vec2& dst_size)
 
 void rm_treeview::on_draw(NVGcontext* pctx) {
 	//m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
-	pctx->setFontFaceId(get_font());
+	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 	pctx->setFontSize(m_rowHeight * 0.8f);
 	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 
@@ -1420,7 +1420,7 @@ void rm_output_text::on_draw(NVGcontext* pctx)
 	rm_utl::draw_frame(pctx, pos, size, rm_utl::RM_BFRM_MODE_SUNKEN, background, stroke,
 		1.f, colors, &cstyle);
 
-	pctx->setFontFaceId(get_font());
+	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 	pctx->fillColor(NVGcolor::RGBA(0, 0, 0, 255));
 	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
 	for (size_t i = 0; i < m_linesbuf.get_num_output_lines(); i++) {
@@ -1518,7 +1518,7 @@ void rm_tabcontrol_ex::on_draw(NVGcontext* pctx)
 			}
 
 			/* draw tab name */
-			pctx->setFontFaceId(get_font());
+			pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 			pctx->fillColor(m_pstyle->get_text_color());
 			pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 			float xoffset = m_pstyle->get_text_offsets().x;
@@ -1580,7 +1580,7 @@ void rm_tabcontrol_ex::get_text_bounds(rm_vec2& dstsize, const char* ptabname)
 	NVGcontext* pctx = m_proot->get_context();
 	assert(pctx && "pctx was nullptr!");
 	pctx->save();
-	pctx->setFontFaceId(get_font());
+	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 	pctx->textBounds(0.f, 0.f, ptabname, nullptr, text_bounds.array);
 	pctx->restore();
 
@@ -1792,7 +1792,7 @@ void rm_tabcontrol_ex::rm_tab_button::draw(NVGcontext* pctx, rm_vec2& pos,
 		border = bg_color;
 	}
 	pctx->beginPath();
-	pctx->setFontFaceId(m_font);
+	pctx->setFontFaceId(((int)m_font.getValue())); //FIXME: wait fontstash refactoring!
 	pctx->fillColor(background);
 	pctx->strokeColor(border);
 	pctx->rect(pos.x, pos.y, size, size);
@@ -2032,7 +2032,7 @@ void rm_menu::on_draw(NVGcontext* pctx)
 		pctx->rect(0.f, 0.f, m_size.x, m_size.y);
 		pctx->fillColor(menu_background);
 		pctx->fill();
-		pctx->setFontFaceId(get_font());
+		pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 		pctx->setTextAlign(NVG_ALIGN_MIDDLE);
 		for (size_t i = 0; i < num_submenus; i++) {
 			pmenu_item = get_submenu(i);
@@ -2073,7 +2073,7 @@ void rm_menu::on_draw(NVGcontext* pctx)
 				pctx->fill();
 			}
 
-			pctx->setFontFaceId(get_font());
+			pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 			pctx->setTextAlign(NVG_ALIGN_MIDDLE);
 			pctx->fillColor(rm_color(255, 255, 255));
 			pctx->text(pos.x, pos.y + half_height, pmenu_item->m_text.c_str(), nullptr);
@@ -2306,7 +2306,7 @@ void rm_radiobutton::on_draw(NVGcontext* pctx) {
 	float circle_right = cx + circle_radius + style.get_border_width_outer();
 	float bounds[4];
 
-	pctx->setFontFaceId(get_font());
+	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 	pctx->setFontSize(style.get_font_size());
 	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 	pctx->textBounds(0, 0, m_label.c_str(), nullptr, bounds);
@@ -2449,7 +2449,7 @@ void rm_listview::on_draw(NVGcontext* pctx)
 	pctx->fill();
 
 	/* draw items */
-	pctx->setFontFaceId(get_font());
+	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
 	pctx->setFontSize(style.get_font_size());
 	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 

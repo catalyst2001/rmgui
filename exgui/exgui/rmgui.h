@@ -88,34 +88,8 @@ _type rm_sign(_type v)
   return (v < (_type)0) ? (_type)-1 : (_type)1;
 }
 
-/**
-* object base class
-*/
-class rm_object {
-  friend class rm_object_accrssor;
-protected:
-  int m_objid;
-public:
-  rm_object(int def_val) : m_objid(def_val) {}
-  inline int get_handle() const { return m_objid; }
-};
-
-template<int k_invalid_value>
-class rm_object_base : public rm_object {
-public:
-  rm_object_base() : rm_object(k_invalid_value) {}
-  inline bool is_valid() const { return get_handle() != k_invalid_value; }
-  operator int() const { return m_objid; }
-  inline static int get_invalid() { return k_invalid_value; }
-};
-
-class rm_object_accrssor {
-protected:
-  inline static void set_handle_value(rm_object &handle, int val) { handle.m_objid = val; }
-};
-
-using rm_font = rm_object_base<-1>; //font handle
-using rm_image = rm_object_base<0>; //image handle
+using rm_font = NVGhandle; //font handle
+using rm_image = NVGhandle; //image handle
 
 class rm_vec2
 {
@@ -1056,7 +1030,7 @@ public:
   }
 };
 
-class rm_surface : public rm_widget, rm_object_accrssor
+class rm_surface : public rm_widget
 {
   std::unique_ptr<NVGcontext> m_pctx;
   rm_widget  *m_pfocus;

@@ -13,7 +13,7 @@ protected:
   void on_draw(NVGcontext* ctx) override;
 
 private:
-  int m_bgImage;
+  NVGhandle m_bgImage;
   int m_bgWidth;
   int m_bgHeight;
   bool m_bgDirty;

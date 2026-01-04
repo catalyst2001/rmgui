@@ -8,7 +8,7 @@
 
 class rmgui_image {
 public:
-  int imageId;
+  NVGhandle imageId;
   int width;
   int height;
   int channels;

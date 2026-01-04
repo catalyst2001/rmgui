@@ -32,10 +32,10 @@ void rm_effects::resize(float width, float height) {
 }
 
 void rm_effects::release_background(NVGcontext* ctx) {
-  if (m_bgImage != 0 && ctx != nullptr) {
+  if (m_bgImage.isValid() && ctx != nullptr) {
     ctx->deleteImage(m_bgImage);
   }
-  m_bgImage = 0;
+  m_bgImage.invalidate();
   m_bgWidth = 0;
   m_bgHeight = 0;
 }
@@ -45,12 +45,12 @@ void rm_effects::ensure_background(NVGcontext* ctx)
   if (ctx == nullptr)
     return;
 
-  if (m_bgDirty && m_bgImage != 0) {
+  if (m_bgDirty && m_bgImage.isValid()) {
     ctx->deleteImage(m_bgImage);
-    m_bgImage = 0;
+    m_bgImage.invalidate();
   }
 
-  if (m_bgImage != 0)
+  if (m_bgImage.isValid())
     return;
 
   const int w = 512;
@@ -186,7 +186,7 @@ void rm_effects::draw_blur_gallery(NVGcontext* ctx, float x, float y, float w) {
 
 void rm_effects::on_draw(NVGcontext* ctx) {
   ensure_background(ctx);
-  if (ctx == nullptr || m_bgImage == 0) {
+  if (ctx == nullptr || !m_bgImage.isValid()) {
     return;
   }
 

@@ -1709,7 +1709,6 @@ void NVGcontext::setFontFaceId(int font)
 
 void NVGcontext::setFontFace(const char* font)
 {
-
 	NVGstate* state = getState();
 	state->fontId = fonsGetFontByName(m_fs, font);
 }
@@ -2747,7 +2746,7 @@ void NVGcontext::glassRect(float x, float y, float w, float h, const NVGglassSty
 
 NVGhandle NVGcontext::createRenderTarget(const NVGrenderTargetDesc& desc)
 {
-	return m_renderer ? m_renderer->reateRenderTarget(desc) : NVGhandle();
+	return m_renderer ? m_renderer->createRenderTarget(desc) : NVGhandle();
 }
 
 void NVGcontext::deleteRenderTarget(NVGhandle target)
@@ -2842,7 +2841,7 @@ NVGcontext::NVGcontext(std::unique_ptr<NVGrenderer> renderer, const NVGcontextCo
 
 	// Create font texture
 	m_fontImages[0] = m_renderer->createTexture(NVG_TEXTURE_ALPHA, fontParams.width, fontParams.height, 0, NULL);
-	if (m_fontImages[0].isValid())
+	if (!m_fontImages[0].isValid())
 		throw std::bad_alloc();
 
 	m_fontImageIdx = 0;

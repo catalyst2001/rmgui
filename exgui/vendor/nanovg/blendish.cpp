@@ -324,9 +324,9 @@ const BNDtheme *bndGetTheme() {
 }
 
 // the handle to the image containing the icon sheet
-static int bnd_icon_image = -1;
+static NVGhandle bnd_icon_image;
 
-void bndSetIconImage(int image) {
+void bndSetIconImage(NVGhandle image) {
     bnd_icon_image = image;
 }
 
@@ -942,7 +942,8 @@ void bndBackground(NVGcontext *ctx, float x, float y, float w, float h) {
 
 void bndIcon(NVGcontext *ctx, float x, float y, int iconid) {
     int ix, iy, u, v;
-    if (bnd_icon_image < 0) return; // no icons loaded
+    if (!bnd_icon_image.isValid())
+      return; // no icons loaded
 
     ix = iconid & 0xff;
     iy = (iconid>>8) & 0xff;
