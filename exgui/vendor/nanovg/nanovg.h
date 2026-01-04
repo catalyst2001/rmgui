@@ -198,8 +198,11 @@ public:
 		// ensure we don't end up smaller than target
 		size_t newCap = std::max(target, grown);
 		_type* newData = new _type[newCap];
-		for (size_t i = 0; i < m_size; ++i)
-			newData[i] = m_pdata[i];
+
+		//for (size_t i = 0; i < m_size; ++i)
+		//	newData[i] = m_pdata[i];
+
+		std::copy(m_pdata, m_pdata + m_size, newData);
 
 		delete[] m_pdata;
 		m_pdata = newData;

@@ -2945,7 +2945,10 @@ bool NVGpathCache::addPoint(float x, float y, int flags, float distTol)
 
 NVGvertex* NVGpathCache::allocTempVerts(int nverts)
 {
-	return m_verts.appendBack(nverts);
+	if(m_verts.availCapacity(nverts))
+		return m_verts.getData();
+
+	return nullptr;
 }
 
 void NVGpathCache::updateCache(float distanceTolerance)
