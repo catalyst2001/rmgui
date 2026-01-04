@@ -77,7 +77,7 @@
 void* nvg__alloc(size_t size, const char* file, int line);
 void  nvg__free(void* ptr, const char* file, int line);
 
-#define NVG_OVERRIDE_ALLOC() \
+#define NVG_OVERRIDE_ALLOC() /*\
     static void* operator new(size_t size) { return nvg__alloc(size, "<not provided>", 0); } \
     static void  operator delete(void* ptr) noexcept { nvg__free(ptr, "<not provided>", 0); } \
     static void* operator new[](size_t size) { return nvg__alloc(size, "<not provided>", 0); } \
@@ -87,18 +87,18 @@ void  nvg__free(void* ptr, const char* file, int line);
     static void* operator new(size_t size, const char* file, int line) { return nvg__alloc(size, file, line); } \
     static void  operator delete(void* ptr, const char* file, int line) noexcept { nvg__free(ptr, file, line); } \
     static void* operator new[](size_t size, const char* file, int line) { return nvg__alloc(size, file, line); } \
-    static void  operator delete[](void* ptr, const char* file, int line) noexcept { nvg__free(ptr, file, line); }
+    static void  operator delete[](void* ptr, const char* file, int line) noexcept { nvg__free(ptr, file, line); }*/
 #else
 void* nvg__alloc(size_t size);
 void  nvg__free(void* ptr);
 
-#define NVG_OVERRIDE_ALLOC() \
+#define NVG_OVERRIDE_ALLOC() /*\
     static void* operator new(size_t size) { return nvg__alloc(size); } \
     static void  operator delete(void* ptr) noexcept { nvg__free(ptr); } \
     static void* operator new[](size_t size) { return nvg__alloc(size); } \
     static void  operator delete[](void* ptr) noexcept { nvg__free(ptr); } \
     static void  operator delete(void* ptr, size_t) noexcept { nvg__free(ptr); } \
-    static void  operator delete[](void* ptr, size_t) noexcept { nvg__free(ptr); }
+    static void  operator delete[](void* ptr, size_t) noexcept { nvg__free(ptr); }*/
 #endif
 
 #include <algorithm>
