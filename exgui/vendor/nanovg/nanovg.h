@@ -435,7 +435,7 @@ template<typename _type, size_t _capacity>
 class NVGhandleAllocatorFixed {
 	static_assert(_capacity > 0 && "_capacity is 0!");
 	static_assert(_capacity <= std::numeric_limits<NVGhandle::_half_type>::max(), "ñapacity doesn't fit into handle index type");
-	static_assert(std::is_trivial<_type>::value, "handle allocator supports only trivial types!");
+	static_assert(std::is_trivially_copyable<_type>::value, "handle allocator supports only trivial types!");
 	NVGhandle::_half_type m_gens[_capacity];
 	_type                 m_pool[_capacity]{};
 	size_t                m_free_count;
@@ -465,7 +465,7 @@ public:
 	* @brief Allocate a new handle.
 	* @return Allocated handle or invalid handle if allocation failed.
 	*/
-	NVGhandle alloc(_type **pdst=nullptr) {
+	NVGhandle alloc(_type** pdst = nullptr) {
 		if (!m_free_count)
 			return NVGhandle(); //return invalid handle
 
@@ -473,10 +473,10 @@ public:
 		assert(!(m_gens[idx] & 1) && "inconsistent state! idx must be free!");
 		m_gens[idx]++;
 		m_pool[idx] = _type{};
-		if(pdst)
+		if (pdst)
 			*pdst = &m_pool[idx];
 
-		return NVGhandle(idx, m_gens[idx]);
+		return NVGhandle(idx, m_gens[idx]); //NOTE KD: idx size_t to half_type narrowing conversion
 	}
 
 	/**
@@ -540,6 +540,24 @@ public:
 		m_gens[idx]++;
 		m_free[m_free_count++] = idx;
 		return true;
+	}
+
+	/**
+	* @brief get first busy handle
+	*/
+	bool getNextBusyHandle(NVGhandle& handle) const {
+		size_t startIdx = 0;
+		if (handle.isValid())
+			startIdx = static_cast<size_t>(handle.getIndex()) + 1;
+
+		for (size_t i = startIdx; i < _capacity; i++) {
+			if (m_gens[i] & 1) {
+				handle = NVGhandle(static_cast<NVGhandle::_half_type>(i), m_gens[i]);
+				return true;
+			}
+		}
+		handle.invalidate();
+		return false;
 	}
 };
 
@@ -889,10 +907,8 @@ public:
 	virtual void fill(const NVGpaint& paint, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, float fringe, const float* bounds, const NVGpath* paths, int npaths) = 0;
 	virtual void stroke(const NVGpaint& paint, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, float fringe, float strokeWidth, const NVGpath* paths, int npaths) = 0;
 	virtual void triangles(const NVGpaint& paint, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, const NVGvertex* verts, int nverts, float fringe) = 0;
-	virtual void Delete() = 0;
-
-	virtual NVGhandle reateRenderTarget(const NVGrenderTargetDesc& desc) = 0;
-	virtual void deleteRenderTarget(NVGhandle target) = 0;
+	virtual NVGhandle createRenderTarget(const NVGrenderTargetDesc& desc) = 0;
+	virtual bool deleteRenderTarget(NVGhandle target) = 0;
 	virtual void setRenderTarget(NVGhandle target) = 0;
 	virtual NVGhandle getRenderTargetImage(NVGhandle target) = 0;
 	virtual NVGhandle createShader(const NVGshaderDesc& desc) = 0;

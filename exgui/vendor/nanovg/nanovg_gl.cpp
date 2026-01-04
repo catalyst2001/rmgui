@@ -40,7 +40,7 @@ static const char* shaderHeader =
 #endif
 "\n";
 
-static const char* fillVertShader = 
+static const char* fillVertShader =
 "#ifdef NANOVG_GL3\n"
 "	uniform vec2 viewSize;\n"
 "	in vec2 vertex;\n"
@@ -227,7 +227,7 @@ struct GLNVGrenderTarget {
 	GLuint fbo;
 	GLuint rbo;
 	GLuint texture;
-	int image;
+	NVGhandle image;
 	int width, height;
 	int flags;
 };
@@ -988,14 +988,19 @@ public:
 		if (m_vertBuf != 0)
 			glDeleteBuffers(1, &m_vertBuf);
 
-		for (i = 0; i < m_ntargets; i++) {
-			if (m_targets[i].id != 0)
-				deleteRenderTarget(m_targets[i].id);
+		NVGhandle handle;
+		while (m_targets.getNextBusyHandle(handle)) {
+			if (!handle.isValid())
+				break;
+
+			deleteRenderTarget(handle);
 		}
 
-		for (i = 0; i < m_ntextures; i++) {
-			if (m_textures[i].tex != 0 && (m_textures[i].flags & NVG_IMAGE_NODELETE) == 0)
-				glDeleteTextures(1, &m_textures[i].tex);
+		handle.invalidate();
+		while (m_textures.getNextBusyHandle(handle)) {
+			if (!handle.isValid())
+				break;
+			deleteTexture(handle);
 		}
 		free(m_paths);
 		free(m_verts);
@@ -1110,21 +1115,21 @@ public:
 	}
 
 	int deleteTexture(NVGhandle image) override {
-		int i;
-		for (i = 0; i < m_ntextures; i++) {
-			if (m_textures[i].id == image) {
-				if (m_textures[i].tex != 0 && (m_textures[i].flags & NVG_IMAGE_NODELETE) == 0)
-					glDeleteTextures(1, &m_textures[i].tex);
-				memset(&m_textures[i], 0, sizeof(m_textures[i]));
-				return 1;
-			}
+		if (m_textures.isValid(image)) {
+			GLNVGtexture* tex = m_textures.getData(image);
+			assert(tex && "tex was nullptr with valid handle!");
+			if (tex->tex != 0 && (tex->flags & NVG_IMAGE_NODELETE) == 0)
+				glDeleteTextures(1, &tex->tex);
+
+			m_textures.free(image);
+			return true;
 		}
-		return 0;
+		return false;
 	}
 
 	int updateTexture(NVGhandle image, int x, int y, int w, int h, const unsigned char* data) override {
-		GLNVGtexture* tex = glnvg__findTexture(image);
-		if (tex == NULL)
+		GLNVGtexture* tex = m_textures.getData(image);
+		if (!tex)
 			return 0;
 
 		glnvg__bindTexture(tex->tex);
@@ -1163,9 +1168,10 @@ public:
 	}
 
 	int getTextureSize(NVGhandle image, int* w, int* h) override {
-		GLNVGtexture* tex = glnvg__findTexture(image);
-		if (tex == NULL)
+		GLNVGtexture* tex = m_textures.getData(image);
+		if (!tex)
 			return 0;
+
 		*w = tex->width;
 		*h = tex->height;
 		return 1;
@@ -1464,7 +1470,18 @@ public:
 		frag->type = NSVG_SHADER_IMG;
 	}
 
-	NVGhandle reateRenderTarget(const NVGrenderTargetDesc& desc) override
+	GLNVGrenderTarget* glnvg__allocRenderTarget()
+	{
+		GLNVGrenderTarget* pRT = nullptr;
+		NVGhandle h = m_targets.alloc(&pRT);
+		if (h.isValid()) {
+			pRT->handle = h;
+			return pRT;
+		}
+		return nullptr;
+	}
+
+	NVGhandle createRenderTarget(const NVGrenderTargetDesc& desc) override
 	{
 #ifdef NANOVG_FBO_VALID
 		GLNVGrenderTarget* target = NULL;
@@ -1480,23 +1497,23 @@ public:
 		if (target == NULL) {
 			glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
 			glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
-			return 0;
+			return NVGhandle();
 		}
 
 		target->image = createTexture(NVG_TEXTURE_RGBA, desc.width, desc.height, imageFlags, NULL);
-		if (target->image == 0) {
+		if (!target->image.isValid()) {
 			glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
 			glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
-			deleteRenderTarget(target->id);
-			return 0;
+			deleteRenderTarget(target->handle);
+			return NVGhandle();
 		}
 
-		tex = glnvg__findTexture(target->image);
-		if (tex == NULL) {
+		tex = m_textures.getData(target->image);
+		if (!tex) {
 			glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
 			glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
-			deleteRenderTarget(target->id);
-			return 0;
+			deleteRenderTarget(target->handle);
+			return NVGhandle();
 		}
 
 		target->texture = tex->tex;
@@ -1527,15 +1544,15 @@ public:
 #endif
 				glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
 				glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
-				deleteRenderTarget(target->id);
-				return 0;
+				deleteRenderTarget(target->handle);
+				return NVGhandle();
 #ifdef GL_DEPTH24_STENCIL8
 			}
 #endif
 		}
 		glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
 		glBindRenderbuffer(GL_RENDERBUFFER, defaultRBO);
-		return target->id;
+		return target->handle;
 #else
 		NVG_NOTUSED(gl);
 		NVG_NOTUSED(desc);
@@ -1543,34 +1560,33 @@ public:
 #endif
 	}
 
-	void deleteRenderTarget(NVGhandle target) override
+	bool deleteRenderTarget(NVGhandle target) override
 	{
-		int i;
-		for (i = 0; i < m_ntargets; i++) {
-			if (m_targets[i].id == target) {
-				if (m_targets[i].fbo != 0)
-					glDeleteFramebuffers(1, &m_targets[i].fbo);
-				if (m_targets[i].rbo != 0)
-					glDeleteRenderbuffers(1, &m_targets[i].rbo);
-				if (m_targets[i].image != 0)
-					deleteTexture(m_targets[i].image);
-				memset(&m_targets[i], 0, sizeof(m_targets[i]));
-				return; //OK
-			}
+		GLNVGrenderTarget* rt = m_targets.getData(target);
+		if (rt) {
+			if (rt->fbo != 0)
+				glDeleteFramebuffers(1, &rt->fbo);
+			if (rt->rbo != 0)
+				glDeleteRenderbuffers(1, &rt->rbo);
+			if (rt->image.isValid())
+				deleteTexture(rt->image);
+
+			m_targets.free(target);
+			return true;
 		}
-		return; //FAIL
+		return false;
 	}
 
 	void setRenderTarget(NVGhandle target) override {
 #ifdef NANOVG_FBO_VALID
-		if (m_defaultFBO == -1) {
+		if (m_defaultFBO == -1)
 			glGetIntegerv(GL_FRAMEBUFFER_BINDING, &m_defaultFBO);
-		}
-		if (target == 0) {
+
+		if (!target.isValid()) {
 			glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFBO);
 			return;
 		}
-		GLNVGrenderTarget* rt = glnvg__findRenderTarget(target);
+		GLNVGrenderTarget* rt = m_targets.getData(target);
 		glBindFramebuffer(GL_FRAMEBUFFER, rt != NULL ? rt->fbo : m_defaultFBO);
 #else
 		NVG_NOTUSED(gl);
@@ -1580,15 +1596,15 @@ public:
 
 	NVGhandle getRenderTargetImage(NVGhandle target) override
 	{
-		GLNVGrenderTarget* rt = glnvg__findRenderTarget(target);
-		return rt != NULL ? rt->image : 0;
+		GLNVGrenderTarget* rt = m_targets.getData(target);
+		return rt != NULL ? rt->image : NVGhandle();
 	}
 
 	//TODO KD: implement shader API
 	NVGhandle createShader(const NVGshaderDesc& desc) override
 	{
 		NVG_NOTUSED(desc);
-		return 0;
+		return NVGhandle();
 	}
 
 	//TODO KD: implement shader API
@@ -1607,6 +1623,37 @@ public:
 		NVG_NOTUSED(nverts);
 		NVG_NOTUSED(fringe);
 	}
+
+	NVGhandle getShader() override {
+		return NVGhandle();
+	}
+
+	void setShader(NVGhandle shader) override {
+		NVG_NOTUSED(shader);
+	}
+
+	NVGhandle createUniform(NVGhandle shader, const char* pname, NVGuniformDataType type, uint32_t size = 1) override {
+		NVG_NOTUSED(shader);
+		NVG_NOTUSED(pname);
+		NVG_NOTUSED(type);
+		NVG_NOTUSED(size);
+		return NVGhandle();
+	}
+	void deleteUniform(NVGhandle uniform) override {
+		NVG_NOTUSED(uniform);
+	}
+	void setUniformData(NVGhandle uniform, const void* data, size_t size) override {
+		NVG_NOTUSED(uniform);
+		NVG_NOTUSED(data);
+		NVG_NOTUSED(size);
+	}
+
+	/* HACK BEGIN ** HACK BEGIN ** HACK BEGIN ** HACK BEGIN ** HACK BEGIN ** HACK BEGIN ** */
+	GLNVGtexture *glnvg__findTexture(NVGhandle image)
+	{
+		return m_textures.getData(image);
+	}
+	/* HACK END **HACK END **HACK END **HACK END **HACK END **HACK END **HACK END **HACK END ** */
 };
 
 #if defined NANOVG_GL2
@@ -1632,7 +1679,7 @@ std::unique_ptr<NVGcontext> nvgCreateGLES3(int flags)
 #if defined NANOVG_GL2
 int nvglCreateImageFromHandleGL2(NVGcontext* ctx, GLuint textureId, int w, int h, int imageFlags)
 #elif defined NANOVG_GL3
-int nvglCreateImageFromHandleGL3(NVGcontext* ctx, GLuint textureId, int w, int h, int imageFlags)
+NVGhandle nvglCreateImageFromHandleGL3(NVGcontext* ctx, GLuint textureId, int w, int h, int imageFlags)
 #elif defined NANOVG_GLES2
 int nvglCreateImageFromHandleGLES2(NVGcontext* ctx, GLuint textureId, int w, int h, int imageFlags)
 #elif defined NANOVG_GLES3
@@ -1641,11 +1688,11 @@ int nvglCreateImageFromHandleGLES3(NVGcontext* ctx, GLuint textureId, int w, int
 {
 	GLNVGrenderer* m_renderer = ctx != NULL ? static_cast<GLNVGrenderer*>(ctx->getRenderer()) : NULL;
 	if (!m_renderer)
-		return 0;
+		return NVGhandle();
 
 	GLNVGtexture* tex = m_renderer->glnvg__allocTexture(); //HACK KD: access to internal function
 	if (tex == NULL)
-		return 0;
+		return NVGhandle();
 
 	tex->type = NVG_TEXTURE_RGBA;
 	tex->tex = textureId;
@@ -1653,17 +1700,17 @@ int nvglCreateImageFromHandleGLES3(NVGcontext* ctx, GLuint textureId, int w, int
 	tex->width = w;
 	tex->height = h;
 
-	return tex->id;
+	return tex->handle;
 }
 
 #if defined NANOVG_GL2
-GLuint nvglImageHandleGL2(NVGcontext* ctx, int image)
+GLuint nvglImageHandleGL2(NVGcontext* ctx, NVGhandle image)
 #elif defined NANOVG_GL3
-GLuint nvglImageHandleGL3(NVGcontext* ctx, int image)
+GLuint nvglImageHandleGL3(NVGcontext* ctx, NVGhandle image)
 #elif defined NANOVG_GLES2
-GLuint nvglImageHandleGLES2(NVGcontext* ctx, int image)
+GLuint nvglImageHandleGLES2(NVGcontext* ctx, NVGhandle image)
 #elif defined NANOVG_GLES3
-GLuint nvglImageHandleGLES3(NVGcontext* ctx, int image)
+GLuint nvglImageHandleGLES3(NVGcontext* ctx, NVGhandle image)
 #endif
 {
 	GLNVGrenderer* m_renderer = ctx != NULL ? static_cast<GLNVGrenderer*>(ctx->getRenderer()) : NULL;

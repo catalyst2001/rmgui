@@ -66,8 +66,8 @@ GLuint nvglImageHandleGL2(NVGcontext* ctx, int image);
 
 std::unique_ptr<NVGcontext> nvgCreateGL3(int flags);
 
-int nvglCreateImageFromHandleGL3(NVGcontext* ctx, GLuint textureId, int w, int h, int flags);
-GLuint nvglImageHandleGL3(NVGcontext* ctx, int image);
+NVGhandle nvglCreateImageFromHandleGL3(NVGcontext* ctx, GLuint textureId, int w, int h, int flags);
+GLuint nvglImageHandleGL3(NVGcontext* ctx, NVGhandle image);
 
 #endif
 

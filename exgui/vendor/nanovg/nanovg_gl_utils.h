@@ -26,7 +26,7 @@ struct NVGLUframebuffer {
 	GLuint fbo;
 	GLuint rbo;
 	GLuint texture;
-	int image;
+	NVGhandle image;
 };
 typedef struct NVGLUframebuffer NVGLUframebuffer;
 

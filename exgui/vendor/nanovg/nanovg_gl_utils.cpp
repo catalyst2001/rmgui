@@ -110,13 +110,13 @@ void nvgluDeleteFramebuffer(NVGLUframebuffer* fb)
 		glDeleteFramebuffers(1, &fb->fbo);
 	if (fb->rbo != 0)
 		glDeleteRenderbuffers(1, &fb->rbo);
-	if (fb->image >= 0)
+	if (fb->image.isValid())
 		fb->ctx->deleteImage(fb->image);
 	fb->ctx = NULL;
 	fb->fbo = 0;
 	fb->rbo = 0;
 	fb->texture = 0;
-	fb->image = -1;
+	fb->image.invalidate();
 	free(fb);
 #else
 	NVG_NOTUSED(fb);
