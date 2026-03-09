@@ -87,49 +87,68 @@ void rm_effects::ensure_background(NVGcontext* ctx)
   }
 
 void rm_effects::draw_glass_showcase(NVGcontext* ctx, float x, float y, float w, float h) {
-  // Get the built-in glass shader and create a glass paint.
   NVGhandle glassShader = ctx->getBuiltinGlassShader();
-  NVGcolor tint = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.14f);
-  NVGpaint glass = NVGpaint::glass(0.0f, 0.0f, m_size.x, m_size.y, m_bgImage, glassShader, tint, 0.9f, 1.0f);
 
-  ctx->beginPath();
-  ctx->roundedRect(x, y, w, h, 18.0f);
-  ctx->fillPaint(glass);
-  ctx->fill();
+  // Set background size uniform (same for all panels, widget-local coords)
+  NVGhandle bgSizeUniform = ctx->findUniform(glassShader, "glassBgSize");
+  if (bgSizeUniform.isValid()) {
+    float bgSize[2] = { m_size.x, m_size.y };
+    ctx->setUniformData(bgSizeUniform, bgSize, sizeof(bgSize));
+  }
 
-  // Border
-  ctx->StrokeWidth(1.0f);
-  ctx->strokeColor(NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.42f));
-  ctx->beginPath();
-  ctx->roundedRect(x + 0.5f, y + 0.5f, w - 1.0f, h - 1.0f, 17.5f);
-  ctx->stroke();
+  // Helper lambda to draw a single glass panel
+  auto drawPanel = [&](float px, float py, float pw, float ph, const char* title, NVGcolor tint) {
+    // Paint encodes panel rect + panel origin (per-draw in frag UBO)
+    NVGpaint glass = NVGpaint::glass(px, py, pw, ph, m_size.x, m_size.y,
+                                     m_bgImage, glassShader, tint, 1.0f);
 
-  ctx->setFontFace("default");
-  ctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+    ctx->beginPath();
+    ctx->roundedRect(px, py, pw, ph, 18.0f);
+    ctx->fillPaint(glass);
+    ctx->fill();
 
-  NVGblurStyle titleBlur;
-  titleBlur.type = NVG_BLUR_LIQUID;
-  titleBlur.radius = 6.0f;
-  titleBlur.strength = 0.7f;
-  titleBlur.steps = 12;
-  titleBlur.rings = 2;
-  titleBlur.jitter = 0.35f;
-  titleBlur.color = NVGcolor::RGBA(255, 255, 255, 235);
+    // Border
+    ctx->StrokeWidth(1.0f);
+    ctx->strokeColor(NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.42f));
+    ctx->beginPath();
+    ctx->roundedRect(px + 0.5f, py + 0.5f, pw - 1.0f, ph - 1.0f, 17.5f);
+    ctx->stroke();
 
-  ctx->setFontSize(30.0f);
-  ctx->textBlur(x + 20.0f, y + 20.0f, "Liquid Glass", nullptr, titleBlur);
+    // Title
+    ctx->setFontFace("default");
+    ctx->setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
+    NVGblurStyle titleBlur;
+    titleBlur.type = NVG_BLUR_LIQUID;
+    titleBlur.radius = 5.0f;
+    titleBlur.strength = 0.65f;
+    titleBlur.steps = 10;
+    titleBlur.rings = 2;
+    titleBlur.jitter = 0.3f;
+    titleBlur.color = NVGcolor::RGBA(255, 255, 255, 230);
+    ctx->setFontSize(22.0f);
+    ctx->textBlur(px + pw * 0.5f, py + 14.0f, title, nullptr, titleBlur);
+  };
 
-  NVGblurStyle subBlur = titleBlur;
-  subBlur.type = NVG_BLUR_GAUSSIAN;
-  subBlur.radius = 3.0f;
-  subBlur.strength = 0.45f;
-  subBlur.jitter = 0.0f;
-  subBlur.color = NVGcolor::RGBA(200, 220, 255, 200);
-  ctx->setFontSize(16.0f);
-  ctx->textBlur(x + 20.0f, y + 72.0f, "Blurred text + frosted panel", nullptr, subBlur);
+  // Layout: 2x2 grid of panels
+  const float gap = 12.0f;
+  const float pw = (w - gap) * 0.5f;
+  const float ph = (h - gap) * 0.5f;
 
-  ctx->fillColor(NVGcolor::RGBA(220, 220, 220, 200));
-  ctx->text(x + 20.0f, y + 112.0f, "Backend-agnostic effects demo", nullptr);
+  // Raw: clear glass with subtle tint
+  drawPanel(x, y, pw, ph, "Raw",
+    NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.06f));
+
+  // Dark: dark overlay
+  drawPanel(x + pw + gap, y, pw, ph, "Dark",
+    NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.3f));
+
+  // Light: white overlay
+  drawPanel(x, y + ph + gap, pw, ph, "Light",
+    NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.3f));
+
+  // Tinted: colored glass
+  drawPanel(x + pw + gap, y + ph + gap, pw, ph, "Tinted",
+    NVGcolor::RGBAf(0.4f, 0.6f, 1.0f, 0.2f));
 }
 
 void rm_effects::draw_blur_gallery(NVGcontext* ctx, float x, float y, float w) {
@@ -199,8 +218,8 @@ void rm_effects::on_draw(NVGcontext* ctx) {
   ctx->fill();
 
   const float pad = 24.0f;
-  const float panelW = rm_min(420.0f, m_size.x - pad * 2.0f);
-  const float panelH = 220.0f;
+  const float panelW = rm_min(480.0f, m_size.x - pad * 2.0f);
+  const float panelH = 320.0f;
   const float panelX = pad;
   const float panelY = pad;
 

@@ -764,30 +764,35 @@ NVGpaint NVGpaint::imagePattern(float cx, float cy, float w, float h, float angl
 	return p;
 }
 
-NVGpaint NVGpaint::glass(float ox, float oy, float ex, float ey, NVGhandle blurredBackdrop, NVGhandle glassShader,
-	NVGcolor tint, float refractionStrength, float alpha)
+NVGpaint NVGpaint::glass(float panelX, float panelY, float panelW, float panelH,
+	float bgW, float bgH, NVGhandle blurredBackdrop, NVGhandle glassShader,
+	NVGcolor tint, float alpha)
 {
 	NVGpaint p;
 	memset(&p, 0, sizeof(p));
 	p.image.invalidate();
 	p.shader.invalidate();
 
+	// xform/extent encode the panel rect (per-draw, in frag UBO)
 	NVGcontext::TransformIdentity(p.xform);
-	p.xform[4] = ox;
-	p.xform[5] = oy;
+	p.xform[4] = panelX;
+	p.xform[5] = panelY;
 
-	p.extent[0] = ex;
-	p.extent[1] = ey;
+	p.extent[0] = panelW;
+	p.extent[1] = panelH;
+
+	// radius/feather store panel origin in widget-local coords (for globalUV reconstruction)
+	p.radius = panelX;
+	p.feather = panelY;
 
 	p.image = blurredBackdrop;
 	p.shader = glassShader;
-	p.radius = refractionStrength;
 
 	// innerCol = tint color (applied to the backdrop)
 	p.innerColor = tint;
 	p.innerColor.a *= alpha;
 	// outerCol = highlight/fresnel edge color (white by default)
-	p.outerColor = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.35f * alpha);
+	p.outerColor = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.4f * alpha);
 
 	return p;
 }
@@ -2585,6 +2590,11 @@ void NVGcontext::deleteShader(NVGhandle shader)
 NVGhandle NVGcontext::createUniform(NVGhandle shader, const char* name, NVGuniformDataType type, uint32_t count)
 {
 	return m_renderer ? m_renderer->createUniform(shader, name, type, count) : NVGhandle();
+}
+
+NVGhandle NVGcontext::findUniform(NVGhandle shader, const char* name)
+{
+	return m_renderer ? m_renderer->findUniform(shader, name) : NVGhandle();
 }
 
 void NVGcontext::setUniformData(NVGhandle uniform, const void* data, size_t size)

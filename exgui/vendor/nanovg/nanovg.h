@@ -578,10 +578,12 @@ struct NVGpaint {
 	static NVGpaint boxGradient(float x, float y, float w, float h, float r, float f, NVGcolor icol, NVGcolor ocol);
 	static NVGpaint radialGradient(float cx, float cy, float inr, float outr, NVGcolor icol, NVGcolor ocol);
 	static NVGpaint imagePattern(float ox, float oy, float ex, float ey, float angle, NVGhandle image, float alpha);
-	// Creates a glass paint using a pre-blurred backdrop image.
-	// refractionStrength: distortion amount (0..1), tint: overlay color, alpha: overall opacity.
-	static NVGpaint glass(float ox, float oy, float ex, float ey, NVGhandle blurredBackdrop, NVGhandle glassShader,
-		NVGcolor tint, float refractionStrength, float alpha);
+	// Creates a glass paint for a panel at (panelX, panelY) with size (panelW, panelH).
+	// bgW, bgH: background image extent in pixels (for correct texture sampling).
+	// tint: overlay color, alpha: overall opacity.
+	static NVGpaint glass(float panelX, float panelY, float panelW, float panelH,
+		float bgW, float bgH, NVGhandle blurredBackdrop, NVGhandle glassShader,
+		NVGcolor tint, float alpha);
 };
 
 enum NVGblurType {
@@ -909,6 +911,7 @@ public:
 	virtual NVGhandle getShader() = 0;
 	virtual void setShader(NVGhandle shader) = 0;
 	virtual NVGhandle createUniform(NVGhandle shader, const char* pname, NVGuniformDataType type, uint32_t size = 1) = 0;
+	virtual NVGhandle findUniform(NVGhandle shader, const char* pname) = 0;
 	virtual void deleteUniform(NVGhandle uniform) = 0;
 	virtual void setUniformData(NVGhandle uniform, const void* data, size_t size) = 0;
 	virtual void drawCustomTriangles(const NVGcustomDraw& draw,
@@ -1116,6 +1119,7 @@ public:
 	NVGhandle createShader(const NVGshaderDesc& desc);
 	void deleteShader(NVGhandle shader);
 	NVGhandle createUniform(NVGhandle shader, const char* name, NVGuniformDataType type, uint32_t count = 1);
+	NVGhandle findUniform(NVGhandle shader, const char* name);
 	void setUniformData(NVGhandle uniform, const void* data, size_t size);
 	void deleteUniform(NVGhandle uniform);
 	NVGhandle getBuiltinBlurShader();

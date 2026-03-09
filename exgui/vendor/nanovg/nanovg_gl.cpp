@@ -325,14 +325,20 @@ static const char* glassFragShader =
 "	#define texType int(frag[10].z)\n"
 "	#define type int(frag[10].w)\n"
 "#endif\n"
-"// Custom uniforms (set via setUniformData, or use defaults from frag UBO)\n"
+"\n"
+"// Custom uniforms\n"
 "uniform float glassBlurRadius;\n"
 "uniform float glassRefractionStrength;\n"
+"uniform float glassCornerRadius;\n"
+"uniform float glassSaturation;\n"
+"uniform float glassContrast;\n"
+"uniform float glassChromaStrength;\n"
 "uniform float glassFresnelBias;\n"
 "uniform float glassFresnelScale;\n"
 "uniform float glassFresnelPower;\n"
 "uniform float glassSpecularIntensity;\n"
 "uniform float glassSpecularSize;\n"
+"uniform vec2 glassBgSize;\n"
 "\n"
 "float scissorMask(vec2 p) {\n"
 "	vec2 sc = (abs((scissorMat * vec3(p,1.0)).xy) - scissorExt);\n"
@@ -340,103 +346,139 @@ static const char* glassFragShader =
 "	return clamp(sc.x,0.0,1.0) * clamp(sc.y,0.0,1.0);\n"
 "}\n"
 "\n"
+"#ifdef NANOVG_GL3\n"
+"   #define TEX(s, uv) texture(s, uv)\n"
+"#else\n"
+"   #define TEX(s, uv) texture2D(s, uv)\n"
+"#endif\n"
+"\n"
 "vec4 sampleBlurred(sampler2D s, vec2 uv, float blurPx) {\n"
 "#ifdef NANOVG_GL3\n"
-"   vec2 texelSize = 1.0 / vec2(textureSize(s, 0));\n"
+"   vec2 ts = 1.0 / vec2(textureSize(s, 0));\n"
 "#else\n"
-"   vec2 texelSize = vec2(1.0/512.0);\n"
+"   vec2 ts = vec2(1.0/512.0);\n"
 "#endif\n"
-"   if (blurPx < 0.5) {\n"
-"#ifdef NANOVG_GL3\n"
-"       return texture(s, uv);\n"
-"#else\n"
-"       return texture2D(s, uv);\n"
-"#endif\n"
-"   }\n"
-"   vec2 off = texelSize * blurPx;\n"
-"   vec4 c = vec4(0.0);\n"
-"   // 2-ring disc blur: inner ring (4 samples) + outer ring (8 samples) + center\n"
-"   float w = 0.0;\n"
-"   // Center\n"
-"#ifdef NANOVG_GL3\n"
-"   c += texture(s, uv) * 4.0; w += 4.0;\n"
-"   // Inner ring (r=0.5)\n"
-"   c += texture(s, uv + off * vec2( 0.5, 0.0)) * 2.0; w += 2.0;\n"
-"   c += texture(s, uv + off * vec2(-0.5, 0.0)) * 2.0; w += 2.0;\n"
-"   c += texture(s, uv + off * vec2( 0.0, 0.5)) * 2.0; w += 2.0;\n"
-"   c += texture(s, uv + off * vec2( 0.0,-0.5)) * 2.0; w += 2.0;\n"
-"   // Outer ring (r=1.0)\n"
-"   c += texture(s, uv + off * vec2( 1.0, 0.0)); w += 1.0;\n"
-"   c += texture(s, uv + off * vec2(-1.0, 0.0)); w += 1.0;\n"
-"   c += texture(s, uv + off * vec2( 0.0, 1.0)); w += 1.0;\n"
-"   c += texture(s, uv + off * vec2( 0.0,-1.0)); w += 1.0;\n"
-"   c += texture(s, uv + off * vec2( 0.707, 0.707)); w += 1.0;\n"
-"   c += texture(s, uv + off * vec2(-0.707, 0.707)); w += 1.0;\n"
-"   c += texture(s, uv + off * vec2( 0.707,-0.707)); w += 1.0;\n"
-"   c += texture(s, uv + off * vec2(-0.707,-0.707)); w += 1.0;\n"
-"#else\n"
-"   c += texture2D(s, uv) * 4.0; w += 4.0;\n"
-"   c += texture2D(s, uv + off * vec2( 0.5, 0.0)) * 2.0; w += 2.0;\n"
-"   c += texture2D(s, uv + off * vec2(-0.5, 0.0)) * 2.0; w += 2.0;\n"
-"   c += texture2D(s, uv + off * vec2( 0.0, 0.5)) * 2.0; w += 2.0;\n"
-"   c += texture2D(s, uv + off * vec2( 0.0,-0.5)) * 2.0; w += 2.0;\n"
-"   c += texture2D(s, uv + off * vec2( 1.0, 0.0)); w += 1.0;\n"
-"   c += texture2D(s, uv + off * vec2(-1.0, 0.0)); w += 1.0;\n"
-"   c += texture2D(s, uv + off * vec2( 0.0, 1.0)); w += 1.0;\n"
-"   c += texture2D(s, uv + off * vec2( 0.0,-1.0)); w += 1.0;\n"
-"   c += texture2D(s, uv + off * vec2( 0.707, 0.707)); w += 1.0;\n"
-"   c += texture2D(s, uv + off * vec2(-0.707, 0.707)); w += 1.0;\n"
-"   c += texture2D(s, uv + off * vec2( 0.707,-0.707)); w += 1.0;\n"
-"   c += texture2D(s, uv + off * vec2(-0.707,-0.707)); w += 1.0;\n"
-"#endif\n"
-"   return c / w;\n"
+"   if (blurPx < 0.5) return TEX(s, uv);\n"
+"   vec2 o = ts * blurPx;\n"
+"   // 9-tap 3x3 gaussian (weights: 1 2 1 / 2 4 2 / 1 2 1  = 16)\n"
+"   vec4 c  = TEX(s, uv) * 4.0;\n"
+"   c += TEX(s, uv + vec2( o.x, 0.0)) * 2.0;\n"
+"   c += TEX(s, uv + vec2(-o.x, 0.0)) * 2.0;\n"
+"   c += TEX(s, uv + vec2(0.0,  o.y)) * 2.0;\n"
+"   c += TEX(s, uv + vec2(0.0, -o.y)) * 2.0;\n"
+"   c += TEX(s, uv + vec2( o.x,  o.y)) * 1.0;\n"
+"   c += TEX(s, uv + vec2(-o.x,  o.y)) * 1.0;\n"
+"   c += TEX(s, uv + vec2( o.x, -o.y)) * 1.0;\n"
+"   c += TEX(s, uv + vec2(-o.x, -o.y)) * 1.0;\n"
+"   return c / 16.0;\n"
 "}\n"
 "\n"
 "void main(void) {\n"
 "   float scissor = scissorMask(fpos);\n"
-"   vec2 uv = (paintMat * vec3(fpos,1.0)).xy / extent;\n"
 "\n"
-"   // Use custom uniforms if set, else fall back to frag UBO values\n"
-"   float blurAmt = glassBlurRadius > 0.0 ? glassBlurRadius : max(radius * 100.0, 0.0);\n"
-"   float refract = glassRefractionStrength > 0.0 ? glassRefractionStrength : max(feather * 0.1, 0.02);\n"
-"   float fBias  = glassFresnelBias  > 0.0 ? glassFresnelBias  : 0.08;\n"
-"   float fScale = glassFresnelScale > 0.0 ? glassFresnelScale : 0.45;\n"
-"   float fPower = glassFresnelPower > 0.0 ? glassFresnelPower : 2.5;\n"
-"   float sInt   = glassSpecularIntensity > 0.0 ? glassSpecularIntensity : 0.25;\n"
-"   float sSize  = glassSpecularSize > 0.0 ? glassSpecularSize : 0.3;\n"
+"   // paintMat maps fpos to panel-local pixel coords (relative to panel origin)\n"
+"   vec2 panelLocal = (paintMat * vec3(fpos, 1.0)).xy;\n"
+"   vec2 localUV = clamp(panelLocal / extent, 0.0, 1.0);\n"
 "\n"
-"   // Refraction distortion\n"
-"   vec2 center = vec2(0.5);\n"
-"   vec2 toCenter = uv - center;\n"
-"   float dist = length(toCenter);\n"
-"   vec2 refractOffset = toCenter * refract * (1.0 - dist);\n"
-"   vec2 distortedUV = clamp(uv + refractOffset, 0.0, 1.0);\n"
+"   // radius/feather store panel origin in widget-local coords (per-draw UBO)\n"
+"   vec2 panelOrigin = vec2(radius, feather);\n"
+"   // Reconstruct widget-local position and compute global UV over background\n"
+"   vec2 widgetLocal = panelLocal + panelOrigin;\n"
+"   vec2 bgSize = max(glassBgSize, vec2(1.0));\n"
+"   vec2 globalUV = widgetLocal / bgSize;\n"
+"   vec2 panelToBg = extent / bgSize;\n"
 "\n"
-"   // Sample blurred backdrop\n"
-"   vec4 backdrop = sampleBlurred(tex, distortedUV, blurAmt);\n"
+"   // Parameters\n"
+"   float blurAmt = glassBlurRadius;\n"
+"   float refract = glassRefractionStrength;\n"
+"   float cR      = glassCornerRadius > 0.0 ? glassCornerRadius : 0.15;\n"
+"   float sat     = glassSaturation;\n"
+"   float con     = glassContrast;\n"
+"   float chroma  = glassChromaStrength;\n"
+"   float fBias   = glassFresnelBias;\n"
+"   float fScale  = glassFresnelScale;\n"
+"   float fPower  = glassFresnelPower > 0.0 ? glassFresnelPower : 2.0;\n"
+"   float sInt    = glassSpecularIntensity;\n"
+"   float sSize   = glassSpecularSize > 0.0 ? glassSpecularSize : 0.25;\n"
 "\n"
-"   // Fresnel effect - edges reflect more\n"
-"   float edgeDist = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));\n"
-"   float fresnel = fBias + fScale * pow(1.0 - clamp(edgeDist * 4.0, 0.0, 1.0), fPower);\n"
+"   // Distance from each of the 4 edges (in localUV space)\n"
+"   float dL = localUV.x;        // left\n"
+"   float dR = 1.0 - localUV.x;  // right\n"
+"   float dT = localUV.y;        // top\n"
+"   float dB = 1.0 - localUV.y;  // bottom\n"
+"\n"
+"   // Per-edge refraction via smoothstep (C1-continuous, no crease artifacts)\n"
+"   // Each edge pushes UV toward center: left→+x, right→-x, top→+y, bottom→-y\n"
+"   float rL = smoothstep(cR, 0.0, dL);  // 0 at dL>=cR, 1 at dL=0\n"
+"   float rR = smoothstep(cR, 0.0, dR);\n"
+"   float rT = smoothstep(cR, 0.0, dT);\n"
+"   float rB = smoothstep(cR, 0.0, dB);\n"
+"\n"
+"   // Net refraction direction: contributions from all 4 edges sum\n"
+"   // At corners, two edges add up → diagonal refraction\n"
+"   vec2 refractDir = vec2(rL - rR, rT - rB);\n"
+"   vec2 refractOffset = refractDir * refract * panelToBg;\n"
+"   vec2 distortedUV = clamp(globalUV + refractOffset, 0.0, 1.0);\n"
+"\n"
+"   // Edge factor for fresnel/rim (overall proximity to any edge)\n"
+"   float edgeDist = min(min(dL, dR), min(dT, dB));\n"
+"   float edgeFactor = smoothstep(cR, 0.0, edgeDist);\n"
+"\n"
+"   // toCenter direction (for chromatic aberration)\n"
+"   vec2 toCenter = vec2(0.5) - localUV;\n"
+"   float tcLen = length(toCenter);\n"
+"   vec2 tcDir = tcLen > 0.001 ? toCenter / tcLen : vec2(0.0);\n"
+"\n"
+"   // Sample backdrop\n"
+"   vec4 backdrop;\n"
+"   if (chroma > 0.0) {\n"
+"       float chromaOff = edgeFactor * chroma * refract * 0.3;\n"
+"       vec2 chromaDir = tcDir * chromaOff * panelToBg;\n"
+"       backdrop.r = sampleBlurred(tex, clamp(distortedUV + chromaDir, 0.0, 1.0), blurAmt).r;\n"
+"       backdrop.g = sampleBlurred(tex, distortedUV, blurAmt).g;\n"
+"       backdrop.b = sampleBlurred(tex, clamp(distortedUV - chromaDir, 0.0, 1.0), blurAmt).b;\n"
+"       backdrop.a = sampleBlurred(tex, distortedUV, blurAmt).a;\n"
+"   } else {\n"
+"       backdrop = sampleBlurred(tex, distortedUV, blurAmt);\n"
+"   }\n"
+"\n"
+"   // Saturation\n"
+"   if (sat != 1.0) {\n"
+"       float lum = dot(backdrop.rgb, vec3(0.299, 0.587, 0.114));\n"
+"       backdrop.rgb = mix(vec3(lum), backdrop.rgb, sat);\n"
+"   }\n"
+"\n"
+"   // Contrast\n"
+"   if (con != 1.0) {\n"
+"       backdrop.rgb = (backdrop.rgb - 0.5) * con + 0.5;\n"
+"   }\n"
+"\n"
+"   // Color tint overlay\n"
+"   vec3 tinted = mix(backdrop.rgb, innerCol.rgb, innerCol.a);\n"
+"\n"
+"   // Fresnel edge reflection\n"
+"   float fresnel = fBias + fScale * pow(edgeFactor, fPower);\n"
 "   fresnel = clamp(fresnel, 0.0, 1.0);\n"
+"   vec3 color = mix(tinted, outerCol.rgb, fresnel * outerCol.a);\n"
 "\n"
-"   // Tint: innerCol is the tint color\n"
-"   vec4 tinted = mix(backdrop, backdrop * innerCol, innerCol.a * 2.0);\n"
+"   // Specular highlight\n"
+"   if (sInt > 0.0) {\n"
+"       vec2 specPos = localUV - vec2(0.3, 0.2);\n"
+"       float spec = exp(-dot(specPos, specPos) / (sSize * sSize + 0.001));\n"
+"       color += vec3(1.0) * spec * sInt;\n"
+"   }\n"
 "\n"
-"   // Blend based on fresnel - outerCol is the edge/highlight color\n"
-"   vec4 color = mix(tinted, outerCol, fresnel * outerCol.a);\n"
+"   // Edge rim highlight (thin border)\n"
+"   float rimFactor = 1.0 - smoothstep(0.0, 0.012, edgeDist);\n"
+"   color += outerCol.rgb * rimFactor * 0.15;\n"
 "\n"
-"   // Specular highlight (top-left sheen)\n"
-"   vec2 specPos = (uv - vec2(0.28, 0.18));\n"
-"   float spec = exp(-dot(specPos, specPos) / (sSize * sSize + 0.001));\n"
-"   color.rgb += vec3(1.0) * spec * sInt;\n"
-"\n"
-"   color.a = clamp(color.a, 0.0, 1.0);\n"
-"   color *= scissor;\n"
+"   // Opaque output (refracted bg already sampled)\n"
+"   float a = clamp(scissor, 0.0, 1.0);\n"
+"   vec4 result = vec4(color, a);\n"
 "#ifdef NANOVG_GL3\n"
-"   outColor = color;\n"
+"   outColor = result;\n"
 "#else\n"
-"   gl_FragColor = color;\n"
+"   gl_FragColor = result;\n"
 "#endif\n"
 "}\n";
 
@@ -849,6 +891,9 @@ private:
 			if (paint->shader.isValid()) {
 				// Custom shader path: use image as texture input, shader determines fragment logic
 				frag->type = NSVG_SHADER_FILLIMG;
+				// Pass radius/feather for custom shaders (e.g. glass uses them for background extent)
+				frag->radius = paint->radius;
+				frag->feather = paint->feather;
 			}
 			else {
 				frag->type = NSVG_SHADER_FILLIMG;
@@ -1396,19 +1441,30 @@ public:
 			if (m_builtinGlassShader.isValid()) {
 				NVGhandle h; float v;
 				h = createUniform(m_builtinGlassShader, "glassBlurRadius", NVG_UNIFORM_FLOAT, 1);
-				v = 12.0f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				v = 4.0f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
 				h = createUniform(m_builtinGlassShader, "glassRefractionStrength", NVG_UNIFORM_FLOAT, 1);
-				v = 0.04f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				v = 0.35f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				h = createUniform(m_builtinGlassShader, "glassCornerRadius", NVG_UNIFORM_FLOAT, 1);
+				v = 0.2f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				h = createUniform(m_builtinGlassShader, "glassSaturation", NVG_UNIFORM_FLOAT, 1);
+				v = 1.2f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				h = createUniform(m_builtinGlassShader, "glassContrast", NVG_UNIFORM_FLOAT, 1);
+				v = 1.05f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				h = createUniform(m_builtinGlassShader, "glassChromaStrength", NVG_UNIFORM_FLOAT, 1);
+				v = 0.0f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
 				h = createUniform(m_builtinGlassShader, "glassFresnelBias", NVG_UNIFORM_FLOAT, 1);
-				v = 0.08f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				v = 0.0f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
 				h = createUniform(m_builtinGlassShader, "glassFresnelScale", NVG_UNIFORM_FLOAT, 1);
-				v = 0.45f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				v = 0.12f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
 				h = createUniform(m_builtinGlassShader, "glassFresnelPower", NVG_UNIFORM_FLOAT, 1);
-				v = 2.5f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				v = 1.5f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
 				h = createUniform(m_builtinGlassShader, "glassSpecularIntensity", NVG_UNIFORM_FLOAT, 1);
-				v = 0.25f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				v = 0.08f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
 				h = createUniform(m_builtinGlassShader, "glassSpecularSize", NVG_UNIFORM_FLOAT, 1);
 				v = 0.3f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				h = createUniform(m_builtinGlassShader, "glassBgSize", NVG_UNIFORM_FLOAT, 2);
+				float bgDefault[2] = { 800.0f, 600.0f };
+				if (h.isValid()) setUniformData(h, bgDefault, sizeof(bgDefault));
 			}
 		}
 
@@ -2152,6 +2208,17 @@ public:
 	void deleteUniform(NVGhandle uniform) override {
 		NVG_NOTUSED(uniform);
 		// Uniforms are freed when the shader is deleted
+	}
+
+	NVGhandle findUniform(NVGhandle shader, const char* pname) override {
+		GLNVGcustomShader* cs = m_customShaders.getData(shader);
+		if (!cs || !pname)
+			return NVGhandle();
+		for (int i = 0; i < cs->numUniforms; i++) {
+			if (strcmp(cs->uniforms[i].name, pname) == 0)
+				return cs->uniforms[i].handle;
+		}
+		return NVGhandle();
 	}
 
 	void setUniformData(NVGhandle uniform, const void* data, size_t size) override {
