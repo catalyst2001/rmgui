@@ -90,7 +90,7 @@ void rm_effects::draw_glass_showcase(NVGcontext* ctx, float x, float y, float w,
   // Get the built-in glass shader and create a glass paint.
   NVGhandle glassShader = ctx->getBuiltinGlassShader();
   NVGcolor tint = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.14f);
-  NVGpaint glass = NVGpaint::glass(0.0f, 0.0f, m_size.x, m_size.y, m_bgImage, glassShader, tint, 0.05f, 1.0f);
+  NVGpaint glass = NVGpaint::glass(0.0f, 0.0f, m_size.x, m_size.y, m_bgImage, glassShader, tint, 0.9f, 1.0f);
 
   ctx->beginPath();
   ctx->roundedRect(x, y, w, h, 18.0f);
@@ -208,7 +208,7 @@ void rm_effects::on_draw(NVGcontext* ctx) {
     return;
   }
 
-  draw_glass_showcase(ctx, panelX, panelY, panelW, panelH);
+  
 
   const float glowX = panelX + panelW + 40.0f;
   const float glowW = m_size.x - glowX - pad;
@@ -235,6 +235,8 @@ void rm_effects::on_draw(NVGcontext* ctx) {
     ctx->setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
     ctx->text(glowX + glowW * 0.5f, glowY + glowH * 0.5f, "Neon Glow", nullptr);
   }
+
+  draw_glass_showcase(ctx, panelX + 200, panelY, panelW, panelH);
 
   ctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
   draw_blur_gallery(ctx, pad, panelY + panelH + 64.0f, m_size.x - pad * 2.0f);
