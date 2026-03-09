@@ -185,6 +185,261 @@ static const char* fillFragShader =
 "#endif\n"
 "}\n";
 
+// -------------------------------------------------------------------
+// Built-in custom shader: Kawase blur (dual filter downsample/upsample)
+// -------------------------------------------------------------------
+static const char* blurFragShader =
+"#ifdef GL_ES\n"
+"#if defined(GL_FRAGMENT_PRECISION_HIGH) || defined(NANOVG_GL3)\n"
+" precision highp float;\n"
+"#else\n"
+" precision mediump float;\n"
+"#endif\n"
+"#endif\n"
+"#ifdef NANOVG_GL3\n"
+"#ifdef USE_UNIFORMBUFFER\n"
+"	layout(std140) uniform frag {\n"
+"		mat3 scissorMat;\n"
+"		mat3 paintMat;\n"
+"		vec4 innerCol;\n"
+"		vec4 outerCol;\n"
+"		vec2 scissorExt;\n"
+"		vec2 scissorScale;\n"
+"		vec2 extent;\n"
+"		float radius;\n"
+"		float feather;\n"
+"		float strokeMult;\n"
+"		float strokeThr;\n"
+"		int texType;\n"
+"		int type;\n"
+"	};\n"
+"#else\n"
+"	uniform vec4 frag[UNIFORMARRAY_SIZE];\n"
+"#endif\n"
+"	uniform sampler2D tex;\n"
+"	in vec2 ftcoord;\n"
+"	in vec2 fpos;\n"
+"	out vec4 outColor;\n"
+"#else\n"
+"	uniform vec4 frag[UNIFORMARRAY_SIZE];\n"
+"	uniform sampler2D tex;\n"
+"	varying vec2 ftcoord;\n"
+"	varying vec2 fpos;\n"
+"#endif\n"
+"#ifndef USE_UNIFORMBUFFER\n"
+"	#define scissorMat mat3(frag[0].xyz, frag[1].xyz, frag[2].xyz)\n"
+"	#define paintMat mat3(frag[3].xyz, frag[4].xyz, frag[5].xyz)\n"
+"	#define innerCol frag[6]\n"
+"	#define outerCol frag[7]\n"
+"	#define scissorExt frag[8].xy\n"
+"	#define scissorScale frag[8].zw\n"
+"	#define extent frag[9].xy\n"
+"	#define radius frag[9].z\n"
+"	#define feather frag[9].w\n"
+"	#define strokeMult frag[10].x\n"
+"	#define strokeThr frag[10].y\n"
+"	#define texType int(frag[10].z)\n"
+"	#define type int(frag[10].w)\n"
+"#endif\n"
+"uniform vec2 blurDir;\n"    // direction + pixel size for this pass
+"uniform float blurRadius;\n" // kernel half-offset in pixels
+"\n"
+"void main(void) {\n"
+"   vec2 uv = (paintMat * vec3(fpos,1.0)).xy / extent;\n"
+"   vec2 off1 = blurDir * blurRadius;\n"
+"   vec2 off2 = blurDir * blurRadius * 2.0;\n"
+"#ifdef NANOVG_GL3\n"
+"   vec4 color = texture(tex, uv) * 0.227027;\n"
+"   color += texture(tex, uv + off1) * 0.316216;\n"
+"   color += texture(tex, uv - off1) * 0.316216;\n"
+"   color += texture(tex, uv + off2) * 0.070270;\n"
+"   color += texture(tex, uv - off2) * 0.070270;\n"
+"#else\n"
+"   vec4 color = texture2D(tex, uv) * 0.227027;\n"
+"   color += texture2D(tex, uv + off1) * 0.316216;\n"
+"   color += texture2D(tex, uv - off1) * 0.316216;\n"
+"   color += texture2D(tex, uv + off2) * 0.070270;\n"
+"   color += texture2D(tex, uv - off2) * 0.070270;\n"
+"#endif\n"
+"   color *= innerCol;\n" // tint/alpha
+"#ifdef NANOVG_GL3\n"
+"   outColor = color;\n"
+"#else\n"
+"   gl_FragColor = color;\n"
+"#endif\n"
+"}\n";
+
+// -------------------------------------------------------------------
+// Built-in custom shader: Glass composition (refraction + fresnel + tint)
+// -------------------------------------------------------------------
+static const char* glassFragShader =
+"#ifdef GL_ES\n"
+"#if defined(GL_FRAGMENT_PRECISION_HIGH) || defined(NANOVG_GL3)\n"
+" precision highp float;\n"
+"#else\n"
+" precision mediump float;\n"
+"#endif\n"
+"#endif\n"
+"#ifdef NANOVG_GL3\n"
+"#ifdef USE_UNIFORMBUFFER\n"
+"	layout(std140) uniform frag {\n"
+"		mat3 scissorMat;\n"
+"		mat3 paintMat;\n"
+"		vec4 innerCol;\n"
+"		vec4 outerCol;\n"
+"		vec2 scissorExt;\n"
+"		vec2 scissorScale;\n"
+"		vec2 extent;\n"
+"		float radius;\n"
+"		float feather;\n"
+"		float strokeMult;\n"
+"		float strokeThr;\n"
+"		int texType;\n"
+"		int type;\n"
+"	};\n"
+"#else\n"
+"	uniform vec4 frag[UNIFORMARRAY_SIZE];\n"
+"#endif\n"
+"	uniform sampler2D tex;\n"
+"	in vec2 ftcoord;\n"
+"	in vec2 fpos;\n"
+"	out vec4 outColor;\n"
+"#else\n"
+"	uniform vec4 frag[UNIFORMARRAY_SIZE];\n"
+"	uniform sampler2D tex;\n"
+"	varying vec2 ftcoord;\n"
+"	varying vec2 fpos;\n"
+"#endif\n"
+"#ifndef USE_UNIFORMBUFFER\n"
+"	#define scissorMat mat3(frag[0].xyz, frag[1].xyz, frag[2].xyz)\n"
+"	#define paintMat mat3(frag[3].xyz, frag[4].xyz, frag[5].xyz)\n"
+"	#define innerCol frag[6]\n"
+"	#define outerCol frag[7]\n"
+"	#define scissorExt frag[8].xy\n"
+"	#define scissorScale frag[8].zw\n"
+"	#define extent frag[9].xy\n"
+"	#define radius frag[9].z\n"
+"	#define feather frag[9].w\n"
+"	#define strokeMult frag[10].x\n"
+"	#define strokeThr frag[10].y\n"
+"	#define texType int(frag[10].z)\n"
+"	#define type int(frag[10].w)\n"
+"#endif\n"
+"// Custom uniforms (set via setUniformData, or use defaults from frag UBO)\n"
+"uniform float glassBlurRadius;\n"
+"uniform float glassRefractionStrength;\n"
+"uniform float glassFresnelBias;\n"
+"uniform float glassFresnelScale;\n"
+"uniform float glassFresnelPower;\n"
+"uniform float glassSpecularIntensity;\n"
+"uniform float glassSpecularSize;\n"
+"\n"
+"float scissorMask(vec2 p) {\n"
+"	vec2 sc = (abs((scissorMat * vec3(p,1.0)).xy) - scissorExt);\n"
+"	sc = vec2(0.5,0.5) - sc * scissorScale;\n"
+"	return clamp(sc.x,0.0,1.0) * clamp(sc.y,0.0,1.0);\n"
+"}\n"
+"\n"
+"vec4 sampleBlurred(sampler2D s, vec2 uv, float blurPx) {\n"
+"#ifdef NANOVG_GL3\n"
+"   vec2 texelSize = 1.0 / vec2(textureSize(s, 0));\n"
+"#else\n"
+"   vec2 texelSize = vec2(1.0/512.0);\n"
+"#endif\n"
+"   if (blurPx < 0.5) {\n"
+"#ifdef NANOVG_GL3\n"
+"       return texture(s, uv);\n"
+"#else\n"
+"       return texture2D(s, uv);\n"
+"#endif\n"
+"   }\n"
+"   vec2 off = texelSize * blurPx;\n"
+"   vec4 c = vec4(0.0);\n"
+"   // 2-ring disc blur: inner ring (4 samples) + outer ring (8 samples) + center\n"
+"   float w = 0.0;\n"
+"   // Center\n"
+"#ifdef NANOVG_GL3\n"
+"   c += texture(s, uv) * 4.0; w += 4.0;\n"
+"   // Inner ring (r=0.5)\n"
+"   c += texture(s, uv + off * vec2( 0.5, 0.0)) * 2.0; w += 2.0;\n"
+"   c += texture(s, uv + off * vec2(-0.5, 0.0)) * 2.0; w += 2.0;\n"
+"   c += texture(s, uv + off * vec2( 0.0, 0.5)) * 2.0; w += 2.0;\n"
+"   c += texture(s, uv + off * vec2( 0.0,-0.5)) * 2.0; w += 2.0;\n"
+"   // Outer ring (r=1.0)\n"
+"   c += texture(s, uv + off * vec2( 1.0, 0.0)); w += 1.0;\n"
+"   c += texture(s, uv + off * vec2(-1.0, 0.0)); w += 1.0;\n"
+"   c += texture(s, uv + off * vec2( 0.0, 1.0)); w += 1.0;\n"
+"   c += texture(s, uv + off * vec2( 0.0,-1.0)); w += 1.0;\n"
+"   c += texture(s, uv + off * vec2( 0.707, 0.707)); w += 1.0;\n"
+"   c += texture(s, uv + off * vec2(-0.707, 0.707)); w += 1.0;\n"
+"   c += texture(s, uv + off * vec2( 0.707,-0.707)); w += 1.0;\n"
+"   c += texture(s, uv + off * vec2(-0.707,-0.707)); w += 1.0;\n"
+"#else\n"
+"   c += texture2D(s, uv) * 4.0; w += 4.0;\n"
+"   c += texture2D(s, uv + off * vec2( 0.5, 0.0)) * 2.0; w += 2.0;\n"
+"   c += texture2D(s, uv + off * vec2(-0.5, 0.0)) * 2.0; w += 2.0;\n"
+"   c += texture2D(s, uv + off * vec2( 0.0, 0.5)) * 2.0; w += 2.0;\n"
+"   c += texture2D(s, uv + off * vec2( 0.0,-0.5)) * 2.0; w += 2.0;\n"
+"   c += texture2D(s, uv + off * vec2( 1.0, 0.0)); w += 1.0;\n"
+"   c += texture2D(s, uv + off * vec2(-1.0, 0.0)); w += 1.0;\n"
+"   c += texture2D(s, uv + off * vec2( 0.0, 1.0)); w += 1.0;\n"
+"   c += texture2D(s, uv + off * vec2( 0.0,-1.0)); w += 1.0;\n"
+"   c += texture2D(s, uv + off * vec2( 0.707, 0.707)); w += 1.0;\n"
+"   c += texture2D(s, uv + off * vec2(-0.707, 0.707)); w += 1.0;\n"
+"   c += texture2D(s, uv + off * vec2( 0.707,-0.707)); w += 1.0;\n"
+"   c += texture2D(s, uv + off * vec2(-0.707,-0.707)); w += 1.0;\n"
+"#endif\n"
+"   return c / w;\n"
+"}\n"
+"\n"
+"void main(void) {\n"
+"   float scissor = scissorMask(fpos);\n"
+"   vec2 uv = (paintMat * vec3(fpos,1.0)).xy / extent;\n"
+"\n"
+"   // Use custom uniforms if set, else fall back to frag UBO values\n"
+"   float blurAmt = glassBlurRadius > 0.0 ? glassBlurRadius : max(radius * 100.0, 0.0);\n"
+"   float refract = glassRefractionStrength > 0.0 ? glassRefractionStrength : max(feather * 0.1, 0.02);\n"
+"   float fBias  = glassFresnelBias  > 0.0 ? glassFresnelBias  : 0.08;\n"
+"   float fScale = glassFresnelScale > 0.0 ? glassFresnelScale : 0.45;\n"
+"   float fPower = glassFresnelPower > 0.0 ? glassFresnelPower : 2.5;\n"
+"   float sInt   = glassSpecularIntensity > 0.0 ? glassSpecularIntensity : 0.25;\n"
+"   float sSize  = glassSpecularSize > 0.0 ? glassSpecularSize : 0.3;\n"
+"\n"
+"   // Refraction distortion\n"
+"   vec2 center = vec2(0.5);\n"
+"   vec2 toCenter = uv - center;\n"
+"   float dist = length(toCenter);\n"
+"   vec2 refractOffset = toCenter * refract * (1.0 - dist);\n"
+"   vec2 distortedUV = clamp(uv + refractOffset, 0.0, 1.0);\n"
+"\n"
+"   // Sample blurred backdrop\n"
+"   vec4 backdrop = sampleBlurred(tex, distortedUV, blurAmt);\n"
+"\n"
+"   // Fresnel effect - edges reflect more\n"
+"   float edgeDist = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));\n"
+"   float fresnel = fBias + fScale * pow(1.0 - clamp(edgeDist * 4.0, 0.0, 1.0), fPower);\n"
+"   fresnel = clamp(fresnel, 0.0, 1.0);\n"
+"\n"
+"   // Tint: innerCol is the tint color\n"
+"   vec4 tinted = mix(backdrop, backdrop * innerCol, innerCol.a * 2.0);\n"
+"\n"
+"   // Blend based on fresnel - outerCol is the edge/highlight color\n"
+"   vec4 color = mix(tinted, outerCol, fresnel * outerCol.a);\n"
+"\n"
+"   // Specular highlight (top-left sheen)\n"
+"   vec2 specPos = (uv - vec2(0.28, 0.18));\n"
+"   float spec = exp(-dot(specPos, specPos) / (sSize * sSize + 0.001));\n"
+"   color.rgb += vec3(1.0) * spec * sInt;\n"
+"\n"
+"   color.a = clamp(color.a, 0.0, 1.0);\n"
+"   color *= scissor;\n"
+"#ifdef NANOVG_GL3\n"
+"   outColor = color;\n"
+"#else\n"
+"   gl_FragColor = color;\n"
+"#endif\n"
+"}\n";
+
 enum GLNVGuniformLoc {
 	GLNVG_LOC_VIEWSIZE,
 	GLNVG_LOC_TEX,
@@ -196,7 +451,7 @@ enum GLNVGshaderType {
 	NSVG_SHADER_FILLGRAD,
 	NSVG_SHADER_FILLIMG,
 	NSVG_SHADER_SIMPLE,
-	NSVG_SHADER_IMG
+	NSVG_SHADER_IMG,
 };
 
 #if NANOVG_GL_USE_UNIFORMBUFFER
@@ -212,6 +467,30 @@ struct GLNVGshader {
 	GLint loc[GLNVG_MAX_LOCS];
 };
 typedef struct GLNVGshader GLNVGshader;
+
+#define GLNVG_MAX_CUSTOM_UNIFORMS 16
+#define GLNVG_MAX_UNIFORM_NAME 64
+#define GLNVG_MAX_UNIFORM_DATA 16 // max floats per uniform
+
+struct GLNVGcustomUniform {
+	NVGhandle handle;
+	GLint location;
+	NVGuniformDataType type;
+	uint32_t count;
+	char name[GLNVG_MAX_UNIFORM_NAME];
+	float data[GLNVG_MAX_UNIFORM_DATA];
+	int dataSize; // bytes actually used
+};
+typedef struct GLNVGcustomUniform GLNVGcustomUniform;
+
+struct GLNVGcustomShader {
+	NVGhandle handle;
+	GLNVGshader shader; // compiled program
+	GLNVGcustomUniform uniforms[GLNVG_MAX_CUSTOM_UNIFORMS];
+	int numUniforms;
+	int nextUniformId;
+};
+typedef struct GLNVGcustomShader GLNVGcustomShader;
 
 struct GLNVGtexture {
 	NVGhandle handle;
@@ -253,6 +532,7 @@ enum GLNVGcallType {
 struct GLNVGcall {
 	int type;
 	NVGhandle image;
+	NVGhandle shader;
 	int pathOffset;
 	int pathCount;
 	int triangleOffset;
@@ -329,10 +609,15 @@ static unsigned int glnvg__nearestPow2(unsigned int num)
 
 class GLNVGrenderer : public NVGrenderer {
 	GLNVGshader m_shader;
-	//GLNVGtexture* m_textures;
-	//GLNVGrenderTarget* m_targets;
 	NVGhandleAllocatorFixed<GLNVGtexture, 512> m_textures;
 	NVGhandleAllocatorFixed<GLNVGrenderTarget, 64> m_targets;
+	NVGhandleAllocatorFixed<GLNVGcustomShader, 64> m_customShaders;
+
+	// Built-in custom shaders
+	NVGhandle m_builtinBlurShader;
+	NVGhandle m_builtinGlassShader;
+
+	GLuint m_boundProgram; // currently bound shader program
 
 	float m_view[2];
 	//int m_ntextures;
@@ -560,7 +845,14 @@ private:
 			else {
 				NVGcontext::TransformInverse(invxform, paint->xform);
 			}
-			frag->type = NSVG_SHADER_FILLIMG;
+
+			if (paint->shader.isValid()) {
+				// Custom shader path: use image as texture input, shader determines fragment logic
+				frag->type = NSVG_SHADER_FILLIMG;
+			}
+			else {
+				frag->type = NSVG_SHADER_FILLIMG;
+			}
 
 #if NANOVG_GL_USE_UNIFORMBUFFER
 			if (tex->type == NVG_TEXTURE_RGBA)
@@ -574,6 +866,13 @@ private:
 				frag->texType = 2.0f;
 #endif
 			//		printf("frag->texType = %d\n", frag->texType);
+		}
+		else if (paint->shader.isValid()) {
+			// Custom shader without image - use gradient-like transform
+			frag->type = NSVG_SHADER_FILLGRAD;
+			frag->radius = paint->radius;
+			frag->feather = paint->feather;
+			NVGcontext::TransformInverse(invxform, paint->xform);
 		}
 		else {
 			frag->type = NSVG_SHADER_FILLGRAD;
@@ -590,11 +889,24 @@ private:
 	void glnvg__setUniforms(int uniformOffset, NVGhandle image)
 	{
 		GLNVGtexture* tex = NULL;
+		GLNVGshader* activeShader = &m_shader;
+
+		// If a custom shader is bound, use its uniform locations
+		if (m_boundProgram != m_shader.prog) {
+			// Find the custom shader that's currently bound
+			// We need to use the correct loc array for uniform uploads
+			// For non-UBO path, we need the custom shader's frag location
+		}
+
 #if NANOVG_GL_USE_UNIFORMBUFFER
 		glBindBufferRange(GL_UNIFORM_BUFFER, GLNVG_FRAG_BINDING, m_fragBuf, uniformOffset, sizeof(GLNVGfragUniforms));
 #else
 		GLNVGfragUniforms* frag = nvg__fragUniformPtr(uniformOffset);
-		glUniform4fv(m_shader.loc[GLNVG_LOC_FRAG], NANOVG_GL_UNIFORMARRAY_SIZE, &(frag->uniformArray[0][0]));
+		// Use the currently bound program's frag uniform location
+		GLint fragLoc = m_boundProgram == m_shader.prog ?
+			m_shader.loc[GLNVG_LOC_FRAG] : glGetUniformLocation(m_boundProgram, "frag");
+		if (fragLoc >= 0)
+			glUniform4fv(fragLoc, NANOVG_GL_UNIFORMARRAY_SIZE, &(frag->uniformArray[0][0]));
 #endif
 
 		tex = m_textures.getData(image);
@@ -604,6 +916,61 @@ private:
 		}
 		glnvg__bindTexture(tex != NULL ? tex->tex : 0);
 		glnvg__checkError("tex paint tex");
+	}
+
+	// Bind a custom shader program, setting up standard uniforms
+	void glnvg__bindCustomShader(NVGhandle shaderHandle)
+	{
+		GLNVGcustomShader* cs = m_customShaders.getData(shaderHandle);
+		if (!cs || cs->shader.prog == 0)
+			return;
+
+		glUseProgram(cs->shader.prog);
+		m_boundProgram = cs->shader.prog;
+
+		// Set standard uniforms on the custom program
+		glUniform1i(cs->shader.loc[GLNVG_LOC_TEX], 0);
+		glUniform2fv(cs->shader.loc[GLNVG_LOC_VIEWSIZE], 1, m_view);
+
+#if NANOVG_GL_USE_UNIFORMBUFFER
+		glBindBuffer(GL_UNIFORM_BUFFER, m_fragBuf);
+#endif
+
+		// Apply custom uniforms
+		for (int i = 0; i < cs->numUniforms; i++) {
+			GLNVGcustomUniform* u = &cs->uniforms[i];
+			if (u->location < 0 || u->dataSize <= 0)
+				continue;
+
+			switch (u->type) {
+			case NVG_UNIFORM_FLOAT:
+				if (u->count == 1) glUniform1fv(u->location, 1, u->data);
+				else if (u->count == 2) glUniform2fv(u->location, 1, u->data);
+				else if (u->count == 3) glUniform3fv(u->location, 1, u->data);
+				else if (u->count == 4) glUniform4fv(u->location, 1, u->data);
+				break;
+			case NVG_UNIFORM_INT:
+				glUniform1iv(u->location, u->count, (const GLint*)u->data);
+				break;
+			case NVG_UNIFORM_UINT:
+				glUniform1uiv(u->location, u->count, (const GLuint*)u->data);
+				break;
+			}
+		}
+	}
+
+	// Restore the built-in shader program
+	void glnvg__restoreBuiltinShader()
+	{
+		if (m_boundProgram != m_shader.prog) {
+			glUseProgram(m_shader.prog);
+			m_boundProgram = m_shader.prog;
+			glUniform1i(m_shader.loc[GLNVG_LOC_TEX], 0);
+			glUniform2fv(m_shader.loc[GLNVG_LOC_VIEWSIZE], 1, m_view);
+#if NANOVG_GL_USE_UNIFORMBUFFER
+			glBindBuffer(GL_UNIFORM_BUFFER, m_fragBuf);
+#endif
+		}
 	}
 
 	void glnvg__fill(GLNVGcall* call)
@@ -617,7 +984,8 @@ private:
 		glnvg__stencilFunc(GL_ALWAYS, 0, 0xff);
 		glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 
-		// set bindpoint for solid loc
+		// set bindpoint for solid loc (stencil pass - always built-in shader)
+		glnvg__restoreBuiltinShader();
 		glnvg__setUniforms(call->uniformOffset, NVGhandle());
 		glnvg__checkError("fill simple");
 
@@ -630,6 +998,10 @@ private:
 
 		// Draw anti-aliased pixels
 		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+		// Color pass - bind custom shader if available
+		if (call->shader.isValid())
+			glnvg__bindCustomShader(call->shader);
 
 		glnvg__setUniforms(call->uniformOffset + m_fragSize, call->image);
 		glnvg__checkError("fill fill");
@@ -647,6 +1019,10 @@ private:
 		glStencilOp(GL_ZERO, GL_ZERO, GL_ZERO);
 		glDrawArrays(GL_TRIANGLE_STRIP, call->triangleOffset, call->triangleCount);
 
+		// Restore built-in shader
+		if (call->shader.isValid())
+			glnvg__restoreBuiltinShader();
+
 		glDisable(GL_STENCIL_TEST);
 	}
 
@@ -654,6 +1030,9 @@ private:
 	{
 		GLNVGpath* paths = &m_paths[call->pathOffset];
 		int i, npaths = call->pathCount;
+
+		if (call->shader.isValid())
+			glnvg__bindCustomShader(call->shader);
 
 		glnvg__setUniforms(call->uniformOffset, call->image);
 		glnvg__checkError("convex fill");
@@ -665,6 +1044,9 @@ private:
 				glDrawArrays(GL_TRIANGLE_STRIP, paths[i].strokeOffset, paths[i].strokeCount);
 			}
 		}
+
+		if (call->shader.isValid())
+			glnvg__restoreBuiltinShader();
 	}
 
 	void glnvg__stroke(GLNVGcall* call)
@@ -680,6 +1062,10 @@ private:
 			// Fill the stroke base without overlap
 			glnvg__stencilFunc(GL_EQUAL, 0x0, 0xff);
 			glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
+
+			if (call->shader.isValid())
+				glnvg__bindCustomShader(call->shader);
+
 			glnvg__setUniforms(call->uniformOffset + m_fragSize, call->image);
 			glnvg__checkError("stroke fill 0");
 			for (i = 0; i < npaths; i++)
@@ -692,6 +1078,9 @@ private:
 			for (i = 0; i < npaths; i++)
 				glDrawArrays(GL_TRIANGLE_STRIP, paths[i].strokeOffset, paths[i].strokeCount);
 
+			if (call->shader.isValid())
+				glnvg__restoreBuiltinShader();
+
 			// Clear stencil buffer.
 			glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 			glnvg__stencilFunc(GL_ALWAYS, 0x0, 0xff);
@@ -703,23 +1092,33 @@ private:
 
 			glDisable(GL_STENCIL_TEST);
 
-			//		glnvg__convertPaint(gl, nvg__fragUniformPtr(gl, call->uniformOffset + fragSize), paint, scissor, strokeWidth, fringe, 1.0f - 0.5f/255.0f);
-
 		}
 		else {
+			if (call->shader.isValid())
+				glnvg__bindCustomShader(call->shader);
+
 			glnvg__setUniforms(call->uniformOffset, call->image);
 			glnvg__checkError("stroke fill");
 			// Draw Strokes
 			for (i = 0; i < npaths; i++)
 				glDrawArrays(GL_TRIANGLE_STRIP, paths[i].strokeOffset, paths[i].strokeCount);
+
+			if (call->shader.isValid())
+				glnvg__restoreBuiltinShader();
 		}
 	}
 
 	void glnvg__triangles(GLNVGcall* call)
 	{
+		if (call->shader.isValid())
+			glnvg__bindCustomShader(call->shader);
+
 		glnvg__setUniforms(call->uniformOffset, call->image);
 		glnvg__checkError("triangles fill");
 		glDrawArrays(GL_TRIANGLES, call->triangleOffset, call->triangleCount);
+
+		if (call->shader.isValid())
+			glnvg__restoreBuiltinShader();
 	}
 
 	//TODO KD: convert to array-based lookup?
@@ -937,8 +1336,7 @@ public:
 private:
 
 public:
-	//FIXME KD: initialize all members in constructor!
-	explicit GLNVGrenderer(int flags) : m_flags(flags), m_defaultFBO(-1) {
+	explicit GLNVGrenderer(int flags) : m_flags(flags), m_defaultFBO(-1), m_boundProgram(0) {
 		int align = 4;
 		glnvg__checkError("init");
 		if (m_flags & NVG_ANTIALIAS) {
@@ -961,7 +1359,7 @@ public:
 
 #if NANOVG_GL_USE_UNIFORMBUFFER
 		// Create UBOs
-		glUniformBlockBinding(shader.prog, shader.loc[GLNVG_LOC_FRAG], GLNVG_FRAG_BINDING);
+		glUniformBlockBinding(m_shader.prog, m_shader.loc[GLNVG_LOC_FRAG], GLNVG_FRAG_BINDING);
 		glGenBuffers(1, &m_fragBuf);
 		glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &align);
 #endif
@@ -970,12 +1368,68 @@ public:
 		// Some platforms does not allow to have samples to unset textures.
 		// Create empty one which is bound when there's no texture specified.
 		m_dummyTex = createTexture(NVG_TEXTURE_ALPHA, 1, 1, 0, NULL);
+
+		// Create built-in custom shaders
+		{
+			NVGshaderDesc blurDesc{};
+			blurDesc.data = blurFragShader;
+			blurDesc.size = strlen(blurFragShader);
+			blurDesc.stage = NVG_SHADER_STAGE_FRAGMENT;
+			blurDesc.codeType = NVG_SHADER_CODE_SRC;
+			m_builtinBlurShader = createShader(blurDesc);
+			if (m_builtinBlurShader.isValid()) {
+				NVGhandle h;
+				float v;
+				h = createUniform(m_builtinBlurShader, "blurDir", NVG_UNIFORM_FLOAT, 2);
+				float blurDirDefault[2] = { 1.0f, 0.0f };
+				if (h.isValid()) setUniformData(h, blurDirDefault, sizeof(blurDirDefault));
+				h = createUniform(m_builtinBlurShader, "blurRadius", NVG_UNIFORM_FLOAT, 1);
+				v = 4.0f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+			}
+
+			NVGshaderDesc glassDesc{};
+			glassDesc.data = glassFragShader;
+			glassDesc.size = strlen(glassFragShader);
+			glassDesc.stage = NVG_SHADER_STAGE_FRAGMENT;
+			glassDesc.codeType = NVG_SHADER_CODE_SRC;
+			m_builtinGlassShader = createShader(glassDesc);
+			if (m_builtinGlassShader.isValid()) {
+				NVGhandle h; float v;
+				h = createUniform(m_builtinGlassShader, "glassBlurRadius", NVG_UNIFORM_FLOAT, 1);
+				v = 12.0f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				h = createUniform(m_builtinGlassShader, "glassRefractionStrength", NVG_UNIFORM_FLOAT, 1);
+				v = 0.04f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				h = createUniform(m_builtinGlassShader, "glassFresnelBias", NVG_UNIFORM_FLOAT, 1);
+				v = 0.08f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				h = createUniform(m_builtinGlassShader, "glassFresnelScale", NVG_UNIFORM_FLOAT, 1);
+				v = 0.45f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				h = createUniform(m_builtinGlassShader, "glassFresnelPower", NVG_UNIFORM_FLOAT, 1);
+				v = 2.5f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				h = createUniform(m_builtinGlassShader, "glassSpecularIntensity", NVG_UNIFORM_FLOAT, 1);
+				v = 0.25f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				h = createUniform(m_builtinGlassShader, "glassSpecularSize", NVG_UNIFORM_FLOAT, 1);
+				v = 0.3f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+			}
+		}
+
 		glnvg__checkError("create done");
 		glFinish();
 	}
 
 	~GLNVGrenderer() override {
 		int i;
+
+		// Delete custom shaders (including built-in blur/glass)
+		{
+			NVGhandle handle;
+			handle.invalidate();
+			while (m_customShaders.getNextBusyHandle(handle)) {
+				if (!handle.isValid())
+					break;
+				deleteShader(handle);
+			}
+		}
+
 		glnvg__deleteShader(&m_shader);
 #if NANOVG_GL3
 #if NANOVG_GL_USE_UNIFORMBUFFER
@@ -1195,6 +1649,7 @@ public:
 		if (m_ncalls > 0) {
 			// Setup require GL state.
 			glUseProgram(m_shader.prog);
+			m_boundProgram = m_shader.prog;
 
 			glEnable(GL_CULL_FACE);
 			glCullFace(GL_BACK);
@@ -1223,7 +1678,7 @@ public:
 #if NANOVG_GL_USE_UNIFORMBUFFER
 			// Upload ubo for frag shaders
 			glBindBuffer(GL_UNIFORM_BUFFER, m_fragBuf);
-			glBufferData(GL_UNIFORM_BUFFER, nuniforms * fragSize, uniforms, GL_STREAM_DRAW);
+			glBufferData(GL_UNIFORM_BUFFER, m_nuniforms * m_fragSize, m_uniforms, GL_STREAM_DRAW);
 #endif
 
 			// Upload vertex data
@@ -1298,6 +1753,7 @@ public:
 		}
 		call->pathCount = npaths;
 		call->image = paint.image;
+		call->shader = paint.shader;
 		call->blendFunc = glnvg__blendCompositeOperation(compositeOperation);
 
 		if (npaths == 1 && paths[0].convex)
@@ -1389,6 +1845,7 @@ public:
 		}
 		call->pathCount = npaths;
 		call->image = paint.image;
+		call->shader = paint.shader;
 		call->blendFunc = glnvg__blendCompositeOperation(compositeOperation);
 
 		// Allocate vertices for all the paths.
@@ -1448,6 +1905,7 @@ public:
 
 		call->type = GLNVG_TRIANGLES;
 		call->image = paint.image;
+		call->shader = paint.shader;
 		call->blendFunc = glnvg__blendCompositeOperation(compositeOperation);
 
 		// Allocate vertices for all the paths.
@@ -1600,20 +2058,50 @@ public:
 		return rt != NULL ? rt->image : NVGhandle();
 	}
 
-	//TODO KD: implement shader API
 	NVGhandle createShader(const NVGshaderDesc& desc) override
 	{
-		NVG_NOTUSED(desc);
-		return NVGhandle();
+		if (!desc.data || desc.size == 0)
+			return NVGhandle();
+
+		// Only support fragment shader source for now
+		if (desc.stage != NVG_SHADER_STAGE_FRAGMENT || desc.codeType != NVG_SHADER_CODE_SRC)
+			return NVGhandle();
+
+		GLNVGcustomShader* cs = nullptr;
+		NVGhandle h = m_customShaders.alloc(&cs);
+		if (!h.isValid())
+			return NVGhandle();
+
+		cs->handle = h;
+		cs->numUniforms = 0;
+		cs->nextUniformId = 0;
+
+		const char* fragSrc = (const char*)desc.data;
+		const char* opts = (m_flags & NVG_ANTIALIAS) ? "#define EDGE_AA 1\n" : NULL;
+
+		if (glnvg__createShader(&cs->shader, "custom", shaderHeader, opts, fillVertShader, fragSrc) == 0) {
+			m_customShaders.free(h);
+			return NVGhandle();
+		}
+
+		glnvg__getUniforms(&cs->shader);
+
+#if NANOVG_GL_USE_UNIFORMBUFFER
+		glUniformBlockBinding(cs->shader.prog, cs->shader.loc[GLNVG_LOC_FRAG], GLNVG_FRAG_BINDING);
+#endif
+
+		return h;
 	}
 
-	//TODO KD: implement shader API
 	void deleteShader(NVGhandle shader) override
 	{
-		NVG_NOTUSED(shader);
+		GLNVGcustomShader* cs = m_customShaders.getData(shader);
+		if (cs) {
+			glnvg__deleteShader(&cs->shader);
+			m_customShaders.free(shader);
+		}
 	}
 
-	//TODO KD: implement drawCustomTriangles XD
 	void drawCustomTriangles(const NVGcustomDraw& draw, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, const NVGvertex* verts, int nverts, float fringe) override
 	{
 		NVG_NOTUSED(draw);
@@ -1632,21 +2120,72 @@ public:
 		NVG_NOTUSED(shader);
 	}
 
-	NVGhandle createUniform(NVGhandle shader, const char* pname, NVGuniformDataType type, uint32_t size = 1) override {
-		NVG_NOTUSED(shader);
-		NVG_NOTUSED(pname);
-		NVG_NOTUSED(type);
-		NVG_NOTUSED(size);
-		return NVGhandle();
+	NVGhandle createUniform(NVGhandle shader, const char* pname, NVGuniformDataType type, uint32_t count = 1) override {
+		GLNVGcustomShader* cs = m_customShaders.getData(shader);
+		if (!cs || !pname || cs->numUniforms >= GLNVG_MAX_CUSTOM_UNIFORMS)
+			return NVGhandle();
+
+		GLint loc = glGetUniformLocation(cs->shader.prog, pname);
+		if (loc < 0)
+			return NVGhandle();
+
+		GLNVGcustomUniform* u = &cs->uniforms[cs->numUniforms];
+		// Encode the uniform index + shader index into a handle
+		// Use the uniform array index as the handle index, shader handle generation as generation
+		u->handle = NVGhandle((NVGhandle::_half_type)cs->nextUniformId, shader.getIndex());
+		u->location = loc;
+		u->type = type;
+		u->count = count;
+		u->dataSize = 0;
+		memset(u->data, 0, sizeof(u->data));
+
+		size_t nameLen = strlen(pname);
+		if (nameLen >= GLNVG_MAX_UNIFORM_NAME) nameLen = GLNVG_MAX_UNIFORM_NAME - 1;
+		memcpy(u->name, pname, nameLen);
+		u->name[nameLen] = '\0';
+
+		cs->numUniforms++;
+		cs->nextUniformId++;
+		return u->handle;
 	}
+
 	void deleteUniform(NVGhandle uniform) override {
 		NVG_NOTUSED(uniform);
+		// Uniforms are freed when the shader is deleted
 	}
+
 	void setUniformData(NVGhandle uniform, const void* data, size_t size) override {
-		NVG_NOTUSED(uniform);
-		NVG_NOTUSED(data);
-		NVG_NOTUSED(size);
+		if (!data || size == 0)
+			return;
+
+		// Find the uniform across all custom shaders
+		// The uniform handle's generation stores the shader index
+		NVGhandle::_half_type shaderIdx = uniform.getGeneration();
+		NVGhandle::_half_type uniformId = uniform.getIndex();
+
+		// Iterate shaders to find matching one
+		NVGhandle sh;
+		while (m_customShaders.getNextBusyHandle(sh)) {
+			if (!sh.isValid()) break;
+			if (sh.getIndex() != shaderIdx) continue;
+
+			GLNVGcustomShader* cs = m_customShaders.getData(sh);
+			if (!cs) break;
+
+			for (int i = 0; i < cs->numUniforms; i++) {
+				if (cs->uniforms[i].handle.getIndex() == uniformId) {
+					size_t copySize = size < sizeof(cs->uniforms[i].data) ? size : sizeof(cs->uniforms[i].data);
+					memcpy(cs->uniforms[i].data, data, copySize);
+					cs->uniforms[i].dataSize = (int)copySize;
+					return;
+				}
+			}
+			break;
+		}
 	}
+
+	NVGhandle getBuiltinBlurShader() const { return m_builtinBlurShader; }
+	NVGhandle getBuiltinGlassShader() const { return m_builtinGlassShader; }
 
 	/* HACK BEGIN ** HACK BEGIN ** HACK BEGIN ** HACK BEGIN ** HACK BEGIN ** HACK BEGIN ** */
 	GLNVGtexture *glnvg__findTexture(NVGhandle image)

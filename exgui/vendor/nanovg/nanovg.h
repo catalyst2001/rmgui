@@ -437,7 +437,7 @@ public:
 template<typename _type, size_t _capacity>
 class NVGhandleAllocatorFixed {
 	static_assert(_capacity > 0 && "_capacity is 0!");
-	static_assert(_capacity <= std::numeric_limits<NVGhandle::_half_type>::max(), "ñapacity doesn't fit into handle index type");
+	static_assert(_capacity <= std::numeric_limits<NVGhandle::_half_type>::max(), "ï¿½apacity doesn't fit into handle index type");
 	static_assert(std::is_trivially_copyable<_type>::value, "handle allocator supports only trivial types!");
 	NVGhandle::_half_type m_gens[_capacity];
 	_type                 m_pool[_capacity]{};
@@ -578,6 +578,10 @@ struct NVGpaint {
 	static NVGpaint boxGradient(float x, float y, float w, float h, float r, float f, NVGcolor icol, NVGcolor ocol);
 	static NVGpaint radialGradient(float cx, float cy, float inr, float outr, NVGcolor icol, NVGcolor ocol);
 	static NVGpaint imagePattern(float ox, float oy, float ex, float ey, float angle, NVGhandle image, float alpha);
+	// Creates a glass paint using a pre-blurred backdrop image.
+	// refractionStrength: distortion amount (0..1), tint: overlay color, alpha: overall opacity.
+	static NVGpaint glass(float ox, float oy, float ex, float ey, NVGhandle blurredBackdrop, NVGhandle glassShader,
+		NVGcolor tint, float refractionStrength, float alpha);
 };
 
 enum NVGblurType {
@@ -612,20 +616,6 @@ struct NVGglowStyle {
 	NVGglowStyle();
 };
 
-struct NVGglassStyle {
-	float    radius;
-	float    blur;
-	int      blurSamples;
-	float    highlight;
-	float    borderWidth;
-	NVGhandle backgroundImage;
-	float    backgroundAlpha;
-	NVGcolor tint;
-	NVGcolor highlightColor;
-	NVGcolor shadowColor;
-	NVGcolor borderColor;
-	NVGglassStyle();
-};
 
 enum NVGwinding {
 	NVG_CCW = 1,
@@ -926,6 +916,8 @@ public:
 		const NVGscissor& scissor,
 		const NVGvertex* verts, int nverts,
 		float fringe) = 0;
+	virtual NVGhandle getBuiltinBlurShader() const { return NVGhandle(); }
+	virtual NVGhandle getBuiltinGlassShader() const { return NVGhandle(); }
 };
 
 struct FONScontext;
@@ -962,10 +954,6 @@ protected:
 	float m_viewHeight;
 
 	NVGhandle m_boundRenderTarget;
-	NVGhandle m_glassRenderTarget;
-	int m_glassRenderTargetW;
-	int m_glassRenderTargetH;
-	float m_glassRenderTargetRatio;
 
 	FONScontext* m_fs;
 	NVGhandle m_fontImages[NVG_MAX_FONTIMAGES];
@@ -1119,7 +1107,6 @@ public:
 	// Effects.
 	void textBlur(float x, float y, const char* string, const char* end, const NVGblurStyle& style);
 	void glowRect(float x, float y, float w, float h, float r, const NVGglowStyle& style);
-	void glassRect(float x, float y, float w, float h, const NVGglassStyle& style);
 
 	// Custom pipeline.
 	NVGhandle createRenderTarget(const NVGrenderTargetDesc& desc);
@@ -1128,6 +1115,11 @@ public:
 	NVGhandle getRenderTargetImage(NVGhandle target);
 	NVGhandle createShader(const NVGshaderDesc& desc);
 	void deleteShader(NVGhandle shader);
+	NVGhandle createUniform(NVGhandle shader, const char* name, NVGuniformDataType type, uint32_t count = 1);
+	void setUniformData(NVGhandle uniform, const void* data, size_t size);
+	void deleteUniform(NVGhandle uniform);
+	NVGhandle getBuiltinBlurShader();
+	NVGhandle getBuiltinGlassShader();
 	void drawTriangles(const NVGcustomDraw& draw, const NVGvertex* verts, int nverts);
 
 	// Debug.
