@@ -87,20 +87,22 @@ void rm_effects::ensure_background(NVGcontext* ctx)
   }
 
 void rm_effects::draw_glass_showcase(NVGcontext* ctx, float x, float y, float w, float h) {
-  NVGglassStyle glass;
-  glass.backgroundImage = m_bgImage;
-  glass.backgroundAlpha = 1.0f;
-  glass.blur = 18.0f;
-  glass.blurSamples = 24;
-  glass.radius = 18.0f;
-  glass.tint = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.14f);
-  glass.highlightColor = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.48f);
-  glass.shadowColor = NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.18f);
-  glass.borderColor = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.42f);
-  glass.borderWidth = 1.0f;
-  glass.highlight = 0.55f;
+  // Get the built-in glass shader and create a glass paint.
+  NVGhandle glassShader = ctx->getBuiltinGlassShader();
+  NVGcolor tint = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.14f);
+  NVGpaint glass = NVGpaint::glass(0.0f, 0.0f, m_size.x, m_size.y, m_bgImage, glassShader, tint, 0.05f, 1.0f);
 
-  ctx->glassRect(x, y, w, h, glass);
+  ctx->beginPath();
+  ctx->roundedRect(x, y, w, h, 18.0f);
+  ctx->fillPaint(glass);
+  ctx->fill();
+
+  // Border
+  ctx->StrokeWidth(1.0f);
+  ctx->strokeColor(NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.42f));
+  ctx->beginPath();
+  ctx->roundedRect(x + 0.5f, y + 0.5f, w - 1.0f, h - 1.0f, 17.5f);
+  ctx->stroke();
 
   ctx->setFontFace("default");
   ctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
