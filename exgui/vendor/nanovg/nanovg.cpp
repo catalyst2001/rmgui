@@ -410,6 +410,8 @@ float NVGcontext::RadToDeg(float rad)
 static void nvg__setPaintColor(NVGpaint* p, NVGcolor color)
 {
 	memset(p, 0, sizeof(*p));
+	p->image.invalidate();
+	p->shader.invalidate();
 	NVGcontext::TransformIdentity(p->xform);
 	p->radius = 0.0f;
 	p->feather = 1.0f;
@@ -654,6 +656,8 @@ NVGpaint NVGpaint::linearGradient(float sx, float sy, float ex, float ey,
 	float dx, dy, d;
 	const float large = 1e5;
 	memset(&p, 0, sizeof(p));
+	p.image.invalidate();
+	p.shader.invalidate();
 
 	// Calculate transform aligned to the line
 	dx = ex - sx;
@@ -692,6 +696,8 @@ NVGpaint NVGpaint::radialGradient(float cx, float cy, float inr, float outr,
 	float r = (inr + outr) * 0.5f;
 	float f = (outr - inr);
 	memset(&p, 0, sizeof(p));
+	p.image.invalidate();
+	p.shader.invalidate();
 
 	NVGcontext::TransformIdentity(p.xform);
 	p.xform[4] = cx;
@@ -715,6 +721,8 @@ NVGpaint NVGpaint::boxGradient(float x, float y, float w, float h, float r, floa
 {
 	NVGpaint p;
 	memset(&p, 0, sizeof(p));
+	p.image.invalidate();
+	p.shader.invalidate();
 
 	NVGcontext::TransformIdentity(p.xform);
 	p.xform[4] = x + w * 0.5f;
@@ -739,6 +747,8 @@ NVGpaint NVGpaint::imagePattern(float cx, float cy, float w, float h, float angl
 {
 	NVGpaint p;
 	memset(&p, 0, sizeof(p));
+	p.image.invalidate();
+	p.shader.invalidate();
 
 	NVGcontext::TransformRotate(p.xform, angle);
 	p.xform[4] = cx;
