@@ -136,19 +136,19 @@ void rm_effects::draw_glass_showcase(NVGcontext* ctx, float x, float y, float w,
 
   // Raw: clear glass with subtle tint
   drawPanel(x, y, pw, ph, "Raw",
-    NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.06f));
+    NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.01f));
 
   // Dark: dark overlay
   drawPanel(x + pw + gap, y, pw, ph, "Dark",
-    NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.3f));
+    NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.01f));
 
   // Light: white overlay
   drawPanel(x, y + ph + gap, pw, ph, "Light",
-    NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.3f));
+    NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.01f));
 
   // Tinted: colored glass
   drawPanel(x + pw + gap, y + ph + gap, pw, ph, "Tinted",
-    NVGcolor::RGBAf(0.4f, 0.6f, 1.0f, 0.2f));
+    NVGcolor::RGBAf(0.4f, 0.6f, 1.0f, 0.01f));
 }
 
 void rm_effects::draw_blur_gallery(NVGcontext* ctx, float x, float y, float w) {

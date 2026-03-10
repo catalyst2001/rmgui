@@ -1441,9 +1441,9 @@ public:
 			if (m_builtinGlassShader.isValid()) {
 				NVGhandle h; float v;
 				h = createUniform(m_builtinGlassShader, "glassBlurRadius", NVG_UNIFORM_FLOAT, 1);
-				v = 4.0f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				v = 1.5f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
 				h = createUniform(m_builtinGlassShader, "glassRefractionStrength", NVG_UNIFORM_FLOAT, 1);
-				v = 0.35f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				v = 0.6f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
 				h = createUniform(m_builtinGlassShader, "glassCornerRadius", NVG_UNIFORM_FLOAT, 1);
 				v = 0.2f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
 				h = createUniform(m_builtinGlassShader, "glassSaturation", NVG_UNIFORM_FLOAT, 1);
@@ -1451,7 +1451,7 @@ public:
 				h = createUniform(m_builtinGlassShader, "glassContrast", NVG_UNIFORM_FLOAT, 1);
 				v = 1.05f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
 				h = createUniform(m_builtinGlassShader, "glassChromaStrength", NVG_UNIFORM_FLOAT, 1);
-				v = 0.0f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
+				v = 1.0f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
 				h = createUniform(m_builtinGlassShader, "glassFresnelBias", NVG_UNIFORM_FLOAT, 1);
 				v = 0.0f; if (h.isValid()) setUniformData(h, &v, sizeof(v));
 				h = createUniform(m_builtinGlassShader, "glassFresnelScale", NVG_UNIFORM_FLOAT, 1);
