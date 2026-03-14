@@ -214,6 +214,7 @@ void rm_surface::draw_recursive(rm_widget* pwidget, float dt)
 	if (!pwidget->get_elem_flags().is_set(RM_FLAG_DISABLE_SCISSOR))
 		m_pctx->scissor(abs_pos.x, abs_pos.y, size.x, size.y);
 
+	m_pctx->setZIndex(pwidget->get_zindex());
 	m_pctx->translate(abs_pos.x + content.x, abs_pos.y + content.y);
 	pwidget->on_draw(m_pctx.get());
 

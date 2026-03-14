@@ -428,8 +428,10 @@ void bui_choice_button::on_draw(NVGcontext* pctx) {
         float menu_y = m_size.y;
         float menu_h = (float)(m_items.size()) * (float)BND_WIDGET_HEIGHT;
         float menu_w = m_size.x;
-
+        int last_zindex = pctx->getZIndex();
+        pctx->setZIndex(1);
         bndMenuBackground(pctx, 0, menu_y, menu_w, menu_h, BND_CORNER_NONE);
+
 
         for (size_t i = 0; i < m_items.size(); i++) {
             float iy = menu_y + (float)i * (float)BND_WIDGET_HEIGHT;
@@ -442,6 +444,7 @@ void bui_choice_button::on_draw(NVGcontext* pctx) {
             bndMenuItem(pctx, 0, iy, menu_w, (float)BND_WIDGET_HEIGHT,
                 item_state, m_items[i].iconid, m_items[i].label.c_str());
         }
+        pctx->setZIndex(last_zindex);
     }
 
     rm_widget::on_draw(pctx);

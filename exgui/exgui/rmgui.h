@@ -881,7 +881,7 @@ protected:
   rm_vec2          m_size; //width;height
   rm_vec2          m_pos_of_parent;
   rm_rect          m_content_area;
-  //int              m_zindex;
+  int              m_zindex;
 
   ///* rmgui_root::rebuild_draw_cache accessor class */
   //class rmgui_root_update_acessor : public rmgui_root {
@@ -918,7 +918,7 @@ public:
 
   rm_widget(int x, int y, int width, int height, rm_widget *p_parent, const char *p_classname,
     uint32_t flags = RM_FLAG_DEFAULT, uint32_t uflags = 0, void *p_userptr = nullptr) : m_proot(nullptr),
-    m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_playout(nullptr)/*, m_zindex(0)*/ {
+    m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_playout(nullptr), m_zindex(0) {
     rm_vec2 parent_coord;
     if (m_pparent) {
       parent_coord = m_pparent->get_pos_of_parent();
@@ -940,7 +940,7 @@ public:
   }
   rm_widget(float x, float y, float width, float height, rm_widget *p_parent, const char *p_classname,
     uint32_t flags = RM_FLAG_DEFAULT, uint32_t uflags = 0, void *p_userptr = nullptr) : m_proot(nullptr),
-    m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_playout(nullptr)/*, m_zindex(0)*/ {
+    m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_playout(nullptr), m_zindex(0) {
     rm_vec2 parent_coord;
     if (m_pparent) {
       parent_coord = m_pparent->get_pos_of_parent();
@@ -1014,9 +1014,8 @@ public:
   inline rm_font     get_font() { return m_font; }
 
   /* layers */
-  //TODO: K.D. [Okay+++] layers not used now! remove this later?
-  inline void        set_zindex(int zidx) { /*m_zindex = zidx;*/ }
-  inline int         get_zindex() const { return /*m_zindex*/0; }
+  inline void        set_zindex(int zidx) { m_zindex = zidx; }
+  inline int         get_zindex() const { return m_zindex; }
 
   virtual void       resize(float width, float height);
   inline void        resize(rm_vec2 newsize) { resize(newsize.x, newsize.y); }
