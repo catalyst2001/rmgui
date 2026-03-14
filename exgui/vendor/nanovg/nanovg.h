@@ -818,6 +818,7 @@ struct NVGstate {
 	float    fontBlur;
 	int      textAlign;
 	int      fontId;
+	int      zIndex;
 };
 
 typedef struct NVGstate NVGstate;
@@ -921,6 +922,7 @@ public:
 		float fringe) = 0;
 	virtual NVGhandle getBuiltinBlurShader() const { return NVGhandle(); }
 	virtual NVGhandle getBuiltinGlassShader() const { return NVGhandle(); }
+	virtual void setZIndex(int /*z*/) {}
 };
 
 struct FONScontext;
@@ -1029,6 +1031,10 @@ public:
 	void LineCap(int cap);
 	void LineJoin(int join);
 	void GlobalAlpha(float alpha);
+
+	// Layer ordering.
+	void setZIndex(int z);
+	int  getZIndex() const;
 
 	// Transforms.
 	void resetTransform();

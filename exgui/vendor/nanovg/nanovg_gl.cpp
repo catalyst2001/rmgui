@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <algorithm>
 #include "nanovg.h"
 
 #if defined(NANOVG_GL3) || defined(NANOVG_GLES2) || defined(NANOVG_GLES3)
@@ -573,6 +574,7 @@ enum GLNVGcallType {
 
 struct GLNVGcall {
 	int type;
+	int zIndex;
 	NVGhandle image;
 	NVGhandle shader;
 	int pathOffset;
@@ -677,6 +679,8 @@ class GLNVGrenderer : public NVGrenderer {
 #endif
 	int m_fragSize;
 	int m_flags;
+	int m_zIndex; // current z-index for new calls
+	bool m_zDirty; // true if any call has zIndex != 0
 
 	// Per frame buffers
 	//TODO KD: replace to container std::vector!!
@@ -1236,6 +1240,7 @@ private:
 		}
 		ret = &m_calls[m_ncalls++];
 		memset(ret, 0, sizeof(GLNVGcall));
+		ret->zIndex = m_zIndex;
 		return ret;
 	}
 
@@ -1381,7 +1386,7 @@ public:
 private:
 
 public:
-	explicit GLNVGrenderer(int flags) : m_flags(flags), m_defaultFBO(-1), m_boundProgram(0) {
+	explicit GLNVGrenderer(int flags) : m_flags(flags), m_zIndex(0), m_zDirty(false), m_defaultFBO(-1), m_boundProgram(0) {
 		int align = 4;
 		glnvg__checkError("init");
 		if (m_flags & NVG_ANTIALIAS) {
@@ -1698,11 +1703,20 @@ public:
 		m_npaths = 0;
 		m_ncalls = 0;
 		m_nuniforms = 0;
+		m_zIndex = 0;
+		m_zDirty = false;
 	}
 
 	void flush() override {
 		int i;
 		if (m_ncalls > 0) {
+			// Stable-sort draw calls by z-index to guarantee layer ordering.
+			// Skip the sort entirely when z-index was never set (common case).
+			if (m_zDirty) {
+				std::stable_sort(m_calls, m_calls + m_ncalls,
+					[](const GLNVGcall& a, const GLNVGcall& b) { return a.zIndex < b.zIndex; });
+			}
+
 			// Setup require GL state.
 			glUseProgram(m_shader.prog);
 			m_boundProgram = m_shader.prog;
@@ -1785,6 +1799,7 @@ public:
 		m_npaths = 0;
 		m_ncalls = 0;
 		m_nuniforms = 0;
+		m_zDirty = false;
 	}
 
 	void fill(const NVGpaint& paint, NVGcompositeOperationState compositeOperation,
@@ -2253,6 +2268,8 @@ public:
 
 	NVGhandle getBuiltinBlurShader() const { return m_builtinBlurShader; }
 	NVGhandle getBuiltinGlassShader() const { return m_builtinGlassShader; }
+
+	void setZIndex(int z) override { m_zIndex = z; if (z != 0) m_zDirty = true; }
 
 	/* HACK BEGIN ** HACK BEGIN ** HACK BEGIN ** HACK BEGIN ** HACK BEGIN ** HACK BEGIN ** */
 	GLNVGtexture *glnvg__findTexture(NVGhandle image)

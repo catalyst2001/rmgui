@@ -506,6 +506,18 @@ void NVGcontext::GlobalAlpha(float alpha)
 	state->alpha = alpha;
 }
 
+void NVGcontext::setZIndex(int z)
+{
+	NVGstate* state = getState();
+	state->zIndex = z;
+	m_renderer->setZIndex(z);
+}
+
+int NVGcontext::getZIndex() const
+{
+	return const_cast<NVGcontext*>(this)->getState()->zIndex;
+}
+
 void NVGcontext::transform(float a, float b, float c, float d, float e, float f)
 {
 	NVGstate* state = getState();
@@ -1588,6 +1600,7 @@ void NVGcontext::fill()
 	fillPaint.innerColor.a *= state->alpha;
 	fillPaint.outerColor.a *= state->alpha;
 
+	m_renderer->setZIndex(state->zIndex);
 	m_renderer->fill(fillPaint, state->compositeOperation, state->scissor, m_fringeWidth,
 		m_pathCache->bounds, m_pathCache->getPaths(), m_pathCache->getNumPaths());
 
@@ -1628,6 +1641,7 @@ void NVGcontext::stroke()
 	else
 		m_pathCache->expandStroke(strokeWidth * 0.5f, 0.0f, state->lineCap, state->lineJoin, state->miterLimit, m_tessTol);
 
+	m_renderer->setZIndex(state->zIndex);
 	m_renderer->stroke(strokePaint, state->compositeOperation, state->scissor, m_fringeWidth,
 		strokeWidth, m_pathCache->getPaths(), m_pathCache->getNumPaths());
 
@@ -1812,6 +1826,7 @@ void NVGcontext::nvg__renderText(NVGvertex* verts, int nverts)
 	paint.innerColor.a *= state->alpha;
 	paint.outerColor.a *= state->alpha;
 
+	m_renderer->setZIndex(state->zIndex);
 	m_renderer->triangles(paint, state->compositeOperation, state->scissor, verts, nverts, m_fringeWidth);
 
 	m_drawCallCount++;
@@ -2623,8 +2638,10 @@ NVGhandle NVGcontext::getBuiltinGlassShader()
 void NVGcontext::drawTriangles(const NVGcustomDraw& draw, const NVGvertex* verts, int nverts)
 {
 	NVGstate* state = getState();
-	if (m_renderer)
+	if (m_renderer) {
+		m_renderer->setZIndex(state->zIndex);
 		m_renderer->drawCustomTriangles(draw, state->compositeOperation, state->scissor, verts, nverts, m_fringeWidth);
+	}
 }
 
 NVGcontext::NVGcontext(std::unique_ptr<NVGrenderer> renderer, const NVGcontextConfig& config)
