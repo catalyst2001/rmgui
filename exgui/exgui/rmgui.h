@@ -842,11 +842,11 @@ protected:
     static NVGcolor colors[] = {
       NVGcolor::RGB(255, 0, 0), NVGcolor::RGB(0, 255, 0)
     };
-    pctx->BeginPath();
-    pctx->Rect( 0.f, 0.f, m_size.x, m_size.y);
-    pctx->StrokeColor( colors[get_elem_flags().is_hovered()]);
-    pctx->StrokeWidth( 2.f);
-    pctx->Stroke();
+    pctx->beginPath();
+    pctx->rect( 0.f, 0.f, m_size.x, m_size.y);
+    pctx->strokeColor( colors[get_elem_flags().is_hovered()]);
+    pctx->strokeWidth( 2.f);
+    pctx->stroke();
 #endif
   }
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) {

@@ -2276,6 +2276,7 @@ void NVGcontext::textBoxBounds(float x, float y, float breakRowWidth, const char
 
 			y += lineh * state->lineHeight;
 		}
+		//TODO KD: potential buffer overflow
 		string = rows[nrows - 1].next;
 	}
 
