@@ -590,6 +590,15 @@ public:
   inline void set_max_size(rm_vec2 size) { m_max_size = size; }
   inline const rm_vec2& get_min_size() { return m_min_size; }
   inline const rm_vec2& get_max_size() { return m_max_size; }
+  inline bool has_min_size() const { return m_min_size.x > 0.f || m_min_size.y > 0.f; }
+  inline bool has_max_size() const { return m_max_size.x > 0.f || m_max_size.y > 0.f; }
+  inline rm_vec2 constrain_size(rm_vec2 size) const {
+    if (m_min_size.x > 0.f) size.x = rm_max(size.x, m_min_size.x);
+    if (m_min_size.y > 0.f) size.y = rm_max(size.y, m_min_size.y);
+    if (m_max_size.x > 0.f) size.x = rm_min(size.x, m_max_size.x);
+    if (m_max_size.y > 0.f) size.y = rm_min(size.y, m_max_size.y);
+    return size;
+  }
 };
 
 /**
@@ -937,6 +946,10 @@ public:
       set_font(((rm_widget *)m_proot)->get_font());
 
     set_classname(p_classname);
+
+    /* default constraints = initial size (CSS-like: element holds its creation size) */
+    set_min_size(m_size);
+    set_max_size(m_size);
   }
   rm_widget(float x, float y, float width, float height, rm_widget *p_parent, const char *p_classname,
     uint32_t flags = RM_FLAG_DEFAULT, uint32_t uflags = 0, void *p_userptr = nullptr) : m_proot(nullptr),
@@ -959,6 +972,10 @@ public:
       set_font(((rm_widget *)m_proot)->get_font());
 
     set_classname(p_classname);
+
+    /* default constraints = initial size (CSS-like: element holds its creation size) */
+    set_min_size(m_size);
+    set_max_size(m_size);
   }
   virtual ~rm_widget() = default;
 

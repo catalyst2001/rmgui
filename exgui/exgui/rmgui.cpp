@@ -28,10 +28,10 @@ void rm_widget::move_to(rm_widget* proot_widget, float xpos, float ypos)
 
 void rm_widget::resize_nolayout(float width, float height)
 {
-	//rm_vec2 start(0.f, 0.f);
-	m_size.init(width, height);
+	rm_vec2 constrained = constrain_size(rm_vec2(width, height));
+	m_size = constrained;
 	m_bbox.init(m_pos_of_parent, m_size);
-	m_content_area.init(0.f, 0.f, m_size.x, m_size.y); //TODO: K.D. check this later
+	m_content_area.init(0.f, 0.f, m_size.x, m_size.y);
 }
 
 void rm_widget::move_relative(rm_vec2& delta)
@@ -380,6 +380,10 @@ float rm_surface::get_text_height(const char* ptext, rm_font hfont, rm_vec2 star
 
 rm_surface::rm_surface(std::unique_ptr<NVGcontext> pctx, int width, int height, irm_sysdf* p_sysdf, void* psyswindow) : rm_widget(0, 0, width, height, nullptr, "ui_root_node")
 {
+	/* root surface is freely resizable (viewport) */
+	set_min_size(rm_vec2(0.f, 0.f));
+	set_max_size(rm_vec2(0.f, 0.f));
+
 	m_psyswindow = psyswindow;
 	m_psysdf = p_sysdf;
 	set_root(this);
@@ -522,10 +526,17 @@ bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
 	if (event == RM_MOUSE_EVENT_MOVE) {
 		const rm_vec2& ps = m_pparent->get_size();
 		if (m_state_flags & WSF_RESIZE) {
+			const rm_vec2& wmin = get_min_size();
+			const rm_vec2& wmax = get_max_size();
+			float min_w = (wmin.x > 0.f) ? wmin.x : 50.0f;
+			float min_h = (wmin.y > 0.f) ? wmin.y : 50.0f;
+			float max_w = (wmax.x > 0.f) ? wmax.x : ps.x;
+			float max_h = (wmax.y > 0.f) ? wmax.y : ps.y;
+
 			rm_vec2 delta = parent_local - m_resize_start_mouse;
 			if (m_active_resizes & WCF_LRESIZE) {
-				float newW = std::max(m_resize_start_size.x - delta.x, 50.0f);
-				newW = std::clamp(newW, 50.0f, ps.x - m_resize_start_pos.x);
+				float newW = std::max(m_resize_start_size.x - delta.x, min_w);
+				newW = std::clamp(newW, min_w, std::min(max_w, ps.x - m_resize_start_pos.x));
 				float newX = m_resize_start_pos.x + (m_resize_start_size.x - newW);
 				newX = std::clamp(newX, 0.0f, ps.x - newW);
 				m_pos_of_parent.x = newX;
@@ -533,14 +544,14 @@ bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
 			}
 
 			if (m_active_resizes & WCF_RRESIZE) {
-				float newW = std::max(m_resize_start_size.x + delta.x, 50.0f);
-				newW = std::clamp(newW, 50.0f, ps.x - m_pos_of_parent.x);
+				float newW = std::max(m_resize_start_size.x + delta.x, min_w);
+				newW = std::clamp(newW, min_w, std::min(max_w, ps.x - m_pos_of_parent.x));
 				m_size.x = newW;
 			}
 
 			if (m_active_resizes & WCF_TRESIZE) {
-				float newH = std::max(m_resize_start_size.y - delta.y, 50.0f);
-				newH = std::clamp(newH, 50.0f, ps.y - m_resize_start_pos.y);
+				float newH = std::max(m_resize_start_size.y - delta.y, min_h);
+				newH = std::clamp(newH, min_h, std::min(max_h, ps.y - m_resize_start_pos.y));
 				float newY = m_resize_start_pos.y + (m_resize_start_size.y - newH);
 				newY = std::clamp(newY, 0.0f, ps.y - newH);
 				m_pos_of_parent.y = newY;
@@ -548,8 +559,8 @@ bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
 			}
 
 			if (m_active_resizes & WCF_BRESIZE) {
-				float newH = std::max(m_resize_start_size.y + delta.y, 50.0f);
-				newH = std::clamp(newH, 50.0f, ps.y - m_pos_of_parent.y);
+				float newH = std::max(m_resize_start_size.y + delta.y, min_h);
+				newH = std::clamp(newH, min_h, std::min(max_h, ps.y - m_pos_of_parent.y));
 				m_size.y = newH;
 			}
 
@@ -578,7 +589,9 @@ bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
 rm_window::rm_window(rm_widget* p_parent, int x, int y, int width, int height, uint32_t flags) :
 	rm_widget(x, y, width, height, p_parent, "ui_window", RM_FLAG_DEFAULT | RM_FLAG_GLOBAL), m_flags(flags), m_state_flags(WSF_NONE), m_active_resizes(WSF_NONE), m_pstyle(nullptr), m_size_drag_width(5.f)
 {
-	//set_zindex(-1);
+	/* window constraints are computed by layout from children, not fixed to initial size */
+	set_min_size(rm_vec2(0.f, 0.f));
+	set_max_size(rm_vec2(0.f, 0.f));
 }
 
 rm_window::~rm_window()
@@ -1153,6 +1166,91 @@ rm_flexbox_layout::rm_flexbox_layout(rm_flex_direction dir,
 
 bool rm_flexbox_layout::measure(rm_widget* pwidget)
 {
+	if (!pwidget)
+		return false;
+
+	const size_t child_count = pwidget->get_num_childs();
+	if (child_count == 0)
+		return true;
+
+	bool is_row = (m_dir == rm_flex_direction::Row || m_dir == rm_flex_direction::RowReverse);
+
+	float total_min_main = 0.f;
+	float total_min_cross = 0.f;
+	float total_max_main = 0.f;
+	float total_max_cross = 0.f;
+	bool all_have_max = true;
+	size_t visible_count = 0;
+
+	for (size_t i = 0; i < child_count; ++i) {
+		rm_widget* child = pwidget->get_child(i);
+		if (!child->is_visible())
+			continue;
+
+		const rm_vec2& cmin = child->get_min_size();
+		const rm_vec2& cmax = child->get_max_size();
+
+		float child_min_main  = is_row ? cmin.x : cmin.y;
+		float child_min_cross = is_row ? cmin.y : cmin.x;
+		float child_max_main  = is_row ? cmax.x : cmax.y;
+		float child_max_cross = is_row ? cmax.y : cmax.x;
+
+		/* main axis: sum of minimums */
+		total_min_main += child_min_main;
+		/* cross axis: max of minimums */
+		total_min_cross = std::max(total_min_cross, child_min_cross);
+
+		/* max: sum along main, max along cross */
+		if (child_max_main > 0.f)
+			total_max_main += child_max_main;
+		else
+			all_have_max = false;
+
+		if (child_max_cross > 0.f)
+			total_max_cross = std::max(total_max_cross, child_max_cross);
+
+		visible_count++;
+	}
+
+	/* add gaps between children */
+	if (visible_count > 1) {
+		float gaps = (float)(visible_count - 1) * m_gap_main;
+		total_min_main += gaps;
+		if (all_have_max)
+			total_max_main += gaps;
+	}
+
+	/* add padding */
+	float pad_main  = is_row ? (m_padding.left + m_padding.right)  : (m_padding.top + m_padding.bottom);
+	float pad_cross = is_row ? (m_padding.top + m_padding.bottom) : (m_padding.left + m_padding.right);
+
+	total_min_main += pad_main;
+	total_min_cross += pad_cross;
+	if (all_have_max) {
+		total_max_main += pad_main;
+		total_max_cross += pad_cross;
+	}
+
+	/* set parent's min_size from children */
+	rm_vec2 computed_min;
+	if (is_row)
+		computed_min.init(total_min_main, total_min_cross);
+	else
+		computed_min.init(total_min_cross, total_min_main);
+	pwidget->set_min_size(computed_min);
+
+	/* set parent's max_size from children (only if all children are bounded) */
+	if (all_have_max) {
+		rm_vec2 computed_max;
+		if (is_row)
+			computed_max.init(total_max_main, total_max_cross);
+		else
+			computed_max.init(total_max_cross, total_max_main);
+		pwidget->set_max_size(computed_max);
+	} else {
+		pwidget->set_max_size(rm_vec2(0.f, 0.f));
+	}
+
 	return true;
 }
 
@@ -1181,6 +1279,13 @@ bool rm_flexbox_layout::perform(rm_widget* pwidget)
 	bool reverse = (m_dir == rm_flex_direction::RowReverse || m_dir == rm_flex_direction::ColumnReverse);
 	bool do_wrap = (m_wrap != rm_flex_wrap::NoWrap);
 
+	// helper: re-read actual widget size after resize (constraints may have clamped it)
+	auto sync_size = [&](rm_widget* child, float& main_sz, float& cross_sz) {
+		rm_vec2 actual = child->get_size();
+		main_sz = is_row ? actual.x : actual.y;
+		cross_sz = is_row ? actual.y : actual.x;
+	};
+
 	// 2) First pass: collect each child's size; apply per-child Clamp only if the child alone exceeds content area
 	struct ChildInfo { rm_widget* w; float main; float cross; };
 	std::vector<ChildInfo> infos;
@@ -1198,32 +1303,29 @@ bool rm_flexbox_layout::perform(rm_widget* pwidget)
 		// 2.a) If fill==Clamp on main axis, clamp child's main size to content
 		if (is_row && m_fill_x == rm_flex_fill::Clamp) {
 			if (child_main > content_width) {
-				child_main = content_width;
-				child->resize(child_main, sz.y);
-				sz.x = child_main;
+				child->resize(content_width, sz.y);
+				sync_size(child, child_main, child_cross);
 			}
 		}
 		else if (!is_row && m_fill_y == rm_flex_fill::Clamp) {
 			if (child_main > content_height) {
-				child_main = content_height;
-				child->resize(sz.x, child_main);
-				sz.y = child_main;
+				child->resize(sz.x, content_height);
+				sync_size(child, child_main, child_cross);
 			}
 		}
 
 		// 2.b) If fill==Clamp on cross axis, clamp child's cross size to content
+		sz = child->get_size();
 		if (is_row && m_fill_y == rm_flex_fill::Clamp) {
 			if (child_cross > content_height) {
-				child_cross = content_height;
-				child->resize(sz.x, child_cross);
-				sz.y = child_cross;
+				child->resize(sz.x, content_height);
+				sync_size(child, child_main, child_cross);
 			}
 		}
 		else if (!is_row && m_fill_x == rm_flex_fill::Clamp) {
 			if (child_cross > content_width) {
-				child_cross = content_width;
-				child->resize(child_cross, sz.y);
-				sz.x = child_cross;
+				child->resize(content_width, sz.y);
+				sync_size(child, child_main, child_cross);
 			}
 		}
 
@@ -1272,19 +1374,20 @@ bool rm_flexbox_layout::perform(rm_widget* pwidget)
 				// Shrink child_main to fit exactly remaining space
 				float remain = max_main - offset_main;
 				if (remain < 0.0f) remain = 0.0f;
-				child_main = remain;
 				if (is_row) {
-					child->resize(child_main, child->get_size().y);
+					child->resize(remain, child->get_size().y);
 				}
 				else {
-					child->resize(child->get_size().x, child_main);
+					child->resize(child->get_size().x, remain);
 				}
+				sync_size(child, child_main, child_cross);
 				info.main = child_main;
 				// Recompute cross if Stretch and cross Clamp not applied
 				if (!is_row && m_fill_x != rm_flex_fill::Clamp && m_align_items == rm_flex_align::Stretch) {
 					// For column, stretching cross means width = content_width
 					child->resize(content_width, child_main);
-					child_cross = content_width;
+					sync_size(child, child_main, child_cross);
+					info.main = child_main;
 					info.cross = child_cross;
 				}
 			}
@@ -1304,12 +1407,12 @@ bool rm_flexbox_layout::perform(rm_widget* pwidget)
 			if (limit < 0.0f) limit = 0.0f;
 			if (is_row) {
 				child->resize(child_main, limit);
-				child_cross = limit;
 			}
 			else {
 				child->resize(limit, child_main);
-				child_cross = limit;
 			}
+			sync_size(child, child_main, child_cross);
+			info.main = child_main;
 			info.cross = child_cross;
 		}
 
@@ -1331,12 +1434,14 @@ bool rm_flexbox_layout::perform(rm_widget* pwidget)
 		case rm_flex_align::Stretch:
 			if (is_row && m_fill_y != rm_flex_fill::Clamp) {
 				child->resize(child_main, content_height);
-				child_cross = content_height;
+				sync_size(child, child_main, child_cross);
+				info.main = child_main;
 				info.cross = child_cross;
 			}
 			else if (!is_row && m_fill_x != rm_flex_fill::Clamp) {
 				child->resize(content_width, child_main);
-				child_cross = content_width;
+				sync_size(child, child_main, child_cross);
+				info.main = child_main;
 				info.cross = child_cross;
 			}
 			offset_cross_child = 0.0f;

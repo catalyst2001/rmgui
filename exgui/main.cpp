@@ -374,6 +374,7 @@ void example_widgets(rm_surface* gui)
       printf("checkbox is %s\n", pcheckbox->is_checked() ? "checked" : "unchecked");
       return true;
     });
+
   size_t effects_idx = ptabctl->find_tab_idx_in_row(0, ptab12->get_id());
   if (!tc::is_valid_tab(effects_idx)) {
     effects_idx = 0;
@@ -420,6 +421,7 @@ void example_widgets(rm_surface* gui)
       //if (sw->is_on())
       //  printf("switch enabled \n");
     });
+  sw->set_max_size({ 60.f, sw->get_size().y });
 
   //sw->set_on(true, 1);
 
@@ -433,11 +435,12 @@ void example_widgets(rm_surface* gui)
   style_slider.set_thumb_border_color(NVGcolor::RGB(57, 76, 195));
   style_slider.set_thumb_border_width(3.5f);
   style_slider.set_all_corners_radius(style_slider.get_track_height() * 0.5f);
-  rm_slider* slider = new rm_slider(pdiv, 10, 160, 400, 40, &style_slider, 0.0f, 100.0f, 50.0f,
+  rm_slider* slider = new rm_slider(pdiv, 10, 160, 200, 40, &style_slider, 0.0f, 100.0f, 50.0f,
     [](rm_slider* psilder) {
       //psilder->get_userptr<rm_output_text>()->printf("slider value changed: %f", psilder->get_value());
     }
   );
+  slider->set_max_size({ 200*2, 40 });
 
   static rm_listview_style lv_style;
   lv_style.set_row_height(30.f);
@@ -453,6 +456,7 @@ void example_widgets(rm_surface* gui)
       printf("Selected item #%zu: %s\n", idx, lv->get_selected_index() == idx ? lv->get_items()[idx].c_str() : "");
     }
   );
+  list->set_max_size({ 200 * 2, 150 * 2 });
 
   list->add_item("First option");
   list->add_item("Second option");
