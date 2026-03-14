@@ -1,6 +1,7 @@
 ﻿#include "backend/rmgui_glfw_opnegl33.h"
 #include "rmgui_controls.h"
 #include "rm_effects.h"
+#include "blend_ui.h"
 #define NANOVG_GL3_IMPLEMENTATION
 #include "nanovg_gl.h"
 #include <iostream>
@@ -341,6 +342,7 @@ void example_widgets(rm_surface* gui)
 
   tc::tab* ptab11 = ptabctl->add_tab("Main page asdasda", 0, 10);
   tc::tab* ptab12 = ptabctl->add_tab("Page 2 asdasdasd", 1, 10);
+  tc::tab* ptab_bui = ptabctl->add_tab("Blendish Controls", 2, 10);
 
   rm_widget* effects_page = ptab12->get_page_widget();
   rm_vec2& effects_size = effects_page->get_size();
@@ -457,6 +459,212 @@ void example_widgets(rm_surface* gui)
   list->add_item("Third option");
   list->add_item("Another item");
 
+  // ========================================================================
+  // Blendish Controls Demo Tab
+  // ========================================================================
+  {
+    rm_widget* bui_page = ptab_bui->get_page_widget();
+    float cx = 10.f, cy = 10.f; // current layout cursor
+
+    // ---------- Column 1: Basic controls ----------
+    // Menu label (section header)
+    new bui_menu_label(bui_page, (int)cx, (int)cy, 200, "Basic Controls");
+    cy += BND_WIDGET_HEIGHT + 4.f;
+
+    // Separator
+    new bui_separator(bui_page, (int)cx, (int)cy, 200);
+    cy += 8.f;
+
+    // Option buttons (checkboxes)
+    bui_option_button* opt1 = new bui_option_button(bui_page, (int)cx, (int)cy, 200, (int)BND_WIDGET_HEIGHT,
+        "Enable Feature", false,
+        [](bui_option_button* btn, bool checked) { printf("[bui] Enable Feature: %s\n", checked ? "ON" : "OFF"); });
+    cy += BND_WIDGET_HEIGHT + 4.f;
+
+    bui_option_button* opt2 = new bui_option_button(bui_page, (int)cx, (int)cy, 200, (int)BND_WIDGET_HEIGHT,
+        "Auto Save", true,
+        [](bui_option_button* btn, bool checked) { printf("[bui] Auto Save: %s\n", checked ? "ON" : "OFF"); });
+    cy += BND_WIDGET_HEIGHT + 4.f;
+
+    // Text field
+    new bui_text_field(bui_page, (int)cx, (int)cy, 200, (int)BND_WIDGET_HEIGHT, "Hello World", -1, BND_CORNER_NONE,
+        [](bui_text_field* pf, const char* text) { printf("[bui] Text: %s\n", text); });
+    cy += BND_WIDGET_HEIGHT + 4.f;
+
+    // Choice button (dropdown)
+    bui_choice_button* choice = new bui_choice_button(bui_page, (int)cx, (int)cy, 200, (int)BND_WIDGET_HEIGHT,
+        -1, BND_CORNER_NONE, [](bui_choice_button* btn, int idx) { printf("[bui] Choice: %d\n", idx); });
+    choice->add_item("Option A");
+    choice->add_item("Option B");
+    choice->add_item("Option C");
+    choice->set_selected(0);
+    cy += BND_WIDGET_HEIGHT + 4.f;
+
+    // Radio button group
+    bui_radio_button* radio = new bui_radio_button(bui_page, (int)cx, (int)cy, 200, (int)(BND_WIDGET_HEIGHT * 3 - 4),
+        false, [](bui_radio_button* btn, int sel) { printf("[bui] Radio: %d\n", sel); });
+    radio->add_item("Point");
+    radio->add_item("Edge");
+    radio->add_item("Face");
+    radio->set_selected(0);
+    cy += BND_WIDGET_HEIGHT * 3.f;
+
+    // ---------- Column 2: Numeric controls ----------
+    float col2_x = 230.f;
+    float col2_y = 10.f;
+
+    new bui_menu_label(bui_page, (int)col2_x, (int)col2_y, 240, "Numeric Controls");
+    col2_y += BND_WIDGET_HEIGHT + 4.f;
+
+    new bui_separator(bui_page, (int)col2_x, (int)col2_y, 240);
+    col2_y += 8.f;
+
+    // Number fields (stacked with shared corners)
+    new bui_number_field(bui_page, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
+        "X", 1.0f, -100.f, 100.f, 0.1f, 2, BND_CORNER_DOWN);
+    col2_y += BND_WIDGET_HEIGHT - 2.f;
+    new bui_number_field(bui_page, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
+        "Y", 0.5f, -100.f, 100.f, 0.1f, 2, BND_CORNER_ALL);
+    col2_y += BND_WIDGET_HEIGHT - 2.f;
+    new bui_number_field(bui_page, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
+        "Z", -2.3f, -100.f, 100.f, 0.1f, 2, BND_CORNER_TOP);
+    col2_y += BND_WIDGET_HEIGHT + 8.f;
+
+    // Slider
+    new bui_slider(bui_page, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
+        "Opacity", 0.75f, 0.f, 1.f, 2, BND_CORNER_NONE,
+        [](bui_slider* s, float v) { printf("[bui] Opacity: %.2f\n", v); });
+    col2_y += BND_WIDGET_HEIGHT + 4.f;
+
+    new bui_slider(bui_page, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
+        "Scale", 50.f, 0.f, 100.f, 1, BND_CORNER_NONE, nullptr);
+    col2_y += BND_WIDGET_HEIGHT + 8.f;
+
+    // Horizontal scrollbar
+    new bui_scrollbar(bui_page, (int)col2_x, (int)col2_y, 240, (int)BND_SCROLLBAR_HEIGHT,
+        false, 0.3f, nullptr);
+    col2_y += BND_SCROLLBAR_HEIGHT + 8.f;
+
+    // Knobs
+    new bui_knob(bui_page, (int)col2_x, (int)col2_y, 50,
+        "Volume", 0.7f, 0.f, 1.f, nullptr);
+    new bui_knob(bui_page, (int)col2_x + 70, (int)col2_y, 50,
+        "Pan", 0.5f, -1.f, 1.f, nullptr);
+    new bui_knob(bui_page, (int)col2_x + 140, (int)col2_y, 50,
+        "Gain", 0.3f, 0.f, 1.f, nullptr);
+    col2_y += 70.f;
+
+    // ---------- Column 3: Color & interactive ----------
+    float col3_x = 490.f;
+    float col3_y = 10.f;
+
+    new bui_menu_label(bui_page, (int)col3_x, (int)col3_y, 200, "Color & Picker");
+    col3_y += BND_WIDGET_HEIGHT + 4.f;
+
+    new bui_separator(bui_page, (int)col3_x, (int)col3_y, 200);
+    col3_y += 8.f;
+
+    // Color buttons
+    new bui_color_button(bui_page, (int)col3_x, (int)col3_y, 40, 40,
+        NVGcolor::RGB(255, 80, 80), BND_CORNER_NONE, nullptr);
+    new bui_color_button(bui_page, (int)col3_x + 44, (int)col3_y, 40, 40,
+        NVGcolor::RGB(80, 200, 80), BND_CORNER_NONE, nullptr);
+    new bui_color_button(bui_page, (int)col3_x + 88, (int)col3_y, 40, 40,
+        NVGcolor::RGB(80, 120, 255), BND_CORNER_NONE, nullptr);
+    new bui_color_button(bui_page, (int)col3_x + 132, (int)col3_y, 40, 40,
+        NVGcolor::RGB(255, 200, 50), BND_CORNER_NONE, nullptr);
+    col3_y += 48.f;
+
+    // Color picker
+    new bui_color_picker(bui_page, (int)col3_x, (int)col3_y, 180,
+        NVGcolor::RGB(200, 100, 50), nullptr);
+    col3_y += 190.f;
+
+    // Toolbar
+    bui_toolbar* toolbar = new bui_toolbar(bui_page, (int)col3_x, (int)col3_y, 200, (int)BND_WIDGET_HEIGHT,
+        false, [](bui_toolbar* tb, int id) { printf("[bui] Toolbar: %d\n", id); });
+    toolbar->add_button(0, BND_ICONID(0, 10), nullptr);
+    toolbar->add_button(1, BND_ICONID(1, 10), nullptr);
+    toolbar->add_button(2, BND_ICONID(2, 10), nullptr);
+    toolbar->add_separator();
+    toolbar->add_button(3, BND_ICONID(3, 10), nullptr);
+    toolbar->add_button(4, BND_ICONID(4, 10), nullptr);
+    toolbar->set_active_id(1);
+    col3_y += BND_WIDGET_HEIGHT + 8.f;
+
+    // Radio Toolbar (horizontal)
+    bui_radio_toolbar* rtoolbar = new bui_radio_toolbar(bui_page, (int)col3_x, (int)col3_y, 200, (int)BND_WIDGET_HEIGHT,
+        false, [](bui_radio_toolbar* tb, int id) { printf("[bui] RadioToolbar: %d\n", id); });
+    rtoolbar->add_button(0, BND_ICONID(6, 10), "File");
+    rtoolbar->add_button(1, BND_ICONID(7, 10), "Edit");
+    rtoolbar->add_separator();
+    rtoolbar->add_button(2, BND_ICONID(8, 10), "View");
+    rtoolbar->set_active_id(0);
+    col3_y += BND_WIDGET_HEIGHT + 8.f;
+
+    // Radio Toolbar (vertical)
+    bui_radio_toolbar* rtoolbar_v = new bui_radio_toolbar(bui_page, (int)col3_x, (int)col3_y, 120, (int)(BND_WIDGET_HEIGHT * 4 - 3),
+        true, [](bui_radio_toolbar* tb, int id) { printf("[bui] RadioToolbarV: %d\n", id); });
+    rtoolbar_v->add_button(0, BND_ICONID(0, 10), nullptr);
+    rtoolbar_v->add_button(1, BND_ICONID(1, 10), nullptr);
+    rtoolbar_v->add_button(2, BND_ICONID(2, 10), nullptr);
+    rtoolbar_v->add_button(3, BND_ICONID(3, 10), nullptr);
+    rtoolbar_v->set_active_id(2);
+    col3_y += BND_WIDGET_HEIGHT * 4.f + 8.f;
+
+    // ---------- Bottom: Node editor area ----------
+    float node_y = rm_max(cy, col2_y) + 10.f;
+
+    new bui_menu_label(bui_page, 10, (int)node_y, 200, "Node Editor");
+    node_y += BND_WIDGET_HEIGHT + 4.f;
+
+    new bui_separator(bui_page, 10, (int)node_y, 680);
+    node_y += 8.f;
+
+    // Create nodes
+    bui_node* node1 = new bui_node(bui_page, 30, (int)node_y, 150,
+        "Mix Shader", -1, NVGcolor::RGBA(180, 60, 60, 255), nullptr);
+    node1->add_input("Fac", NVGcolor::RGB(200, 200, 200));
+    node1->add_input("Shader", NVGcolor::RGB(80, 200, 80));
+    node1->add_input("Shader", NVGcolor::RGB(80, 200, 80));
+    node1->add_output("Shader", NVGcolor::RGB(80, 200, 80));
+
+    bui_node* node2 = new bui_node(bui_page, 250, (int)node_y + 30, 150,
+        "Diffuse BSDF", -1, NVGcolor::RGBA(60, 120, 180, 255), nullptr);
+    node2->add_input("Color", NVGcolor::RGB(200, 200, 80));
+    node2->add_input("Roughness", NVGcolor::RGB(200, 200, 200));
+    node2->add_input("Normal", NVGcolor::RGB(120, 120, 200));
+    node2->add_output("BSDF", NVGcolor::RGB(80, 200, 80));
+
+    bui_node* node3 = new bui_node(bui_page, 470, (int)node_y + 10, 150,
+        "Material Output", -1, NVGcolor::RGBA(100, 100, 100, 255), nullptr);
+    node3->add_input("Surface", NVGcolor::RGB(80, 200, 80));
+    node3->add_input("Volume", NVGcolor::RGB(80, 200, 80));
+    node3->add_input("Displacement", NVGcolor::RGB(200, 200, 200));
+
+    // Splitter at the bottom
+    float splitter_y = node_y + 180.f;
+    new bui_splitter(bui_page, 10, (int)splitter_y, 680, 60,
+        true, 0.5f, 6.f, nullptr);
+
+    // Panel (collapsible)
+    bui_panel* panel = new bui_panel(bui_page, (int)col3_x, (int)(col3_y + 10.f), 200, 120,
+        "Properties", -1, nullptr);
+    new bui_option_button(panel, 10, 30, 180, (int)BND_WIDGET_HEIGHT,
+        "Smooth Shading", true, nullptr);
+    new bui_number_field(panel, 10, 56, 180, (int)BND_WIDGET_HEIGHT,
+        "Subdiv", 2.f, 0.f, 6.f, 1.f, 0, BND_CORNER_NONE, nullptr);
+
+    // Vertical scrollbar
+    new bui_scrollbar(bui_page, (int)(col3_x + 205.f), (int)(col3_y + 10.f), (int)BND_SCROLLBAR_WIDTH, 120,
+        true, 0.4f, nullptr);
+
+    // Select this tab by default
+    size_t bui_tab_idx = ptabctl->find_tab_idx_in_row(0, ptab_bui->get_id());
+    if (tc::is_valid_tab(bui_tab_idx))
+      ptabctl->select_tab(0, bui_tab_idx);
+  }
+
   /* performing layout */
   pdiv->perform_layout();
 }
@@ -482,6 +690,10 @@ int main() {
   }
 
   g_gui->set_font(default_font);
+
+  // Initialize blendish font for bui_ controls
+  bndSetFont(g_gui->get_context()->findFont("default"));
+
   example_widgets(g_gui);
 
   glDisable(GL_DEPTH_TEST);

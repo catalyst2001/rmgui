@@ -793,7 +793,8 @@ void rm_slider::on_draw(NVGcontext* pctx) {
 	pctx->fill();
 
 	/* draw fill track */
-	float frac = (m_value - m_min) / (m_max - m_min);
+	float range = m_max - m_min;
+	float frac = (range > FLT_EPSILON) ? (m_value - m_min) / range : 0.f;
 	frac = std::clamp(frac, 0.f, 1.f);
 	float fill_w = (w - 2 * pad) * frac;
 	NVGpaint fg_paint = NVGpaint::boxGradient(pad + 0.5f, ty + 0.5f, fill_w - 1.0f, th, tr, 1.0f, style.get_track_fill(), style.get_track_fill());
@@ -1080,7 +1081,7 @@ void rm_scrollbar::adjust_position()
 
 void rm_scrollbar::on_draw(NVGcontext* pctx)
 {
-	rm_vec2 content_rect(1000, 1000);
+	rm_vec2 content_rect = m_pparent ? m_pparent->get_size() : m_size;
 	draw_scroll(pctx, m_pstyle, content_rect, m_size, m_pstyle->get_thumb_size(), m_position);
 	rm_widget::on_draw(pctx);
 }
@@ -1475,7 +1476,7 @@ bool rm_number_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE sta
 
 rm_number_input::rm_number_input(rm_widget* p_parent, int x, int y, int width, int height,
 	input_type type, float value, float step, float minval, float maxval) :
-	rm_widget(x, y, width, height, p_parent, "ui_outputtext", RM_FLAG_DEFAULT),
+	rm_widget(x, y, width, height, p_parent, "ui_number_input", RM_FLAG_DEFAULT),
 	m_type(type), m_value(value), m_step(step), m_minval(minval), m_maxval(maxval)
 {
 }
@@ -2182,10 +2183,8 @@ rm_menu::rm_menu(rm_widget* p_parent, int height, const char* pname) :
 	if (!m_level) {
 		m_elem_flags.set_bit(RM_FLAG_DISABLE_SCISSOR);
 		m_proot_menu = this;
-		printf("PRE last pos: %f %f   last size: %f %f\n", m_pos_of_parent.x, m_pos_of_parent.y, m_size.x, m_size.y);
 		move({ 0.f, 0.f });
 		resize({ p_parent->get_size().x, float(height) });
-		printf("POST last pos: %f %f   last size: %f %f\n", m_pos_of_parent.x, m_pos_of_parent.y, m_size.x, m_size.y);
 		return;
 	}
 	else {

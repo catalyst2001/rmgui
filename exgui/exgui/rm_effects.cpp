@@ -96,25 +96,106 @@ void rm_effects::draw_glass_showcase(NVGcontext* ctx, float x, float y, float w,
     ctx->setUniformData(bgSizeUniform, bgSize, sizeof(bgSize));
   }
 
+  // Cache uniform handles
+  NVGhandle uBlur     = ctx->findUniform(glassShader, "glassBlurRadius");
+  NVGhandle uRefract  = ctx->findUniform(glassShader, "glassRefractionStrength");
+  NVGhandle uSat      = ctx->findUniform(glassShader, "glassSaturation");
+  NVGhandle uContrast = ctx->findUniform(glassShader, "glassContrast");
+  NVGhandle uChroma   = ctx->findUniform(glassShader, "glassChromaStrength");
+  NVGhandle uCorner   = ctx->findUniform(glassShader, "glassCornerRadius");
+  NVGhandle uFBias    = ctx->findUniform(glassShader, "glassFresnelBias");
+  NVGhandle uFScale   = ctx->findUniform(glassShader, "glassFresnelScale");
+  NVGhandle uFPower   = ctx->findUniform(glassShader, "glassFresnelPower");
+  NVGhandle uSpecInt  = ctx->findUniform(glassShader, "glassSpecularIntensity");
+  NVGhandle uSpecSize = ctx->findUniform(glassShader, "glassSpecularSize");
+
+  // Helper: set a float uniform
+  auto setF = [&](NVGhandle u, float v) {
+    if (u.isValid()) ctx->setUniformData(u, &v, sizeof(v));
+  };
+
+  // Liquid-glass parameters matching CSS: liquid-glass(refraction, cornerPx [, chroma])
+  struct GlassPreset {
+    const char* title;
+    const char* subtitle;
+    float blurRadius;        // blur(Npx)
+    float refractionStr;     // liquid-glass arg 1
+    float cornerRadius;      // liquid-glass arg 2 (normalized)
+    float saturation;        // saturate()
+    float contrast;          // contrast()
+    float chromaStrength;    // liquid-glass arg 3 (0=off, 1=on)
+    NVGcolor tint;           // color-overlay(color, alpha)
+    float fresnelScale;
+    float fresnelPower;
+    float specIntensity;
+  };
+
+  const GlassPreset presets[] = {
+    // Row 1: no chroma
+    { "liquid-glass() + blur()", "Raw",
+      0.4f, 0.15f, 0.25f, 1.1f, 1.0f, 0.0f,
+      NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.02f),
+      0.06f, 1.5f, 0.02f },
+
+    { "liquid-glass() + blur()", "Dark",
+      0.4f, 0.15f, 0.25f, 1.1f, 1.1f, 0.0f,
+      NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.12f),
+      0.05f, 1.5f, 0.015f },
+
+    { "liquid-glass() + blur()", "Light",
+      0.4f, 0.15f, 0.25f, 1.1f, 1.1f, 0.0f,
+      NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.12f),
+      0.08f, 1.5f, 0.03f },
+
+    // Row 2: chroma enabled
+    { "liquid-glass() + blur()", "Chroma Raw",
+      0.4f, 0.15f, 0.25f, 1.1f, 1.0f, 0.6f,
+      NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.02f),
+      0.06f, 1.5f, 0.02f },
+
+    { "liquid-glass() + blur()", "Chroma Dark",
+      0.4f, 0.15f, 0.25f, 1.1f, 1.1f, 0.6f,
+      NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.12f),
+      0.05f, 1.5f, 0.015f },
+
+    { "liquid-glass() + blur()", "Chroma Light",
+      0.4f, 0.15f, 0.25f, 1.1f, 1.1f, 0.6f,
+      NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.12f),
+      0.08f, 1.5f, 0.03f },
+  };
+
   // Helper lambda to draw a single glass panel
-  auto drawPanel = [&](float px, float py, float pw, float ph, const char* title, NVGcolor tint) {
+  auto drawPanel = [&](float px, float py, float pw, float ph, const GlassPreset& p) {
+    // Set per-panel shader uniforms
+    setF(uBlur, p.blurRadius);
+    setF(uRefract, p.refractionStr);
+    setF(uCorner, p.cornerRadius);
+    setF(uSat, p.saturation);
+    setF(uContrast, p.contrast);
+    setF(uChroma, p.chromaStrength);
+    setF(uFBias, 0.0f);
+    setF(uFScale, p.fresnelScale);
+    setF(uFPower, p.fresnelPower);
+    setF(uSpecInt, p.specIntensity);
+    setF(uSpecSize, 0.35f);
+
     // Paint encodes panel rect + panel origin (per-draw in frag UBO)
     NVGpaint glass = NVGpaint::glass(px, py, pw, ph, m_size.x, m_size.y,
-                                     m_bgImage, glassShader, tint, 1.0f);
+                                     m_bgImage, glassShader, p.tint, 1.0f);
 
     ctx->beginPath();
     ctx->roundedRect(px, py, pw, ph, 18.0f);
     ctx->fillPaint(glass);
     ctx->fill();
 
-    // Border
+    // Border (thin, subtle)
     ctx->StrokeWidth(1.0f);
-    ctx->strokeColor(NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.42f));
+    ctx->strokeColor(NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.18f));
     ctx->beginPath();
     ctx->roundedRect(px + 0.5f, py + 0.5f, pw - 1.0f, ph - 1.0f, 17.5f);
     ctx->stroke();
 
-    // Title
+    // Title text with blur
     ctx->setFontFace("default");
     ctx->setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
     NVGblurStyle titleBlur;
@@ -125,30 +206,40 @@ void rm_effects::draw_glass_showcase(NVGcontext* ctx, float x, float y, float w,
     titleBlur.rings = 2;
     titleBlur.jitter = 0.3f;
     titleBlur.color = NVGcolor::RGBA(255, 255, 255, 230);
-    ctx->setFontSize(22.0f);
-    ctx->textBlur(px + pw * 0.5f, py + 14.0f, title, nullptr, titleBlur);
+    ctx->setFontSize(20.0f);
+    ctx->textBlur(px + pw * 0.5f, py + 14.0f, p.title, nullptr, titleBlur);
+
+    // Subtitle
+    ctx->setFontSize(16.0f);
+    ctx->textBlur(px + pw * 0.5f, py + 38.0f, p.subtitle, nullptr, titleBlur);
   };
 
-  // Layout: 2x2 grid of panels
-  const float gap = 12.0f;
-  const float pw = (w - gap) * 0.5f;
-  const float ph = (h - gap) * 0.5f;
+  // Layout: 2 rows x 3 columns
+  const float gapX = 14.0f;
+  const float gapY = 14.0f;
+  const float pw = (w - gapX * 2.0f) / 3.0f;
+  const float ph = (h - gapY) * 0.5f;
 
-  // Raw: clear glass with subtle tint
-  drawPanel(x, y, pw, ph, "Raw",
-    NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.01f));
+  for (int i = 0; i < 6; i++) {
+    int col = i % 3;
+    int row = i / 3;
+    float px = x + col * (pw + gapX);
+    float py = y + row * (ph + gapY);
+    drawPanel(px, py, pw, ph, presets[i]);
+  }
 
-  // Dark: dark overlay
-  drawPanel(x + pw + gap, y, pw, ph, "Dark",
-    NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.01f));
-
-  // Light: white overlay
-  drawPanel(x, y + ph + gap, pw, ph, "Light",
-    NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 0.01f));
-
-  // Tinted: colored glass
-  drawPanel(x + pw + gap, y + ph + gap, pw, ph, "Tinted",
-    NVGcolor::RGBAf(0.4f, 0.6f, 1.0f, 0.01f));
+  // Restore defaults
+  setF(uBlur, 1.5f);
+  setF(uRefract, 0.6f);
+  setF(uCorner, 0.2f);
+  setF(uSat, 1.2f);
+  setF(uContrast, 1.05f);
+  setF(uChroma, 1.0f);
+  setF(uFBias, 0.0f);
+  setF(uFScale, 0.12f);
+  setF(uFPower, 1.5f);
+  setF(uSpecInt, 0.08f);
+  setF(uSpecSize, 0.3f);
 }
 
 void rm_effects::draw_blur_gallery(NVGcontext* ctx, float x, float y, float w) {
@@ -218,18 +309,19 @@ void rm_effects::on_draw(NVGcontext* ctx) {
   ctx->fill();
 
   const float pad = 24.0f;
-  const float panelW = rm_min(480.0f, m_size.x - pad * 2.0f);
-  const float panelH = 320.0f;
   const float panelX = pad;
   const float panelY = pad;
+  const float glassW = rm_min(780.0f, m_size.x - pad * 2.0f);
+  const float glassH = 380.0f;
 
-  if (panelW <= 0.0f || panelH <= 0.0f) {
+  if (glassW <= 0.0f || glassH <= 0.0f) {
     return;
   }
 
-  
+  draw_glass_showcase(ctx, panelX, panelY, glassW, glassH);
 
-  const float glowX = panelX + panelW + 40.0f;
+  // Glow demo to the right of the glass panels, if there's room
+  const float glowX = panelX + glassW + 24.0f;
   const float glowW = m_size.x - glowX - pad;
   if (glowW > 120.0f) {
     const float glowH = 140.0f;
@@ -255,8 +347,6 @@ void rm_effects::on_draw(NVGcontext* ctx) {
     ctx->text(glowX + glowW * 0.5f, glowY + glowH * 0.5f, "Neon Glow", nullptr);
   }
 
-  draw_glass_showcase(ctx, panelX + 200, panelY, panelW, panelH);
-
   ctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-  draw_blur_gallery(ctx, pad, panelY + panelH + 64.0f, m_size.x - pad * 2.0f);
+  draw_blur_gallery(ctx, pad, panelY + glassH + 64.0f, m_size.x - pad * 2.0f);
 }
