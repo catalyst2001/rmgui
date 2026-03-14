@@ -1,13 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.9.34902.65
+# Visual Studio Version 18
+VisualStudioVersion = 18.4.11519.219 insiders
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "exgui", "exgui\exgui.vcxproj", "{8477AA57-BE71-47ED-A61A-AF90E8A8275C}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "algtest", "algtest\algtest.vcxproj", "{8632EA0B-55FE-40E5-8EB0-F581A10BB3F4}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nvg_tests", "nvg_tests\nvg_tests.vcxproj", "{C98A57B3-EC41-4BE5-8069-97996C8F5C0F}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "designer", "designer\designer.vcxproj", "{01CC73B2-8224-4BC0-913E-5E0B71D53D97}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -41,6 +43,14 @@ Global
 		{C98A57B3-EC41-4BE5-8069-97996C8F5C0F}.Release|x64.Build.0 = Release|x64
 		{C98A57B3-EC41-4BE5-8069-97996C8F5C0F}.Release|x86.ActiveCfg = Release|Win32
 		{C98A57B3-EC41-4BE5-8069-97996C8F5C0F}.Release|x86.Build.0 = Release|Win32
+		{01CC73B2-8224-4BC0-913E-5E0B71D53D97}.Debug|x64.ActiveCfg = Debug|x64
+		{01CC73B2-8224-4BC0-913E-5E0B71D53D97}.Debug|x64.Build.0 = Debug|x64
+		{01CC73B2-8224-4BC0-913E-5E0B71D53D97}.Debug|x86.ActiveCfg = Debug|Win32
+		{01CC73B2-8224-4BC0-913E-5E0B71D53D97}.Debug|x86.Build.0 = Debug|Win32
+		{01CC73B2-8224-4BC0-913E-5E0B71D53D97}.Release|x64.ActiveCfg = Release|x64
+		{01CC73B2-8224-4BC0-913E-5E0B71D53D97}.Release|x64.Build.0 = Release|x64
+		{01CC73B2-8224-4BC0-913E-5E0B71D53D97}.Release|x86.ActiveCfg = Release|Win32
+		{01CC73B2-8224-4BC0-913E-5E0B71D53D97}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
