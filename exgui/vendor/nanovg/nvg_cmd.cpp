@@ -14,11 +14,12 @@
 //  Execution context passed to every handler
 // ─────────────────────────────────────────────────────────────
 struct NVGcmdExecCtx {
-	NVGcontext*       ctx;
-	const NVGcmdCell* args;     // pointer to first arg cell
-	uint32_t          varmask;
-	const void*       data;
+	NVGcontext*         ctx;
+	const NVGcmdCell*   args;     // pointer to first arg cell
+	uint32_t            varmask;
+	const void*         data;
 	const NVGcmdLayout* layout;
+	const NVGcmdBuf*    buf;      // needed for property resolution
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -32,15 +33,53 @@ struct NVGcmdExecCtx {
 # define NVG_FINLINE inline
 #endif
 
+// ── Property-aware resolution helpers ────────────────────────
+
+// Resolve the state index for a given property.
+// Returns 0 if the property is constant or the state variable
+// cannot be read (fallback to first value).
+static NVG_FINLINE uint32_t resolvePropState(
+	const NVGcmdExecCtx& e, const NVGcmdProperty& prop)
+{
+	if (prop.stateVarIndex == ~0u) return 0;   // constant
+
+	uint32_t si = prop.stateVarIndex;
+	const void* data = e.data;
+	const NVGcmdLayout* layout = e.layout;
+	if (!data || !layout || si >= layout->count) return 0;
+
+	const NVGcmdVar& sv = (*layout)[si];
+	const uint8_t* base = (const uint8_t*)data;
+	uint32_t state;
+	switch (sv.type) {
+		case NVG_VAR_UINT32: state = *(const uint32_t*)(base + sv.offset); break;
+		case NVG_VAR_INT32:  state = (uint32_t)*(const int32_t*)(base + sv.offset); break;
+		case NVG_VAR_FLOAT:  state = (uint32_t)*(const float*)(base + sv.offset); break;
+		default:             return 0;
+	}
+	if (state >= (uint32_t)prop.values.size()) return 0;
+	return state;
+}
+
 static NVG_FINLINE float resolveFloat(const NVGcmdExecCtx& e, uint32_t n)
 {
 	const NVGcmdCell& cell = e.args[n];
 	if (!((e.varmask >> n) & 1)) return cell.f;
 
+	uint32_t idx = cell.u;
+
+	// Property reference (high bit set)
+	if (idx & NVG_CMD_PROP_BIT) {
+		uint32_t pi = idx & ~NVG_CMD_PROP_BIT;
+		if (!e.buf || pi >= (uint32_t)e.buf->props.size()) return 0.0f;
+		const NVGcmdProperty& prop = e.buf->props[pi];
+		return prop.values[resolvePropState(e, prop)].f;
+	}
+
+	// Data-bound variable
 	const void* data = e.data;
 	const NVGcmdLayout* layout = e.layout;
 	if (!data || !layout) return 0.0f;
-	uint32_t idx = cell.u;
 	if (idx >= layout->count) return 0.0f;
 
 	const NVGcmdVar& v = (*layout)[idx];
@@ -58,10 +97,18 @@ static NVG_FINLINE int32_t resolveInt(const NVGcmdExecCtx& e, uint32_t n)
 	const NVGcmdCell& cell = e.args[n];
 	if (!((e.varmask >> n) & 1)) return cell.i;
 
+	uint32_t idx = cell.u;
+
+	if (idx & NVG_CMD_PROP_BIT) {
+		uint32_t pi = idx & ~NVG_CMD_PROP_BIT;
+		if (!e.buf || pi >= (uint32_t)e.buf->props.size()) return 0;
+		const NVGcmdProperty& prop = e.buf->props[pi];
+		return prop.values[resolvePropState(e, prop)].i;
+	}
+
 	const void* data = e.data;
 	const NVGcmdLayout* layout = e.layout;
 	if (!data || !layout) return 0;
-	uint32_t idx = cell.u;
 	if (idx >= layout->count) return 0;
 
 	const NVGcmdVar& v = (*layout)[idx];
@@ -79,10 +126,14 @@ static NVG_FINLINE const char* resolveString(const NVGcmdExecCtx& e, uint32_t n)
 	const NVGcmdCell& cell = e.args[n];
 	if (!((e.varmask >> n) & 1)) return "";
 
+	uint32_t idx = cell.u;
+
+	// Properties cannot hold strings — fall through to data vars
+	if (idx & NVG_CMD_PROP_BIT) return "";
+
 	const void* data = e.data;
 	const NVGcmdLayout* layout = e.layout;
 	if (!data || !layout) return "";
-	uint32_t idx = cell.u;
 	if (idx >= layout->count) return "";
 
 	const NVGcmdVar& v = (*layout)[idx];
@@ -97,10 +148,14 @@ static NVG_FINLINE NVGhandle resolveHandle(const NVGcmdExecCtx& e, uint32_t n)
 	const NVGcmdCell& cell = e.args[n];
 	if (!((e.varmask >> n) & 1)) return NVGhandle();
 
+	uint32_t idx = cell.u;
+
+	// Properties cannot hold handles
+	if (idx & NVG_CMD_PROP_BIT) return NVGhandle();
+
 	const void* data = e.data;
 	const NVGcmdLayout* layout = e.layout;
 	if (!data || !layout) return NVGhandle();
-	uint32_t idx = cell.u;
 	if (idx >= layout->count) return NVGhandle();
 
 	const NVGcmdVar& v = (*layout)[idx];
@@ -234,6 +289,11 @@ static void h_textBox(const NVGcmdExecCtx& e) {
 	e.ctx->textBox(F(0), F(1), F(2), S(3), nullptr);
 }
 
+// ── Layer ordering ───────────────────────────────────────
+static void h_setZIndex(const NVGcmdExecCtx& e) {
+	e.ctx->setZIndex(I(0));
+}
+
 #undef F
 #undef I
 #undef S
@@ -297,6 +357,7 @@ static const NVGcmdHandler g_cmdDispatch[NVG_CMD__COUNT] = {
 	/* 51 */ h_fontFaceId,
 	/* 52 */ h_text,
 	/* 53 */ h_textBox,
+	/* 54 */ h_setZIndex,
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -317,6 +378,7 @@ void nvgEval(NVGcontext& ctx,
 	e.ctx    = &ctx;
 	e.data   = data;
 	e.layout = layout;
+	e.buf    = &buf;
 
 	while (pc < total) {
 		const uint32_t opVal = cells[pc].u;
@@ -408,6 +470,7 @@ static const char* const g_opNames[NVG_CMD__COUNT] = {
 	"font_face_id",            // 51
 	"text",                    // 52
 	"text_box",                // 53
+	"set_zindex",              // 54
 };
 
 const char* nvgCmdOpName(uint32_t op)
@@ -456,7 +519,7 @@ NVGcmdVarType nvgCmdVarTypeFromName(const char* name)
 //   [4] numCells        [numCells*4] cell data
 
 static const uint32_t NVG_BINARY_MAGIC   = ('N') | ('V' << 8) | ('C' << 16) | ('B' << 24);
-static const uint32_t NVG_BINARY_VERSION = 1;
+static const uint32_t NVG_BINARY_VERSION = 2;
 
 static bool ioWriteU32(NVGio& io, uint32_t v) {
 	return io.write(&v, 4);
@@ -521,6 +584,20 @@ bool NVGcmdBuf::saveBinary(NVGio& io) const
 	if (nc > 0 && !io.write(cells.data(), nc * sizeof(NVGcmdCell)))
 		return false;
 
+	// Properties (v2)
+	uint32_t np = (uint32_t)props.size();
+	if (!ioWriteU32(io, np)) return false;
+	for (uint32_t i = 0; i < np; i++) {
+		const NVGcmdProperty& pr = props[i];
+		if (!ioWriteStr(io, pr.name))              return false;
+		if (!ioWriteU32(io, (uint32_t)pr.type))    return false;
+		if (!ioWriteU32(io, pr.stateVarIndex))     return false;
+		uint32_t nv = (uint32_t)pr.values.size();
+		if (!ioWriteU32(io, nv))                   return false;
+		if (nv > 0 && !io.write(pr.values.data(), nv * sizeof(NVGcmdCell)))
+			return false;
+	}
+
 	return true;
 }
 
@@ -531,7 +608,7 @@ bool NVGcmdBuf::loadBinary(NVGio& io)
 	// Header
 	uint32_t magic, fmtVer;
 	if (!ioReadU32(io, magic)  || magic  != NVG_BINARY_MAGIC)   return false;
-	if (!ioReadU32(io, fmtVer) || fmtVer != NVG_BINARY_VERSION) return false;
+	if (!ioReadU32(io, fmtVer) || fmtVer > NVG_BINARY_VERSION)  return false;
 
 	// Meta
 	if (!ioReadU32(io, meta.version))                           return false;
@@ -557,6 +634,28 @@ bool NVGcmdBuf::loadBinary(NVGio& io)
 	cells.resize(nc);
 	if (nc > 0 && io.read(cells.data(), nc * sizeof(NVGcmdCell)) != nc * sizeof(NVGcmdCell))
 		return false;
+
+	// Properties (v2+)
+	if (fmtVer >= 2) {
+		uint32_t np;
+		if (!ioReadU32(io, np)) return false;
+		if (np > 4096) return false;
+		props.resize(np);
+		for (uint32_t i = 0; i < np; i++) {
+			NVGcmdProperty& pr = props[i];
+			if (!ioReadStr(io, pr.name, NVG_CMD_MAX_NAME)) return false;
+			uint32_t t;
+			if (!ioReadU32(io, t)) return false;
+			pr.type = (NVGcmdVarType)t;
+			if (!ioReadU32(io, pr.stateVarIndex)) return false;
+			uint32_t nv;
+			if (!ioReadU32(io, nv)) return false;
+			if (nv > 4096) return false;
+			pr.values.resize(nv);
+			if (nv > 0 && io.read(pr.values.data(), nv * sizeof(NVGcmdCell)) != nv * sizeof(NVGcmdCell))
+				return false;
+		}
+	}
 
 	return true;
 }
@@ -605,6 +704,34 @@ bool NVGcmdBuf::saveText(NVGio& io) const
 		              nvgCmdVarTypeName(meta.vars[i].type));
 		putLine(tmp);
 	}
+
+	// Property declarations
+	for (size_t i = 0; i < props.size(); i++) {
+		const NVGcmdProperty& pr = props[i];
+		putStr("@prop ");
+		putStr(pr.name);
+		putChar(' ');
+		putStr(nvgCmdVarTypeName(pr.type));
+
+		if (pr.stateVarIndex != ~0u && pr.stateVarIndex < meta.vars.size()) {
+			putStr(" $");
+			putStr(meta.vars[pr.stateVarIndex].name);
+		}
+
+		for (size_t j = 0; j < pr.values.size(); j++) {
+			putChar(' ');
+			if (pr.type == NVG_VAR_INT32) {
+				std::snprintf(tmp, sizeof(tmp), "%d", pr.values[j].i);
+			} else if (pr.type == NVG_VAR_UINT32) {
+				std::snprintf(tmp, sizeof(tmp), "%u", pr.values[j].u);
+			} else {
+				std::snprintf(tmp, sizeof(tmp), "%.7g", (double)pr.values[j].f);
+			}
+			putStr(tmp);
+		}
+		putChar('\n');
+	}
+
 	putChar('\n');
 
 	// Command stream
@@ -630,14 +757,27 @@ bool NVGcmdBuf::saveText(NVGio& io) const
 			for (uint8_t k = 0; k < nargs; k++) {
 				putChar(' ');
 				if ((varmask >> k) & 1) {
-					// Variable reference
+					// Variable or property reference
 					uint32_t vi = c[pc + k].u;
-					putChar('$');
-					if (vi < meta.vars.size())
-						putStr(meta.vars[vi].name);
-					else {
-						std::snprintf(tmp, sizeof(tmp), "%u", vi);
-						putStr(tmp);
+					if (vi & NVG_CMD_PROP_BIT) {
+						// Property reference
+						uint32_t pi = vi & ~NVG_CMD_PROP_BIT;
+						putChar('%');
+						if (pi < props.size())
+							putStr(props[pi].name);
+						else {
+							std::snprintf(tmp, sizeof(tmp), "%u", pi);
+							putStr(tmp);
+						}
+					} else {
+						// Data variable reference
+						putChar('$');
+						if (vi < meta.vars.size())
+							putStr(meta.vars[vi].name);
+						else {
+							std::snprintf(tmp, sizeof(tmp), "%u", vi);
+							putStr(tmp);
+						}
 					}
 				} else if ((imask >> k) & 1) {
 					// Integer literal
@@ -728,6 +868,52 @@ bool NVGcmdBuf::loadText(NVGio& io)
 				if (readTok(varName, sizeof(varName)) &&
 				    readTok(varType, sizeof(varType)))
 					meta.addVar(varName, nvgCmdVarTypeFromName(varType));
+			} else if (std::strcmp(token, "@prop") == 0) {
+				// @prop name type [$stateVar] val0 [val1 val2 ...]
+				char propName[NVG_CMD_MAX_NAME] = {};
+				char propType[64] = {};
+				if (!readTok(propName, sizeof(propName)) ||
+				    !readTok(propType, sizeof(propType))) {
+					skipLine(); continue;
+				}
+				NVGcmdProperty pr{};
+				std::strncpy(pr.name, propName, NVG_CMD_MAX_NAME - 1);
+				pr.name[NVG_CMD_MAX_NAME - 1] = '\0';
+				pr.type = nvgCmdVarTypeFromName(propType);
+				pr.stateVarIndex = ~0u;
+
+				// Remaining tokens: optional $stateVar + values
+				std::vector<char*> valTokens;
+				std::vector<std::vector<char>> valBufs;
+				while (!atEOL()) {
+					char vt[256] = {};
+					if (!readTok(vt, sizeof(vt))) break;
+					valBufs.emplace_back(vt, vt + std::strlen(vt) + 1);
+				}
+
+				size_t startIdx = 0;
+				if (!valBufs.empty() && valBufs[0][0] == '$') {
+					int si = meta.findVar(valBufs[0].data() + 1);
+					pr.stateVarIndex = (si >= 0) ? (uint32_t)si : ~0u;
+					startIdx = 1;
+				}
+
+				for (size_t vi = startIdx; vi < valBufs.size(); vi++) {
+					NVGcmdCell vc{};
+					const char* vs = valBufs[vi].data();
+					if (pr.type == NVG_VAR_INT32)
+						vc.i = (int32_t)std::strtol(vs, nullptr, 10);
+					else if (pr.type == NVG_VAR_UINT32)
+						vc.u = (uint32_t)std::strtoul(vs, nullptr, 10);
+					else
+						vc.f = std::strtof(vs, nullptr);
+					pr.values.push_back(vc);
+				}
+				if (pr.values.empty()) {
+					NVGcmdCell vc{}; vc.f = 0.0f;
+					pr.values.push_back(vc);
+				}
+				props.push_back(std::move(pr));
 			}
 			skipLine();
 			continue;
@@ -755,6 +941,10 @@ bool NVGcmdBuf::loadText(NVGio& io)
 					varmask |= (1u << k);
 					int vi = meta.findVar(argTok + 1);
 					argCells[k].u = (vi >= 0) ? (uint32_t)vi : 0;
+				} else if (argTok[0] == '%') {
+					varmask |= (1u << k);
+					int pi = findProperty(argTok + 1);
+					argCells[k].u = ((pi >= 0) ? (uint32_t)pi : 0) | NVG_CMD_PROP_BIT;
 				} else if ((imask >> k) & 1) {
 					argCells[k].i = (int32_t)std::strtol(argTok, nullptr, 10);
 				} else {

@@ -114,6 +114,9 @@ enum NVGcmdOp : uint32_t {
 	NVG_CMD_TEXT,                    // 52  (x, y, stringVar)
 	NVG_CMD_TEXT_BOX,                // 53  (x, y, breakWidth, stringVar)
 
+	// ── Layer ordering ───────────────────────────────────────
+	NVG_CMD_SET_ZINDEX,              // 54  (zIndex)
+
 	NVG_CMD__COUNT
 };
 
@@ -174,6 +177,7 @@ inline const uint8_t* nvgCmdArgCount() {
 		/* 51 FONT_FACE_ID      */ 1,
 		/* 52 TEXT              */ 3,
 		/* 53 TEXT_BOX          */ 4,
+		/* 54 SET_ZINDEX        */ 1,
 	};
 	return table;
 }
@@ -197,6 +201,7 @@ inline const uint16_t* nvgCmdArgIntMask() {
 		/* 50 */    0x0001,  // TEXT_ALIGN
 		/* 51 */    0x0001,  // FONT_FACE_ID
 		/* 52-53 */ 0, 0,
+		/* 54 */    0x0001,  // SET_ZINDEX
 	};
 	return table;
 }
@@ -246,6 +251,30 @@ struct NVGcmdLayout {
 // Variable type name for text serialization.
 const char*   nvgCmdVarTypeName(NVGcmdVarType type);
 NVGcmdVarType nvgCmdVarTypeFromName(const char* name);
+
+// ─────────────────────────────────────────────────────────────
+//  Properties — schema-local values, optionally state-dependent
+// ─────────────────────────────────────────────────────────────
+//
+// A property is a named value that lives in the schema itself
+// (not in the widget data block).  It can be:
+//   - constant:  one value, independent of state
+//   - state-dep: N values, indexed by a data-bound variable
+//     (typically the widget's "state" field).
+//
+// When a command arg is a property reference, the high bit of
+// the variable index is set (| NVG_CMD_PROP_BIT).  The lower
+// 31 bits are the prop index.
+//
+
+static constexpr uint32_t NVG_CMD_PROP_BIT = 0x80000000u;
+
+struct NVGcmdProperty {
+	char          name[NVG_CMD_MAX_NAME];
+	NVGcmdVarType type;            // value type
+	uint32_t      stateVarIndex;   // data-var that selects the state (~0u = constant)
+	std::vector<NVGcmdCell> values; // 1 value if constant, N if state-dependent
+};
 
 // ─────────────────────────────────────────────────────────────
 //  Metadata — widget schema descriptor
@@ -317,10 +346,19 @@ struct NVGcmdArg {
 		a.cell.u = varIndex;
 		return a;
 	}
+	// Named constructor for property reference.
+	static NVGcmdArg prop(uint32_t propIndex) {
+		NVGcmdArg a(0.0f);
+		a.isVar  = true;
+		a.cell.u = propIndex | NVG_CMD_PROP_BIT;
+		return a;
+	}
 };
 
 // Shorthand: V(idx) creates a variable reference argument.
 inline NVGcmdArg V(uint32_t idx) { return NVGcmdArg::var(idx); }
+// Shorthand: P(idx) creates a property reference argument.
+inline NVGcmdArg P(uint32_t idx) { return NVGcmdArg::prop(idx); }
 
 // ─────────────────────────────────────────────────────────────
 //  Command buffer — serialisable list of drawing commands
@@ -328,10 +366,56 @@ inline NVGcmdArg V(uint32_t idx) { return NVGcmdArg::var(idx); }
 struct NVGcmdBuf {
 	NVGcmdMeta              meta;
 	std::vector<NVGcmdCell> cells;
+	std::vector<NVGcmdProperty> props;   // schema-local properties
 
-	void     clear()               { meta.clear(); cells.clear(); }
+	void clear() {
+		meta.clear();
+		cells.clear();
+		props.clear();
+	}
 	uint32_t size()  const         { return (uint32_t)cells.size(); }
 	const NVGcmdCell* data() const { return cells.data(); }
+
+	// ── Property helpers ─────────────────────────────────────
+
+	// Add a constant property. Returns property index.
+	uint32_t addProperty(const char* name, NVGcmdVarType type,
+	                     NVGcmdCell value) {
+		NVGcmdProperty p{};
+		std::strncpy(p.name, name, NVG_CMD_MAX_NAME - 1);
+		p.name[NVG_CMD_MAX_NAME - 1] = '\0';
+		p.type = type;
+		p.stateVarIndex = ~0u;
+		p.values.push_back(value);
+		uint32_t idx = (uint32_t)props.size();
+		props.push_back(std::move(p));
+		return idx;
+	}
+
+	// Add a state-dependent property. Returns property index.
+	// stateVar is the data-variable index whose uint32 value selects
+	// which entry from 'values' to use.
+	uint32_t addProperty(const char* name, NVGcmdVarType type,
+	                     uint32_t stateVarIndex,
+	                     std::initializer_list<NVGcmdCell> values) {
+		assert(values.size() > 0);
+		NVGcmdProperty p{};
+		std::strncpy(p.name, name, NVG_CMD_MAX_NAME - 1);
+		p.name[NVG_CMD_MAX_NAME - 1] = '\0';
+		p.type = type;
+		p.stateVarIndex = stateVarIndex;
+		p.values.assign(values);
+		uint32_t idx = (uint32_t)props.size();
+		props.push_back(std::move(p));
+		return idx;
+	}
+
+	int findProperty(const char* name) const {
+		for (size_t i = 0; i < props.size(); i++)
+			if (std::strcmp(props[i].name, name) == 0)
+				return (int)i;
+		return -1;
+	}
 
 	// ── Serialization ────────────────────────────────────────
 	bool saveBinary(NVGio& io) const;
@@ -587,6 +671,11 @@ struct NVGcmdBuf {
 	void textBox(NVGcmdArg x, NVGcmdArg y,
 	             NVGcmdArg breakWidth, NVGcmdArg stringVar) {
 		emit(NVG_CMD_TEXT_BOX, {x, y, breakWidth, stringVar});
+	}
+
+	// ── Layer ordering ───────────────────────────────────────
+	void setZIndex(NVGcmdArg z) {
+		emit(NVG_CMD_SET_ZINDEX, {z});
 	}
 };
 
