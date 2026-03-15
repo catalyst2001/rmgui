@@ -620,3 +620,63 @@ public:
     inline void set_active_id(int id) { m_active_id = id; }
     inline bool is_vertical() const { return m_vertical; }
 };
+
+// ============================================================================
+// bui_menubar - Blendish-styled horizontal menu bar with dropdown menus
+// Uses: bndMenuBackground, bndMenuItem, bndMenuLabel, bndToolButton
+// ============================================================================
+
+struct bui_menu_item_def {
+    int         id;
+    int         iconid;
+    std::string label;
+    bool        separator;
+};
+
+struct bui_submenu_def {
+    int         id;
+    std::string label;
+    int         iconid;
+    std::vector<bui_menu_item_def> items;
+    float       cached_header_w;  // computed in on_draw
+};
+
+class bui_menubar;
+using bui_menubar_cb = void(*)(bui_menubar* pmenu, int submenu_id, int item_id);
+
+class bui_menubar : public rm_widget, public rm_callback<bui_menubar_cb> {
+    std::vector<bui_submenu_def> m_submenus;
+    int     m_open_submenu;   // index of currently open submenu (-1 = none)
+    int     m_hover_header;   // index of hovered header item (-1 = none)
+    int     m_hover_item;     // index of hovered item in open submenu (-1 = none)
+    float   m_item_padding;   // horizontal padding around header labels
+    bool    m_widths_dirty;   // true if label widths need recomputation
+
+    virtual void on_draw(NVGcontext* pctx) override;
+    virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+        RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
+
+    void  recompute_widths(NVGcontext* pctx);
+    int   header_hit_test(const rm_vec2& local) const;
+    int   item_hit_test(const rm_vec2& local) const;
+    float get_header_x(int idx) const;
+    float get_header_width(int idx) const;
+    float get_dropdown_width(int idx) const;
+    float get_dropdown_x(int idx) const;
+    float get_dropdown_y() const;
+    float get_dropdown_height(int idx) const;
+
+public:
+    bui_menubar(rm_widget* p_parent, int x, int y, int w,
+        bui_menubar_cb cb = nullptr);
+    virtual ~bui_menubar() = default;
+
+    int  add_submenu(const char* label, int id = -1, int iconid = -1);
+    void add_item(int submenu_idx, const char* label, int id, int iconid = -1);
+    void add_separator(int submenu_idx);
+
+    inline bool is_open() const { return m_open_submenu >= 0; }
+    inline void close() { m_open_submenu = -1; m_hover_item = -1; }
+    inline int  get_open_submenu() const { return m_open_submenu; }
+    inline size_t get_num_submenus() const { return m_submenus.size(); }
+};

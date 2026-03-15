@@ -826,7 +826,7 @@ bool rm_slider::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm
 		compute_value(local);
 		return false;
 	}
-	if (event == RM_MOUSE_EVENT_CLICK && state == UP) {
+	if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_dragging) {
 		m_dragging = false;
 		return false;
 	}

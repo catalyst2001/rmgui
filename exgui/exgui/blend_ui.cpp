@@ -1327,7 +1327,7 @@ bool bui_color_picker::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
                 return false;
             }
         }
-        if (state == UP) {
+        if (state == UP && (m_dragging_wheel || m_dragging_triangle)) {
             m_dragging_wheel = false;
             m_dragging_triangle = false;
             if (is_valid_callback()) get_callback()(this, get_color());
@@ -1594,5 +1594,281 @@ bool bui_radio_toolbar::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
             return false;
         }
     }
+    return true;
+}
+
+// ============================================================================
+// bui_menubar
+// ============================================================================
+bui_menubar::bui_menubar(rm_widget* p_parent, int x, int y, int w,
+    bui_menubar_cb cb)
+    : rm_widget(x, y, w, (int)BND_WIDGET_HEIGHT, p_parent, "bui_menubar",
+        RM_FLAG_DEFAULT | RM_FLAG_GLOBAL | RM_FLAG_DISABLE_SCISSOR)
+    , m_open_submenu(-1), m_hover_header(-1), m_hover_item(-1)
+    , m_item_padding(8.f), m_widths_dirty(true)
+{
+    set_callback(cb);
+    set_zindex(900);
+
+    // Push parent's content area down so all siblings appear below the menu
+    if (p_parent) {
+        float menu_h = m_size.y;
+        rm_rect& ca = p_parent->get_content_area();
+        m_pos_of_parent.y = -menu_h;
+        m_bbox.init(m_pos_of_parent, m_size);
+        ca.y += menu_h;
+    }
+}
+
+int bui_menubar::add_submenu(const char* label, int id, int iconid) {
+    bui_submenu_def sub;
+    sub.id = (id >= 0) ? id : (int)m_submenus.size();
+    sub.label = label ? label : "";
+    sub.iconid = iconid;
+    sub.cached_header_w = 0.f;
+    m_submenus.push_back(std::move(sub));
+    m_widths_dirty = true;
+    return (int)m_submenus.size() - 1;
+}
+
+void bui_menubar::add_item(int submenu_idx, const char* label, int id, int iconid) {
+    if (submenu_idx < 0 || submenu_idx >= (int)m_submenus.size()) return;
+    bui_menu_item_def item;
+    item.id = id;
+    item.iconid = iconid;
+    item.label = label ? label : "";
+    item.separator = false;
+    m_submenus[submenu_idx].items.push_back(std::move(item));
+    m_widths_dirty = true;
+}
+
+void bui_menubar::add_separator(int submenu_idx) {
+    if (submenu_idx < 0 || submenu_idx >= (int)m_submenus.size()) return;
+    bui_menu_item_def item;
+    item.id = -1;
+    item.iconid = -1;
+    item.separator = true;
+    m_submenus[submenu_idx].items.push_back(std::move(item));
+}
+
+float bui_menubar::get_header_x(int idx) const {
+    float x = 0.f;
+    for (int i = 0; i < idx && i < (int)m_submenus.size(); i++) {
+        x += m_submenus[i].cached_header_w;
+    }
+    return x;
+}
+
+float bui_menubar::get_header_width(int idx) const {
+    if (idx < 0 || idx >= (int)m_submenus.size()) return 0.f;
+    return m_submenus[idx].cached_header_w;
+}
+
+float bui_menubar::get_dropdown_width(int idx) const {
+    if (idx < 0 || idx >= (int)m_submenus.size()) return 0.f;
+    const auto& sub = m_submenus[idx];
+    // Use header width as minimum, then check cached_header_w of items
+    float max_w = rm_max(100.f, sub.cached_header_w);
+    for (size_t i = 0; i < sub.items.size(); i++) {
+        if (sub.items[i].separator) continue;
+        // Approximate: icon + label + padding
+        float w = 30.f;
+        if (sub.items[i].iconid >= 0) w += 20.f;
+        w += (float)sub.items[i].label.size() * 7.f; // rough estimate when no ctx
+        if (w > max_w) max_w = w;
+    }
+    return max_w;
+}
+
+void bui_menubar::recompute_widths(NVGcontext* pctx) {
+    for (auto& sub : m_submenus) {
+        sub.cached_header_w = bndLabelWidth(pctx, sub.iconid,
+            sub.label.c_str()) + m_item_padding * 2.f;
+    }
+    m_widths_dirty = false;
+}
+
+float bui_menubar::get_dropdown_x(int idx) const {
+    return get_header_x(idx);
+}
+
+float bui_menubar::get_dropdown_y() const {
+    return m_size.y;
+}
+
+float bui_menubar::get_dropdown_height(int idx) const {
+    if (idx < 0 || idx >= (int)m_submenus.size()) return 0.f;
+    const auto& items = m_submenus[idx].items;
+    float h = 0.f;
+    for (size_t i = 0; i < items.size(); i++) {
+        h += items[i].separator ? 8.f : (float)BND_WIDGET_HEIGHT;
+    }
+    return h;
+}
+
+int bui_menubar::header_hit_test(const rm_vec2& local) const {
+    if (local.y < 0 || local.y > m_size.y) return -1;
+    float x = 0.f;
+    for (int i = 0; i < (int)m_submenus.size(); i++) {
+        float w = get_header_width(i);
+        if (local.x >= x && local.x < x + w)
+            return i;
+        x += w;
+    }
+    return -1;
+}
+
+int bui_menubar::item_hit_test(const rm_vec2& local) const {
+    if (m_open_submenu < 0 || m_open_submenu >= (int)m_submenus.size())
+        return -1;
+    const auto& items = m_submenus[m_open_submenu].items;
+    float dx = get_dropdown_x(m_open_submenu);
+    float dy = get_dropdown_y();
+    float dw = get_dropdown_width(m_open_submenu);
+    float iy = dy;
+    for (int i = 0; i < (int)items.size(); i++) {
+        float ih = items[i].separator ? 8.f : (float)BND_WIDGET_HEIGHT;
+        if (!items[i].separator &&
+            local.x >= dx && local.x < dx + dw &&
+            local.y >= iy && local.y < iy + ih) {
+            return i;
+        }
+        iy += ih;
+    }
+    return -1;
+}
+
+void bui_menubar::on_draw(NVGcontext* pctx) {
+    if (m_widths_dirty)
+        recompute_widths(pctx);
+
+    // Draw menu bar background
+    bndMenuBackground(pctx, 0, 0, m_size.x, m_size.y, BND_CORNER_NONE);
+
+    // Draw header items
+    float hx = 0.f;
+    for (int i = 0; i < (int)m_submenus.size(); i++) {
+        float hw = m_submenus[i].cached_header_w;
+        BNDwidgetState state = BND_DEFAULT;
+        if (i == m_open_submenu)
+            state = BND_ACTIVE;
+        else if (i == m_hover_header)
+            state = BND_HOVER;
+        bndToolButton(pctx, hx, 0, hw, m_size.y, BND_CORNER_NONE, state,
+            m_submenus[i].iconid, m_submenus[i].label.c_str());
+        hx += hw;
+    }
+
+    // Draw open dropdown
+    if (m_open_submenu >= 0 && m_open_submenu < (int)m_submenus.size()) {
+        const auto& items = m_submenus[m_open_submenu].items;
+        float dx = get_dropdown_x(m_open_submenu);
+        float dy = get_dropdown_y();
+
+        // Compute dropdown width using context
+        float dw = rm_max(100.f, m_submenus[m_open_submenu].cached_header_w);
+        for (size_t i = 0; i < items.size(); i++) {
+            if (items[i].separator) continue;
+            float w = bndLabelWidth(pctx, items[i].iconid, items[i].label.c_str()) + 30.f;
+            if (w > dw) dw = w;
+        }
+        float dh = get_dropdown_height(m_open_submenu);
+
+        int last_zindex = pctx->getZIndex();
+        pctx->setZIndex(901);
+
+        bndMenuBackground(pctx, dx, dy, dw, dh, BND_CORNER_NONE);
+
+        float iy = dy;
+        for (int i = 0; i < (int)items.size(); i++) {
+            if (items[i].separator) {
+                // Draw separator line
+                const BNDtheme* theme = bndGetTheme();
+                NVGcolor shade = bndOffsetColor(theme->backgroundColor, -20);
+                pctx->beginPath();
+                pctx->moveTo(dx + 4.f, iy + 4.f);
+                pctx->lineTo(dx + dw - 4.f, iy + 4.f);
+                pctx->StrokeWidth(1.0f);
+                pctx->strokeColor(shade);
+                pctx->stroke();
+                iy += 8.f;
+            } else {
+                BNDwidgetState item_state = BND_DEFAULT;
+                if (i == m_hover_item)
+                    item_state = BND_HOVER;
+                bndMenuItem(pctx, dx, iy, dw, (float)BND_WIDGET_HEIGHT,
+                    item_state, items[i].iconid, items[i].label.c_str());
+                iy += (float)BND_WIDGET_HEIGHT;
+            }
+        }
+        pctx->setZIndex(last_zindex);
+    }
+}
+
+bool bui_menubar::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+    RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
+    rm_vec2 local = cursor_to_local(cursor_pos);
+
+    // Check if cursor is in header bar
+    int hdr = header_hit_test(local);
+    m_hover_header = hdr;
+
+    // Check if cursor is in open dropdown
+    int itm = item_hit_test(local);
+    m_hover_item = itm;
+
+    bool in_bar = (local.y >= 0 && local.y < m_size.y && local.x >= 0 && local.x < m_size.x);
+    bool in_dropdown = false;
+    if (m_open_submenu >= 0) {
+        float dx = get_dropdown_x(m_open_submenu);
+        float dy = get_dropdown_y();
+        float dw = get_dropdown_width(m_open_submenu);
+        float dh = get_dropdown_height(m_open_submenu);
+        in_dropdown = (local.x >= dx && local.x < dx + dw &&
+                       local.y >= dy && local.y < dy + dh);
+    }
+
+    if (event == RM_MOUSE_EVENT_CLICK && state == DOWN) {
+        if (in_bar && hdr >= 0) {
+            // Toggle submenu open/close
+            if (m_open_submenu == hdr)
+                close();
+            else {
+                m_open_submenu = hdr;
+                m_hover_item = -1;
+            }
+            return false;
+        }
+        if (in_dropdown && itm >= 0) {
+            // Item clicked
+            const auto& items = m_submenus[m_open_submenu].items;
+            if (!items[itm].separator) {
+                int sub_id = m_submenus[m_open_submenu].id;
+                int item_id = items[itm].id;
+                close();
+                if (is_valid_callback())
+                    get_callback()(this, sub_id, item_id);
+            }
+            return false;
+        }
+        // Clicked outside — close menu
+        if (m_open_submenu >= 0) {
+            close();
+            return false;
+        }
+    }
+
+    if (event == RM_MOUSE_EVENT_MOVE) {
+        // If menu is open and hovering over a different header, switch submenu
+        if (m_open_submenu >= 0 && in_bar && hdr >= 0 && hdr != m_open_submenu) {
+            m_open_submenu = hdr;
+            m_hover_item = -1;
+        }
+    }
+
+    // Consume events when menu is open and cursor is in interactive area
+    if (m_open_submenu >= 0 && (in_bar || in_dropdown))
+        return false;
+
     return true;
 }

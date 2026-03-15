@@ -189,11 +189,20 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
 	if (p_elem->get_elem_flags().has_active() &&
 		p_elem->get_elem_flags().has_childs() &&
 		p_elem->get_elem_flags().has_notify_childs()) {
+		bool b_child_consumed = false;
 		for (size_t i = 0; i < p_elem->get_num_childs(); i++) {
 			if (!mouse_dispatcher(p_elem->get_child(i), event, vk, state, child_cursor)) {
+				/* For UP events, keep dispatching to all siblings so that
+				   every widget can clear its pressed/dragging state. */
+				if (event == RM_MOUSE_EVENT_CLICK && state == UP) {
+					b_child_consumed = true;
+					continue;
+				}
 				return false;
 			}
 		}
+		if (b_child_consumed)
+			return false;
 	}
 	return true; //continue handling next
 }

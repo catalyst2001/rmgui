@@ -468,6 +468,37 @@ void example_widgets(rm_surface* gui)
   // ========================================================================
   {
     rm_widget* bui_page = ptab_bui->get_page_widget();
+
+    // ---------- Menu bar at the top ----------
+    bui_menubar* menubar = new bui_menubar(bui_page, 0, 0, (int)bui_page->get_size().x,
+        [](bui_menubar* pmenu, int sub_id, int item_id) {
+          printf("[bui_menubar] submenu=%d item=%d\n", sub_id, item_id);
+        });
+    int mf = menubar->add_submenu("File", 0, BND_ICONID(0, 8));
+    menubar->add_item(mf, "New", 0, BND_ICONID(0, 0));
+    menubar->add_item(mf, "Open...", 1, BND_ICONID(1, 0));
+    menubar->add_item(mf, "Save", 2, BND_ICONID(2, 0));
+    menubar->add_item(mf, "Save As...", 3);
+    menubar->add_separator(mf);
+    menubar->add_item(mf, "Quit", 4);
+
+    int me = menubar->add_submenu("Edit", 1, BND_ICONID(1, 8));
+    menubar->add_item(me, "Undo", 0);
+    menubar->add_item(me, "Redo", 1);
+    menubar->add_separator(me);
+    menubar->add_item(me, "Cut", 2);
+    menubar->add_item(me, "Copy", 3);
+    menubar->add_item(me, "Paste", 4);
+
+    int mv = menubar->add_submenu("View", 2);
+    menubar->add_item(mv, "Zoom In", 0, BND_ICONID(5, 10));
+    menubar->add_item(mv, "Zoom Out", 1, BND_ICONID(6, 10));
+    menubar->add_separator(mv);
+    menubar->add_item(mv, "Reset View", 2);
+
+    int mh = menubar->add_submenu("Help", 3);
+    menubar->add_item(mh, "About", 0);
+
     float cx = 10.f, cy = 10.f; // current layout cursor
 
     // ---------- Column 1: Basic controls ----------
