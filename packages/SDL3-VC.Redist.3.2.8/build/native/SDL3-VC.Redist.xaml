@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ProjectSchemaDefinitions xmlns="clr-namespace:Microsoft.Build.Framework.XamlTypes;assembly=Microsoft.Build.Framework">
+	<Rule Name="NugetPackageSDL3" PageTemplate="tool" DisplayName="Nuget Packages" SwitchPrefix="/" Order="1">
+		<Rule.Categories>
+			<Category Name="SDL3" DisplayName="SDL3 Redistribution" />
+		</Rule.Categories>
+		<Rule.DataSource>
+			<DataSource Persistence="ProjectFile" ItemType="" />
+		</Rule.DataSource>
+		<EnumProperty Name="SDL3Redist" DisplayName="SDL3 Redistribution" Description="Do you need to copy binaries? Not mandatory if you create a tool (like a dll) and you add this package as dependency" Category="SDL3">
+			<EnumValue Name="copy_binaries" DisplayName="Copy Binaries" IsDefault="true"/>
+			<EnumValue Name="do_not_copy_binaries" DisplayName="Do Not Copy Binaries" />
+		</EnumProperty>
+	</Rule>
+</ProjectSchemaDefinitions>

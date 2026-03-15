@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="15.0">
+    <PropertyGroup>
+		<SDL3Redist Condition="'$(SDL3Redist)' == ''">copy_binaries</SDL3Redist>
+	</PropertyGroup>
+	
+	<ItemGroup>
+		<PropertyPageSchema Include="$(MSBuildThisFileDirectory)\SDL3.Redist.xaml"/>
+	</ItemGroup>
+	
+	<!-- Copy dll redistributable -->
+    <ItemGroup Condition="'$(SDL3Redist)' == 'copy_binaries'">
+        <Content Include="$(MSBuildThisFileDirectory)bin\$(PlatformShortName)\SDL3.dll">
+            <Link>SDL3.dll</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <Visible>False</Visible>
+        </Content>
+    </ItemGroup>
+</Project>

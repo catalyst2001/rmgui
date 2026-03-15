@@ -597,7 +597,7 @@ void rm_checkbox::on_draw(NVGcontext* pctx) {
 		pctx->fillColor(m_pstyle->get_mark_color());
 		xo = m_size.y / 2.f;
 		yo = m_size.y / 2.f;
-		pctx->text(xo, yo, ICON_FA_CHECK, nullptr);
+		pctx->text(xo, yo, (const char*)ICON_FA_CHECK, nullptr);
 	}
 
 	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!

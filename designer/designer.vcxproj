@@ -74,13 +74,15 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NANOVG_GL3;_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>..\exgui\exgui\;..\exgui\vendor\nanovg\;..\exgui\vendor\stb\;..\exgui\vendor\glad\include\glad\;..\exgui\vendor\glad\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -89,26 +91,30 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NANOVG_GL3;_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>..\exgui\exgui\;..\exgui\vendor\nanovg\;..\exgui\vendor\stb\;..\exgui\vendor\glad\include\glad\;..\exgui\vendor\glad\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NANOVG_GL3;_CRT_SECURE_NO_WARNINGS;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>..\exgui\exgui\;..\exgui\vendor\nanovg\;..\exgui\vendor\stb\;..\exgui\vendor\glad\include\glad\;..\exgui\vendor\glad\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -117,19 +123,61 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NANOVG_GL3;_CRT_SECURE_NO_WARNINGS;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>..\exgui\exgui\;..\exgui\vendor\nanovg\;..\exgui\vendor\stb\;..\exgui\vendor\glad\include\glad\;..\exgui\vendor\glad\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="SDL_initializer.cpp" />
+    <ClCompile Include="..\exgui\exgui\rmgui.cpp" />
+    <ClCompile Include="..\exgui\exgui\rmgui_controls.cpp" />
+    <ClCompile Include="..\exgui\exgui\blend_ui.cpp" />
+    <ClCompile Include="..\exgui\exgui\rm_effects.cpp" />
+    <ClCompile Include="..\exgui\exgui\rmgui_resources.cpp" />
+    <ClCompile Include="..\exgui\exgui\backend\rmgui_sdl3_opengl33.cpp" />
+    <ClCompile Include="..\exgui\vendor\glad\src\glad.c" />
+    <ClCompile Include="..\exgui\vendor\nanovg\blendish.cpp" />
+    <ClCompile Include="..\exgui\vendor\nanovg\nanovg.cpp" />
+    <ClCompile Include="..\exgui\vendor\nanovg\nanovg_gl.cpp" />
+    <ClCompile Include="..\exgui\vendor\nanovg\nanovg_gl_utils.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SDL_initializer.h" />
+    <ClInclude Include="..\exgui\exgui\rmgui.h" />
+    <ClInclude Include="..\exgui\exgui\rmgui_controls.h" />
+    <ClInclude Include="..\exgui\exgui\blend_ui.h" />
+    <ClInclude Include="..\exgui\exgui\rm_effects.h" />
+    <ClInclude Include="..\exgui\exgui\rmgui_resources.h" />
+    <ClInclude Include="..\exgui\exgui\backend\rmgui_sdl3_opengl33.h" />
+    <ClInclude Include="..\exgui\vendor\glad\include\glad\glad.h" />
+    <ClInclude Include="..\exgui\vendor\nanovg\blendish.h" />
+    <ClInclude Include="..\exgui\vendor\nanovg\nanovg.h" />
+    <ClInclude Include="..\exgui\vendor\nanovg\nanovg_gl.h" />
+    <ClInclude Include="..\exgui\vendor\nanovg\nanovg_gl_utils.h" />
+    <ClInclude Include="..\exgui\vendor\nanovg\fontstash.h" />
+    <ClInclude Include="..\exgui\vendor\stb\stb_image.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\packages\SDL3-VC.Redist.3.2.8\build\native\SDL3-VC.Redist.targets" Condition="Exists('..\packages\SDL3-VC.Redist.3.2.8\build\native\SDL3-VC.Redist.targets')" />
+    <Import Project="..\packages\SDL3-VC.3.2.8\build\native\SDL3-VC.targets" Condition="Exists('..\packages\SDL3-VC.3.2.8\build\native\SDL3-VC.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>Данный проект ссылается на пакеты NuGet, отсутствующие на этом компьютере. Используйте восстановление пакетов NuGet, чтобы скачать их.  Дополнительную информацию см. по адресу: http://go.microsoft.com/fwlink/?LinkID=322105. Отсутствует следующий файл: {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\SDL3-VC.Redist.3.2.8\build\native\SDL3-VC.Redist.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\SDL3-VC.Redist.3.2.8\build\native\SDL3-VC.Redist.targets'))" />
+    <Error Condition="!Exists('..\packages\SDL3-VC.3.2.8\build\native\SDL3-VC.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\SDL3-VC.3.2.8\build\native\SDL3-VC.targets'))" />
+  </Target>
 </Project>

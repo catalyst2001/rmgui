@@ -13,10 +13,108 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="rmgui">
+      <UniqueIdentifier>{A1B2C3D4-1111-2222-3333-444455556666}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="rmgui\backend">
+      <UniqueIdentifier>{A1B2C3D4-1111-2222-3333-444455557777}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vendor">
+      <UniqueIdentifier>{A1B2C3D4-1111-2222-3333-444455558888}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vendor\nanovg">
+      <UniqueIdentifier>{A1B2C3D4-1111-2222-3333-444455559999}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vendor\glad">
+      <UniqueIdentifier>{A1B2C3D4-1111-2222-3333-44445555AAAA}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="SDL_initializer.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="..\exgui\exgui\rmgui.cpp">
+      <Filter>rmgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\exgui\exgui\rmgui_controls.cpp">
+      <Filter>rmgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\exgui\exgui\blend_ui.cpp">
+      <Filter>rmgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\exgui\exgui\rm_effects.cpp">
+      <Filter>rmgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\exgui\exgui\rmgui_resources.cpp">
+      <Filter>rmgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\exgui\exgui\backend\rmgui_sdl3_opengl33.cpp">
+      <Filter>rmgui\backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\exgui\vendor\glad\src\glad.c">
+      <Filter>vendor\glad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\exgui\vendor\nanovg\blendish.cpp">
+      <Filter>vendor\nanovg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\exgui\vendor\nanovg\nanovg.cpp">
+      <Filter>vendor\nanovg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\exgui\vendor\nanovg\nanovg_gl.cpp">
+      <Filter>vendor\nanovg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\exgui\vendor\nanovg\nanovg_gl_utils.cpp">
+      <Filter>vendor\nanovg</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SDL_initializer.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\exgui\rmgui.h">
+      <Filter>rmgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\exgui\rmgui_controls.h">
+      <Filter>rmgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\exgui\blend_ui.h">
+      <Filter>rmgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\exgui\rm_effects.h">
+      <Filter>rmgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\exgui\rmgui_resources.h">
+      <Filter>rmgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\exgui\backend\rmgui_sdl3_opengl33.h">
+      <Filter>rmgui\backend</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\vendor\glad\include\glad\glad.h">
+      <Filter>vendor\glad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\vendor\nanovg\blendish.h">
+      <Filter>vendor\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\vendor\nanovg\nanovg.h">
+      <Filter>vendor\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\vendor\nanovg\nanovg_gl.h">
+      <Filter>vendor\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\vendor\nanovg\nanovg_gl_utils.h">
+      <Filter>vendor\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\vendor\nanovg\fontstash.h">
+      <Filter>vendor\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\vendor\stb\stb_image.h">
+      <Filter>vendor</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
