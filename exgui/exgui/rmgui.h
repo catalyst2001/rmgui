@@ -375,6 +375,7 @@ enum RM_EVENT : uint32_t {
 #define RM_FLAG_GLOBAL        (1 << 10)
 #define RM_FLAG_DISABLE_SCISSOR (1 << 11)
 #define RM_FLAG_HIGHEST_PRIORITY      (1 << 12)
+#define RM_FLAG_OPAQUE                (1 << 13)
 
 /* default flags for each widget */
 #define RM_FLAG_DEFAULT       (RM_FLAG_VISIBLE|RM_FLAG_ACTIVE|RM_FLAG_NOTIFY_CHILDS|RM_FLAG_HAS_SYM|RM_FLAG_HAS_KEYBD|RM_FLAG_HAS_MOUSE|RM_FLAG_HAS_CHILDS)

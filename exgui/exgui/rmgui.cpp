@@ -190,8 +190,11 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
 		p_elem->get_elem_flags().has_childs() &&
 		p_elem->get_elem_flags().has_notify_childs()) {
 		bool b_child_consumed = false;
-		for (size_t i = 0; i < p_elem->get_num_childs(); i++) {
-			if (!mouse_dispatcher(p_elem->get_child(i), event, vk, state, child_cursor)) {
+		/* Iterate children in reverse order (last added = drawn on top = highest priority).
+		   This ensures topmost visual elements receive mouse events first. */
+		size_t num = p_elem->get_num_childs();
+		for (size_t i = num; i > 0; i--) {
+			if (!mouse_dispatcher(p_elem->get_child(i - 1), event, vk, state, child_cursor)) {
 				/* For UP events, keep dispatching to all siblings so that
 				   every widget can clear its pressed/dragging state. */
 				if (event == RM_MOUSE_EVENT_CLICK && state == UP) {
@@ -204,6 +207,12 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
 		if (b_child_consumed)
 			return false;
 	}
+
+	/* Opaque elements absorb all mouse events inside their bounds,
+	   preventing click-through to siblings behind them. */
+	if (b_cursor_inside && p_elem->get_elem_flags().is_set(RM_FLAG_OPAQUE))
+		return false;
+
 	return true; //continue handling next
 }
 
