@@ -194,10 +194,18 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
 		   This ensures topmost visual elements receive mouse events first. */
 		size_t num = p_elem->get_num_childs();
 		for (size_t i = num; i > 0; i--) {
-			if (!mouse_dispatcher(p_elem->get_child(i - 1), event, vk, state, child_cursor)) {
+			rm_widget* pchild = p_elem->get_child(i - 1);
+			if (!mouse_dispatcher(pchild, event, vk, state, child_cursor)) {
 				/* For UP events, keep dispatching to all siblings so that
-				   every widget can clear its pressed/dragging state. */
+				   every widget can clear its pressed/dragging state.
+				   But if the child is OPAQUE and cursor is inside it,
+				   block propagation even for UP — nothing behind an
+				   opaque element should receive events. */
 				if (event == RM_MOUSE_EVENT_CLICK && state == UP) {
+					if (pchild->get_bbox().inside(child_cursor) &&
+						pchild->get_elem_flags().is_set(RM_FLAG_OPAQUE)) {
+						return false;
+					}
 					b_child_consumed = true;
 					continue;
 				}
