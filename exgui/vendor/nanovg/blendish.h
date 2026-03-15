@@ -747,7 +747,7 @@ BND_EXPORT const BNDtheme *bndGetTheme();
 // sheet; the order of icons does not matter.
 // A valid icon sheet is e.g. shown at
 // http://wiki.blender.org/index.php/Dev:2.5/Doc/How_to/Add_an_icon
-BND_EXPORT void bndSetIconImage(int image);
+BND_EXPORT void bndSetIconImage(NVGhandle image);
 
 // designates an image handle as returned by nvgCreateFont*() as the themes'
 // UI font. Blender's original UI font Droid Sans is perfectly suited and
