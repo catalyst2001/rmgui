@@ -1742,20 +1742,54 @@ void bui_menubar::on_draw(NVGcontext* pctx) {
     if (m_widths_dirty)
         recompute_widths(pctx);
 
-    // Draw menu bar background
-    bndMenuBackground(pctx, 0, 0, m_size.x, m_size.y, BND_CORNER_NONE);
+    // Draw menu bar background (flat, no drop shadow)
+    const BNDtheme* theme = bndGetTheme();
+    {
+        NVGcolor shade_top, shade_down;
+        bndInnerColors(&shade_top, &shade_down, &theme->menuTheme, BND_DEFAULT, 0);
+        bndInnerBox(pctx, 0, 0, m_size.x, m_size.y, 0, 0, 0, 0, shade_top, shade_down);
+    }
 
     // Draw header items
     float hx = 0.f;
     for (int i = 0; i < (int)m_submenus.size(); i++) {
         float hw = m_submenus[i].cached_header_w;
-        BNDwidgetState state = BND_DEFAULT;
-        if (i == m_open_submenu)
-            state = BND_ACTIVE;
-        else if (i == m_hover_header)
-            state = BND_HOVER;
-        bndToolButton(pctx, hx, 0, hw, m_size.y, BND_CORNER_NONE, state,
-            m_submenus[i].iconid, m_submenus[i].label.c_str());
+        bool is_active = (i == m_open_submenu);
+        bool is_hover = (i == m_hover_header && !is_active);
+        float rr = 4.f; // corner radius
+
+        if (is_active) {
+            pctx->beginPath();
+            bndRoundedBox(pctx, hx + 1, 1, hw - 2, m_size.y - 2, rr, rr, rr, rr);
+            pctx->fillColor(NVGcolor::RGBA(0, 0, 0, 50));
+            pctx->fill();
+        } else if (is_hover) {
+            pctx->beginPath();
+            bndRoundedBox(pctx, hx + 1, 1, hw - 2, m_size.y - 2, rr, rr, rr, rr);
+            pctx->fillColor(NVGcolor::RGBA(255, 255, 255, 24));
+            pctx->fill();
+        }
+
+        // Draw icon + centered label
+        // bndLabelWidth sets up the blendish font on the context as a side effect
+        bndLabelWidth(pctx, -1, m_submenus[i].label.c_str());
+        float tw = pctx->textBounds(0, 0, m_submenus[i].label.c_str(), nullptr, nullptr);
+        bool has_icon = (m_submenus[i].iconid >= 0);
+        float icon_w = has_icon ? 16.f : 0.f;
+        float icon_gap = has_icon ? 4.f : 0.f;
+        float total_w = icon_w + icon_gap + tw;
+        float cx = hx + (hw - total_w) * 0.5f;
+        float ty = m_size.y * 0.5f + 4.f; // baseline offset
+
+        if (has_icon) {
+            bndIcon(pctx, cx, (m_size.y - 16.f) * 0.5f, m_submenus[i].iconid);
+            cx += icon_w + icon_gap;
+        }
+
+        pctx->beginPath();
+        pctx->fillColor(theme->menuItemTheme.textColor);
+        pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
+        pctx->text(cx, ty, m_submenus[i].label.c_str(), nullptr);
         hx += hw;
     }
 
