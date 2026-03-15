@@ -125,12 +125,17 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
   rm_surface* psurface = reinterpret_cast<rm_surface*>(glfwGetWindowUserPointer(window));
   assert(psurface && "mouse_button_callback(): psurface was nullptr!");
-  if (button == GLFW_MOUSE_BUTTON_LEFT) {
-    double xpos, ypos;
-    glfwGetCursorPos(window, &xpos, &ypos);
-    RM_KEY_STATE state = (action == GLFW_PRESS ? DOWN : UP);
-    psurface->mouse(RM_MOUSE_EVENT_CLICK, RM_KEY_NONE, state, (int)xpos, (int)ypos);
+  RM_KEY vk = RM_KEY_NONE;
+  switch (button) {
+  case GLFW_MOUSE_BUTTON_LEFT:   vk = RM_KEY_LMOUSE; break;
+  case GLFW_MOUSE_BUTTON_MIDDLE: vk = RM_KEY_MMOUSE; break;
+  case GLFW_MOUSE_BUTTON_RIGHT:  vk = RM_KEY_RMOUSE; break;
+  default: return;
   }
+  double xpos, ypos;
+  glfwGetCursorPos(window, &xpos, &ypos);
+  RM_KEY_STATE state = (action == GLFW_PRESS ? DOWN : UP);
+  psurface->mouse(RM_MOUSE_EVENT_CLICK, vk, state, (int)xpos, (int)ypos);
 }
 
 void char_callback(GLFWwindow* window, unsigned int codepoint) {
