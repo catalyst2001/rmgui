@@ -1044,6 +1044,8 @@ bui_node::bui_node(rm_widget* p_parent, int x, int y, int w,
     , m_title_color(title_color), m_dragging(false), m_drag_offset(0, 0)
 {
     set_callback(cb);
+    /* allow node to grow vertically when ports are added */
+    set_max_size(rm_vec2(0.f, 0.f));
 }
 
 bui_node_port* bui_node::add_input(const char* label, NVGcolor color) {
@@ -1128,6 +1130,45 @@ bool bui_node::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
         return false;
     }
     return true;
+}
+
+// ============================================================================
+// bui_node_wires
+// ============================================================================
+bui_node_wires::bui_node_wires(rm_widget* p_parent)
+    : rm_widget(0, 0, 0, 0, p_parent, "bui_node_wires",
+        RM_FLAG_VISIBLE | RM_FLAG_DISABLE_SCISSOR)
+{
+    /* zero-size so bbox never matches cursor → no mouse interaction.
+       DISABLE_SCISSOR lets us draw wires across the full parent area. */
+    set_min_size(rm_vec2(0.f, 0.f));
+    set_max_size(rm_vec2(0.f, 0.f));
+}
+
+void bui_node_wires::add_connection(bui_node_port* from, bui_node_port* to) {
+    if (!from || !to) return;
+    from->set_connected(true);
+    to->set_connected(true);
+    m_connections.push_back({ from, to });
+}
+
+void bui_node_wires::on_draw(NVGcontext* pctx) {
+    for (auto& conn : m_connections) {
+        if (!conn.from || !conn.to) continue;
+        rm_widget* from_node = conn.from->get_parent();
+        rm_widget* to_node = conn.to->get_parent();
+        if (!from_node || !to_node) continue;
+
+        rm_vec2 fc = conn.from->get_center();
+        rm_vec2 tc = conn.to->get_center();
+        float x0 = from_node->get_pos_of_parent().x + fc.x;
+        float y0 = from_node->get_pos_of_parent().y + fc.y;
+        float x1 = to_node->get_pos_of_parent().x + tc.x;
+        float y1 = to_node->get_pos_of_parent().y + tc.y;
+
+        bndColoredNodeWire(pctx, x0, y0, x1, y1,
+            conn.from->get_color(), conn.to->get_color());
+    }
 }
 
 // ============================================================================
@@ -1606,9 +1647,18 @@ bui_menubar::bui_menubar(rm_widget* p_parent, int x, int y, int w,
         RM_FLAG_DEFAULT | RM_FLAG_GLOBAL | RM_FLAG_DISABLE_SCISSOR)
     , m_open_submenu(-1), m_hover_header(-1), m_hover_item(-1)
     , m_item_padding(8.f), m_widths_dirty(true)
+    , m_corner_tl(0.f), m_corner_tr(0.f)
 {
     set_callback(cb);
-    set_zindex(900);
+    set_zindex(BUI_ZINDEX_DROPDOWN);
+
+    // Auto-detect bui_window parent and sync corner radius
+    if (p_parent && p_parent->classname_is("bui_window")) {
+        bui_window* pwnd = static_cast<bui_window*>(p_parent);
+        float cr = pwnd->get_corner_radius();
+        m_corner_tl = cr;
+        m_corner_tr = cr;
+    }
 
     // Push parent's content area down so all siblings appear below the menu
     if (p_parent) {
@@ -1747,7 +1797,8 @@ void bui_menubar::on_draw(NVGcontext* pctx) {
     {
         NVGcolor shade_top, shade_down;
         bndInnerColors(&shade_top, &shade_down, &theme->menuTheme, BND_DEFAULT, 0);
-        bndInnerBox(pctx, 0, 0, m_size.x, m_size.y, 0, 0, 0, 0, shade_top, shade_down);
+        bndInnerBox(pctx, 0, 0, m_size.x, m_size.y,
+            m_corner_tl, m_corner_tr, 0, 0, shade_top, shade_down);
     }
 
     // Draw header items
@@ -1809,7 +1860,7 @@ void bui_menubar::on_draw(NVGcontext* pctx) {
         float dh = get_dropdown_height(m_open_submenu);
 
         int last_zindex = pctx->getZIndex();
-        pctx->setZIndex(901);
+        pctx->setZIndex(BUI_ZINDEX_DROPDOWN + 1);
 
         bndMenuBackground(pctx, dx, dy, dw, dh, BND_CORNER_NONE);
 
@@ -1902,6 +1953,456 @@ bool bui_menubar::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
 
     // Consume events when menu is open and cursor is in interactive area
     if (m_open_submenu >= 0 && (in_bar || in_dropdown))
+        return false;
+
+    return true;
+}
+
+// ============================================================================
+// bui_window
+// ============================================================================
+bui_window::bui_window(rm_widget* p_parent, int x, int y, int w, int h,
+    bui_window_type type, const char* title, int iconid)
+    : rm_widget(x, y, w, h, p_parent, "bui_window", RM_FLAG_DEFAULT | RM_FLAG_GLOBAL | RM_FLAG_OPAQUE)
+    , m_wtype(type), m_title(title ? title : ""), m_icon(iconid)
+    , m_title_height(type == BUI_WINDOW_POPUP ? 0.f : 25.f)
+    , m_corner_radius(4.f)
+    , m_dragging(false)
+{
+    set_zindex(type == BUI_WINDOW_POPUP ? BUI_ZINDEX_POPUP : BUI_ZINDEX_OVERLAPPED);
+
+    // Content area starts below title bar
+    m_content_area.y = m_title_height;
+    m_content_area.height = m_size.y - m_title_height;
+
+    // Allow resize freely
+    set_min_size(rm_vec2(80.f, m_title_height + 20.f));
+    set_max_size(rm_vec2(0.f, 0.f));
+}
+
+void bui_window::on_draw(NVGcontext* pctx) {
+    float cr = m_corner_radius;
+
+    // Compensate for content_area.y offset applied by draw_recursive
+    float offy = -m_content_area.y;
+
+    // Drop shadow
+    bndDropShadow(pctx, 0, offy, m_size.x, m_size.y, cr,
+        2.f, 20.f);
+
+    if (m_wtype == BUI_WINDOW_OVERLAPPED) {
+        // Background
+        bndBackground(pctx, 0, offy, m_size.x, m_size.y);
+        bndBevel(pctx, 0, offy, m_size.x, m_size.y);
+
+        // Title bar (drawn as tool button, like bui_panel "Properties")
+        BNDwidgetState hdr_state = (m_dragging || get_elem_flags().is_focused())
+            ? BND_ACTIVE : (get_elem_flags().is_hovered() ? BND_HOVER : BND_DEFAULT);
+        bndToolButton(pctx, 0, offy, m_size.x, m_title_height,
+            BND_CORNER_DOWN, hdr_state, m_icon, m_title.c_str());
+    } else {
+        // Popup: single rounded box
+        const BNDtheme* theme = bndGetTheme();
+        NVGcolor bg = bndOffsetColor(theme->backgroundColor, -5);
+        bndInnerBox(pctx, 0, offy, m_size.x, m_size.y, cr, cr, cr, cr, bg, bg);
+
+        // Outline
+        bndOutlineBox(pctx, 0.5f, offy + 0.5f, m_size.x - 1.f, m_size.y - 1.f,
+            cr, cr, cr, cr,
+            NVGcolor::RGBA(0, 0, 0, 80));
+    }
+}
+
+bool bui_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+    RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
+    rm_vec2 local = cursor_to_local(cursor_pos);
+    bool inside = m_bbox.inside(cursor_pos);
+
+    if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && inside) {
+        // Drag from title bar (overlapped) or anywhere (popup)
+        bool in_title = (m_wtype == BUI_WINDOW_POPUP)
+            || (local.y >= 0.f && local.y <= m_title_height);
+        if (in_title) {
+            m_dragging = true;
+            m_drag_start_pos = m_pos_of_parent;
+            m_drag_start_mouse = cursor_pos;
+            return false;
+        }
+    }
+
+    if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_dragging) {
+        m_dragging = false;
+        return false;
+    }
+
+    if (event == RM_MOUSE_EVENT_MOVE && m_dragging) {
+        rm_vec2 dm = cursor_pos - m_drag_start_mouse;
+        m_pos_of_parent = rm_vec2(
+            m_drag_start_pos.x + dm.x,
+            m_drag_start_pos.y + dm.y
+        );
+        m_bbox.init(m_pos_of_parent, m_size);
+        return false;
+    }
+
+    return true;
+}
+
+// ============================================================================
+// bui_toolbox
+// ============================================================================
+bui_toolbox::bui_toolbox(rm_widget* p_parent, int x, int y, int size,
+    bui_toolbox_anchor anchor, bui_toolbox_cb cb)
+    : rm_widget(x, y,
+        (anchor == BUI_ANCHOR_LEFT || anchor == BUI_ANCHOR_RIGHT) ? size : size,
+        (anchor == BUI_ANCHOR_LEFT || anchor == BUI_ANCHOR_RIGHT) ? size : size,
+        p_parent, "bui_toolbox",
+        RM_FLAG_DEFAULT | RM_FLAG_DISABLE_SCISSOR)
+    , m_anchor(anchor)
+    , m_hover_id(-1), m_active_id(-1), m_active_subtool_id(-1)
+    , m_lmb_down(false), m_lmb_down_time(0.f), m_lmb_down_tool_id(-1)
+    , m_hold_threshold(0.5f)
+    , m_popup_open(false), m_popup_tool_idx(-1), m_popup_hover_idx(-1)
+    , m_resizing(false), m_resize_start_pos(0.f), m_resize_start_size(0.f)
+    , m_button_size((float)size), m_is_expanded(false)
+{
+    set_callback(cb);
+    set_max_size(rm_vec2(0.f, 0.f));
+}
+
+bool bui_toolbox::is_vertical() const {
+    return m_anchor == BUI_ANCHOR_LEFT || m_anchor == BUI_ANCHOR_RIGHT;
+}
+
+int bui_toolbox::find_item_index(int tool_id) const {
+    for (int i = 0; i < (int)m_items.size(); i++) {
+        if (!m_items[i].separator && m_items[i].id == tool_id)
+            return i;
+    }
+    return -1;
+}
+
+float bui_toolbox::get_tool_offset(int idx) const {
+    float off = 0.f;
+    for (int i = 0; i < idx && i < (int)m_items.size(); i++) {
+        off += m_items[i].separator ? 5.f : m_button_size;
+    }
+    return off;
+}
+
+int bui_toolbox::add_tool(int id, int iconid, const char* label) {
+    bui_toolbox_item item;
+    item.id = id;
+    item.iconid = iconid;
+    item.label = label ? label : "";
+    item.separator = false;
+    m_items.push_back(std::move(item));
+
+    // Resize widget to fit all items
+    float total = get_tool_offset((int)m_items.size());
+    if (is_vertical()) {
+        resize_nolayout(m_size.x, total);
+    } else {
+        resize_nolayout(total, m_size.y);
+    }
+    return id;
+}
+
+void bui_toolbox::add_multitool(int tool_id, int subtool_id, int iconid, const char* label) {
+    int idx = find_item_index(tool_id);
+    if (idx < 0) return;
+    bui_multitool_item mt;
+    mt.id = subtool_id;
+    mt.iconid = iconid;
+    mt.label = label ? label : "";
+    m_items[idx].multitools.push_back(std::move(mt));
+}
+
+void bui_toolbox::add_separator() {
+    bui_toolbox_item item;
+    item.id = -1;
+    item.iconid = -1;
+    item.separator = true;
+    m_items.push_back(std::move(item));
+
+    float total = get_tool_offset((int)m_items.size());
+    if (is_vertical()) {
+        resize_nolayout(m_size.x, total);
+    } else {
+        resize_nolayout(total, m_size.y);
+    }
+}
+
+int bui_toolbox::hit_test_tool(const rm_vec2& local) const {
+    float off = 0.f;
+    for (int i = 0; i < (int)m_items.size(); i++) {
+        if (m_items[i].separator) { off += 5.f; continue; }
+        float bs = m_button_size;
+        if (is_vertical()) {
+            if (local.y >= off && local.y < off + bs &&
+                local.x >= 0 && local.x < m_size.x)
+                return m_items[i].id;
+        } else {
+            if (local.x >= off && local.x < off + bs &&
+                local.y >= 0 && local.y < m_size.y)
+                return m_items[i].id;
+        }
+        off += bs;
+    }
+    return -1;
+}
+
+int bui_toolbox::hit_test_popup(const rm_vec2& local) const {
+    if (m_popup_tool_idx < 0 || m_popup_tool_idx >= (int)m_items.size())
+        return -1;
+    const auto& mts = m_items[m_popup_tool_idx].multitools;
+    float tool_off = get_tool_offset(m_popup_tool_idx);
+    float bs = m_button_size;
+
+    // Popup position: adjacent to the button
+    float px, py;
+    if (is_vertical()) {
+        // Popup to the right/left of the button
+        px = (m_anchor == BUI_ANCHOR_LEFT) ? m_size.x : -120.f;
+        py = tool_off;
+    } else {
+        px = tool_off;
+        py = (m_anchor == BUI_ANCHOR_TOP) ? m_size.y : -((float)mts.size() * BND_WIDGET_HEIGHT);
+    }
+    float pw = 120.f;
+
+    for (int i = 0; i < (int)mts.size(); i++) {
+        float iy = py + i * (float)BND_WIDGET_HEIGHT;
+        if (local.x >= px && local.x < px + pw &&
+            local.y >= iy && local.y < iy + (float)BND_WIDGET_HEIGHT)
+            return i;
+    }
+    return -1;
+}
+
+void bui_toolbox::draw_multitool_triangle(NVGcontext* pctx, float x, float y, float sz) const {
+    pctx->beginPath();
+    pctx->moveTo(x + sz, y + sz);
+    pctx->lineTo(x, y + sz);
+    pctx->lineTo(x + sz, y);
+    pctx->closePath();
+    pctx->fillColor(NVGcolor::RGBA(200, 200, 200, 180));
+    pctx->fill();
+}
+
+void bui_toolbox::on_draw(NVGcontext* pctx) {
+    // Check long-press for multitool popup
+    if (m_lmb_down && !m_popup_open && m_psysdf) {
+        float now = m_psysdf->get_time();
+        int idx = find_item_index(m_lmb_down_tool_id);
+        if (idx >= 0 && !m_items[idx].multitools.empty() &&
+            (now - m_lmb_down_time) >= m_hold_threshold) {
+            m_popup_open = true;
+            m_popup_tool_idx = idx;
+            m_popup_hover_idx = -1;
+        }
+    }
+
+    const BNDtheme* theme = bndGetTheme();
+
+    // Background
+    {
+        NVGcolor bg = bndOffsetColor(theme->backgroundColor, -10);
+        bndInnerBox(pctx, 0, 0, m_size.x, m_size.y, 0, 0, 0, 0, bg, bg);
+    }
+
+    // Draw tool buttons
+    float off = 0.f;
+    for (int i = 0; i < (int)m_items.size(); i++) {
+        if (m_items[i].separator) {
+            // Separator line
+            NVGcolor sep = bndOffsetColor(theme->backgroundColor, -30);
+            pctx->beginPath();
+            if (is_vertical()) {
+                pctx->moveTo(4.f, off + 2.5f);
+                pctx->lineTo(m_size.x - 4.f, off + 2.5f);
+            } else {
+                pctx->moveTo(off + 2.5f, 4.f);
+                pctx->lineTo(off + 2.5f, m_size.y - 4.f);
+            }
+            pctx->StrokeWidth(1.f);
+            pctx->strokeColor(sep);
+            pctx->stroke();
+            off += 5.f;
+            continue;
+        }
+
+        float bx = is_vertical() ? 0.f : off;
+        float by = is_vertical() ? off : 0.f;
+        float bs = m_button_size;
+
+        bool is_active = (m_items[i].id == m_active_id);
+        bool is_hover = (m_items[i].id == m_hover_id && !is_active);
+        BNDwidgetState bstate = BND_DEFAULT;
+        if (is_active) bstate = BND_ACTIVE;
+        else if (is_hover) bstate = BND_HOVER;
+
+        // Draw button using bndToolButton
+        if (m_is_expanded && !m_items[i].label.empty()) {
+            bndToolButton(pctx, bx, by,
+                is_vertical() ? m_size.x : bs,
+                is_vertical() ? bs : m_size.y,
+                BND_CORNER_NONE, bstate, m_items[i].iconid,
+                m_items[i].label.c_str());
+        } else {
+            bndToolButton(pctx, bx, by, bs, bs,
+                BND_CORNER_NONE, bstate, m_items[i].iconid, nullptr);
+        }
+
+        // Multitool triangle indicator
+        if (!m_items[i].multitools.empty()) {
+            float tri_sz = 5.f;
+            float tri_x = bx + bs - tri_sz - 2.f;
+            float tri_y = by + bs - tri_sz - 2.f;
+            draw_multitool_triangle(pctx, tri_x, tri_y, tri_sz);
+        }
+
+        off += bs;
+    }
+
+    // Draw multitool popup
+    if (m_popup_open && m_popup_tool_idx >= 0 &&
+        m_popup_tool_idx < (int)m_items.size()) {
+        const auto& mts = m_items[m_popup_tool_idx].multitools;
+        if (!mts.empty()) {
+            float tool_off = get_tool_offset(m_popup_tool_idx);
+            float px, py;
+            if (is_vertical()) {
+                px = (m_anchor == BUI_ANCHOR_LEFT) ? m_size.x : -120.f;
+                py = tool_off;
+            } else {
+                px = tool_off;
+                py = (m_anchor == BUI_ANCHOR_TOP) ? m_size.y
+                    : -((float)mts.size() * BND_WIDGET_HEIGHT);
+            }
+            float pw = 120.f;
+            float ph = (float)mts.size() * (float)BND_WIDGET_HEIGHT;
+
+            int last_z = pctx->getZIndex();
+            pctx->setZIndex(BUI_ZINDEX_DROPDOWN + 1);
+
+            bndMenuBackground(pctx, px, py, pw, ph, BND_CORNER_NONE);
+            for (int i = 0; i < (int)mts.size(); i++) {
+                BNDwidgetState istate = (i == m_popup_hover_idx) ? BND_HOVER : BND_DEFAULT;
+                bndMenuItem(pctx, px, py + i * (float)BND_WIDGET_HEIGHT,
+                    pw, (float)BND_WIDGET_HEIGHT,
+                    istate, mts[i].iconid, mts[i].label.c_str());
+            }
+
+            pctx->setZIndex(last_z);
+        }
+    }
+}
+
+bool bui_toolbox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+    RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
+    rm_vec2 local = cursor_to_local(cursor_pos);
+    bool in_bbox = m_bbox.inside(cursor_pos);
+
+    int tool_hit = in_bbox ? hit_test_tool(local) : -1;
+    int popup_hit = m_popup_open ? hit_test_popup(local) : -1;
+    m_hover_id = tool_hit;
+    m_popup_hover_idx = popup_hit;
+
+    if (event == RM_MOUSE_EVENT_CLICK && vk == RM_KEY_LMOUSE) {
+        if (state == DOWN) {
+            if (tool_hit >= 0) {
+                m_lmb_down = true;
+                m_lmb_down_time = m_psysdf ? m_psysdf->get_time() : 0.f;
+                m_lmb_down_tool_id = tool_hit;
+                return false;
+            }
+            if (m_popup_open && popup_hit < 0) {
+                // Clicked outside popup — close it
+                m_popup_open = false;
+                m_lmb_down = false;
+                return false;
+            }
+        } else if (state == UP) {
+            if (m_popup_open) {
+                // Select from popup
+                if (popup_hit >= 0 && m_popup_tool_idx >= 0 &&
+                    m_popup_tool_idx < (int)m_items.size()) {
+                    const auto& mts = m_items[m_popup_tool_idx].multitools;
+                    if (popup_hit < (int)mts.size()) {
+                        m_active_id = m_items[m_popup_tool_idx].id;
+                        m_active_subtool_id = mts[popup_hit].id;
+                        if (is_valid_callback())
+                            get_callback()(this, m_active_id, m_active_subtool_id, false);
+                    }
+                }
+                m_popup_open = false;
+                m_lmb_down = false;
+                return false;
+            }
+            if (m_lmb_down) {
+                m_lmb_down = false;
+                // Short press — activate default
+                if (tool_hit >= 0) {
+                    m_active_id = tool_hit;
+                    m_active_subtool_id = -1;
+                    if (is_valid_callback())
+                        get_callback()(this, m_active_id, -1, true);
+                    return false;
+                }
+            }
+        }
+    }
+
+    if (event == RM_MOUSE_EVENT_MOVE && m_popup_open) {
+        m_popup_hover_idx = hit_test_popup(local);
+    }
+
+    // Resize by dragging edge
+    if (event == RM_MOUSE_EVENT_CLICK && vk == RM_KEY_LMOUSE) {
+        if (state == DOWN && in_bbox && !m_resizing) {
+            float edge_tol = 5.f;
+            bool on_edge = false;
+            if (is_vertical()) {
+                if (m_anchor == BUI_ANCHOR_LEFT && local.x >= m_size.x - edge_tol)
+                    on_edge = true;
+                else if (m_anchor == BUI_ANCHOR_RIGHT && local.x <= edge_tol)
+                    on_edge = true;
+            } else {
+                if (m_anchor == BUI_ANCHOR_TOP && local.y >= m_size.y - edge_tol)
+                    on_edge = true;
+                else if (m_anchor == BUI_ANCHOR_BOTTOM && local.y <= edge_tol)
+                    on_edge = true;
+            }
+            if (on_edge) {
+                m_resizing = true;
+                m_resize_start_pos = is_vertical() ? cursor_pos.x : cursor_pos.y;
+                m_resize_start_size = is_vertical() ? m_size.x : m_size.y;
+                return false;
+            }
+        } else if (state == UP && m_resizing) {
+            m_resizing = false;
+            // Snap: if past half of button_size, expand; otherwise collapse
+            float cross = is_vertical() ? m_size.x : m_size.y;
+            m_is_expanded = (cross > m_button_size * 1.5f);
+            return false;
+        }
+    }
+
+    if (event == RM_MOUSE_EVENT_MOVE && m_resizing) {
+        float cur = is_vertical() ? cursor_pos.x : cursor_pos.y;
+        float diff = cur - m_resize_start_pos;
+        if (m_anchor == BUI_ANCHOR_RIGHT || m_anchor == BUI_ANCHOR_BOTTOM)
+            diff = -diff;
+        float new_cross = rm_max(m_button_size, m_resize_start_size + diff);
+        if (is_vertical())
+            resize_nolayout(new_cross, m_size.y);
+        else
+            resize_nolayout(m_size.x, new_cross);
+        return false;
+    }
+
+    if (m_popup_open || m_lmb_down)
         return false;
 
     return true;

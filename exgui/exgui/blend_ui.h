@@ -12,6 +12,14 @@
 // ============================================================================
 
 // ============================================================================
+// Z-index layer system
+// Organized rendering layers for proper visual stacking order
+// ============================================================================
+#define BUI_ZINDEX_OVERLAPPED   0    // overlapped windows (default)
+#define BUI_ZINDEX_POPUP        1    // popup windows (no title bar)
+#define BUI_ZINDEX_DROPDOWN     50   // dropdowns, menus, overlays on top of window elements
+
+// ============================================================================
 // bui_tooltip - Tooltip popup widget
 // Uses: bndTooltipBackground, bndLabel
 // ============================================================================
@@ -492,6 +500,22 @@ struct bui_wire_connection {
     bui_node_port* to;
 };
 
+// ============================================================================
+// bui_node_wires - Widget that draws Bezier wires between connected node ports
+// Add as sibling of nodes (child of same parent container).
+// Uses zero-size + RM_FLAG_DISABLE_SCISSOR to draw without consuming mouse.
+// ============================================================================
+class bui_node_wires : public rm_widget {
+    std::vector<bui_wire_connection> m_connections;
+    virtual void on_draw(NVGcontext* pctx) override;
+public:
+    bui_node_wires(rm_widget* p_parent);
+    virtual ~bui_node_wires() = default;
+
+    void add_connection(bui_node_port* from, bui_node_port* to);
+    size_t get_num_connections() const { return m_connections.size(); }
+};
+
 class bui_node_wire_renderer {
 public:
     static void draw_wire(NVGcontext* pctx,
@@ -679,4 +703,136 @@ public:
     inline void close() { m_open_submenu = -1; m_hover_item = -1; }
     inline int  get_open_submenu() const { return m_open_submenu; }
     inline size_t get_num_submenus() const { return m_submenus.size(); }
+
+    // Corner radius for top-left/top-right (synced with parent window)
+    inline void set_corner_radius(float tl, float tr) { m_corner_tl = tl; m_corner_tr = tr; }
+
+private:
+    float m_corner_tl;
+    float m_corner_tr;
+};
+
+// ============================================================================
+// bui_window - Blendish-styled window with two modes
+// BUI_WINDOW_OVERLAPPED: titled window with drag, z=BUI_ZINDEX_OVERLAPPED
+// BUI_WINDOW_POPUP: borderless popup, z=BUI_ZINDEX_POPUP
+// ============================================================================
+enum bui_window_type : uint32_t {
+    BUI_WINDOW_OVERLAPPED = 0, // regular titled window
+    BUI_WINDOW_POPUP = 1       // popup, no title bar
+};
+
+class bui_window;
+using bui_window_cb = void(*)(bui_window* pwnd);
+
+class bui_window : public rm_widget {
+    bui_window_type m_wtype;
+    std::string     m_title;
+    int             m_icon;
+    float           m_title_height;
+    float           m_corner_radius;
+    bool            m_dragging;
+    rm_vec2         m_drag_start_pos;
+    rm_vec2         m_drag_start_mouse;
+
+    virtual void on_draw(NVGcontext* pctx) override;
+    virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+        RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
+public:
+    bui_window(rm_widget* p_parent, int x, int y, int w, int h,
+        bui_window_type type = BUI_WINDOW_OVERLAPPED,
+        const char* title = "", int iconid = -1);
+    virtual ~bui_window() = default;
+
+    inline bui_window_type get_window_type() const { return m_wtype; }
+    inline float get_corner_radius() const { return m_corner_radius; }
+    inline void  set_corner_radius(float r) { m_corner_radius = r; }
+    inline const char* get_title() const { return m_title.c_str(); }
+    inline void set_title(const char* t) { m_title = t ? t : ""; }
+    inline float get_title_height() const { return m_title_height; }
+};
+
+// ============================================================================
+// bui_toolbox - Toolbox panel with icon buttons and multitool support
+// Supports vertical/horizontal orientation
+// Multitool items show popup on long-press (configurable threshold)
+// Resizable by dragging border past half its width
+// ============================================================================
+enum bui_toolbox_anchor : uint32_t {
+    BUI_ANCHOR_LEFT = 0,  // vertical, resize right only
+    BUI_ANCHOR_RIGHT,     // vertical, resize left only
+    BUI_ANCHOR_TOP,       // horizontal, resize down only
+    BUI_ANCHOR_BOTTOM     // horizontal, resize up only
+};
+
+struct bui_multitool_item {
+    int         id;
+    int         iconid;
+    std::string label;
+};
+
+struct bui_toolbox_item {
+    int         id;
+    int         iconid;
+    std::string label;
+    bool        separator;
+    std::vector<bui_multitool_item> multitools;
+};
+
+class bui_toolbox;
+using bui_toolbox_cb = void(*)(bui_toolbox* ptoolbox, int tool_id, int subtool_id, bool is_default);
+
+class bui_toolbox : public rm_widget, public rm_callback<bui_toolbox_cb> {
+    std::vector<bui_toolbox_item> m_items;
+    bui_toolbox_anchor m_anchor;
+    int    m_hover_id;
+    int    m_active_id;
+    int    m_active_subtool_id;
+
+    // Long-press / multitool popup
+    bool   m_lmb_down;
+    float  m_lmb_down_time;
+    int    m_lmb_down_tool_id;
+    float  m_hold_threshold;
+    bool   m_popup_open;
+    int    m_popup_tool_idx;
+    int    m_popup_hover_idx;
+
+    // Resize
+    bool   m_resizing;
+    float  m_resize_start_pos;
+    float  m_resize_start_size;
+    float  m_button_size;        // default square button size
+    bool   m_is_expanded;
+
+    virtual void on_draw(NVGcontext* pctx) override;
+    virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+        RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
+
+    int   hit_test_tool(const rm_vec2& local) const;
+    int   hit_test_popup(const rm_vec2& local) const;
+    bool  is_vertical() const;
+    int   find_item_index(int tool_id) const;
+    float get_tool_offset(int idx) const;
+    void  draw_multitool_triangle(NVGcontext* pctx, float x, float y, float sz) const;
+
+public:
+    bui_toolbox(rm_widget* p_parent, int x, int y, int size,
+        bui_toolbox_anchor anchor = BUI_ANCHOR_LEFT,
+        bui_toolbox_cb cb = nullptr);
+    virtual ~bui_toolbox() = default;
+
+    int  add_tool(int id, int iconid, const char* label = nullptr);
+    void add_multitool(int tool_id, int subtool_id, int iconid, const char* label);
+    void add_separator();
+
+    inline int   get_active_id() const { return m_active_id; }
+    inline void  set_active_id(int id) { m_active_id = id; }
+    inline int   get_active_subtool_id() const { return m_active_subtool_id; }
+    inline float get_hold_threshold() const { return m_hold_threshold; }
+    inline void  set_hold_threshold(float seconds) { m_hold_threshold = seconds; }
+    inline bui_toolbox_anchor get_anchor() const { return m_anchor; }
+    inline bool  is_expanded() const { return m_is_expanded; }
+    inline float get_button_size() const { return m_button_size; }
+    inline void  set_button_size(float s) { m_button_size = s; }
 };

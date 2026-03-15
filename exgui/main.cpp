@@ -469,8 +469,11 @@ void example_widgets(rm_surface* gui)
   {
     rm_widget* bui_page = ptab_bui->get_page_widget();
 
-    // ---------- Menu bar at the top ----------
-    bui_menubar* menubar = new bui_menubar(bui_page, 0, 0, (int)bui_page->get_size().x,
+    // ---------- bui_window (overlapped) with its own menu bar ----------
+    bui_window* bui_wnd = new bui_window(gui, 10, 10, 760, 500,
+        BUI_WINDOW_OVERLAPPED, "Blendish Demo", -1);
+
+    bui_menubar* menubar = new bui_menubar(bui_wnd, 0, 0, (int)bui_wnd->get_size().x,
         [](bui_menubar* pmenu, int sub_id, int item_id) {
           printf("[bui_menubar] submenu=%d item=%d\n", sub_id, item_id);
         });
@@ -499,35 +502,50 @@ void example_widgets(rm_surface* gui)
     int mh = menubar->add_submenu("Help", 3);
     menubar->add_item(mh, "About", 0);
 
-    float cx = 10.f, cy = 10.f; // current layout cursor
+    // ---------- Vertical toolbox (left-anchored) ----------
+    bui_toolbox* toolbox_v = new bui_toolbox(bui_wnd, 0, 0, 28,
+        BUI_ANCHOR_LEFT,
+        [](bui_toolbox* tb, int tool_id, int subtool_id, bool is_default) {
+          printf("[bui_toolbox] tool=%d subtool=%d default=%d\n", tool_id, subtool_id, is_default);
+        });
+    toolbox_v->add_tool(0, BND_ICONID(0, 10), "Select");
+    toolbox_v->add_tool(1, BND_ICONID(1, 10), "Move");
+    toolbox_v->add_multitool(1, 10, BND_ICONID(2, 10), "Rotate");
+    toolbox_v->add_multitool(1, 11, BND_ICONID(3, 10), "Scale");
+    toolbox_v->add_tool(2, BND_ICONID(4, 10), "Draw");
+    toolbox_v->add_separator();
+    toolbox_v->add_tool(3, BND_ICONID(5, 10), "Erase");
+    toolbox_v->set_active_id(0);
+
+    float cx = 40.f, cy = 10.f; // current layout cursor (offset for toolbox)
 
     // ---------- Column 1: Basic controls ----------
     // Menu label (section header)
-    new bui_menu_label(bui_page, (int)cx, (int)cy, 200, "Basic Controls");
+    new bui_menu_label(bui_wnd, (int)cx, (int)cy, 200, "Basic Controls");
     cy += BND_WIDGET_HEIGHT + 4.f;
 
     // Separator
-    new bui_separator(bui_page, (int)cx, (int)cy, 200);
+    new bui_separator(bui_wnd, (int)cx, (int)cy, 200);
     cy += 8.f;
 
     // Option buttons (checkboxes)
-    bui_option_button* opt1 = new bui_option_button(bui_page, (int)cx, (int)cy, 200, (int)BND_WIDGET_HEIGHT,
+    bui_option_button* opt1 = new bui_option_button(bui_wnd, (int)cx, (int)cy, 200, (int)BND_WIDGET_HEIGHT,
         "Enable Feature", false,
         [](bui_option_button* btn, bool checked) { printf("[bui] Enable Feature: %s\n", checked ? "ON" : "OFF"); });
     cy += BND_WIDGET_HEIGHT + 4.f;
 
-    bui_option_button* opt2 = new bui_option_button(bui_page, (int)cx, (int)cy, 200, (int)BND_WIDGET_HEIGHT,
+    bui_option_button* opt2 = new bui_option_button(bui_wnd, (int)cx, (int)cy, 200, (int)BND_WIDGET_HEIGHT,
         "Auto Save", true,
         [](bui_option_button* btn, bool checked) { printf("[bui] Auto Save: %s\n", checked ? "ON" : "OFF"); });
     cy += BND_WIDGET_HEIGHT + 4.f;
 
     // Text field
-    new bui_text_field(bui_page, (int)cx, (int)cy, 200, (int)BND_WIDGET_HEIGHT, "Hello World", -1, BND_CORNER_NONE,
+    new bui_text_field(bui_wnd, (int)cx, (int)cy, 200, (int)BND_WIDGET_HEIGHT, "Hello World", -1, BND_CORNER_NONE,
         [](bui_text_field* pf, const char* text) { printf("[bui] Text: %s\n", text); });
     cy += BND_WIDGET_HEIGHT + 4.f;
 
     // Choice button (dropdown)
-    bui_choice_button* choice = new bui_choice_button(bui_page, (int)cx, (int)cy, 200, (int)BND_WIDGET_HEIGHT,
+    bui_choice_button* choice = new bui_choice_button(bui_wnd, (int)cx, (int)cy, 200, (int)BND_WIDGET_HEIGHT,
         -1, BND_CORNER_NONE, [](bui_choice_button* btn, int idx) { printf("[bui] Choice: %d\n", idx); });
     choice->add_item("Option A");
     choice->add_item("Option B");
@@ -536,7 +554,7 @@ void example_widgets(rm_surface* gui)
     cy += BND_WIDGET_HEIGHT + 4.f;
 
     // Radio button group
-    bui_radio_button* radio = new bui_radio_button(bui_page, (int)cx, (int)cy, 200, (int)(BND_WIDGET_HEIGHT * 3 - 4),
+    bui_radio_button* radio = new bui_radio_button(bui_wnd, (int)cx, (int)cy, 200, (int)(BND_WIDGET_HEIGHT * 3 - 4),
         false, [](bui_radio_button* btn, int sel) { printf("[bui] Radio: %d\n", sel); });
     radio->add_item("Point");
     radio->add_item("Edge");
@@ -548,44 +566,44 @@ void example_widgets(rm_surface* gui)
     float col2_x = 230.f;
     float col2_y = 10.f;
 
-    new bui_menu_label(bui_page, (int)col2_x, (int)col2_y, 240, "Numeric Controls");
+    new bui_menu_label(bui_wnd, (int)col2_x, (int)col2_y, 240, "Numeric Controls");
     col2_y += BND_WIDGET_HEIGHT + 4.f;
 
-    new bui_separator(bui_page, (int)col2_x, (int)col2_y, 240);
+    new bui_separator(bui_wnd, (int)col2_x, (int)col2_y, 240);
     col2_y += 8.f;
 
     // Number fields (stacked with shared corners)
-    new bui_number_field(bui_page, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
+    new bui_number_field(bui_wnd, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
         "X", 1.0f, -100.f, 100.f, 0.1f, 2, BND_CORNER_DOWN);
     col2_y += BND_WIDGET_HEIGHT - 2.f;
-    new bui_number_field(bui_page, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
+    new bui_number_field(bui_wnd, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
         "Y", 0.5f, -100.f, 100.f, 0.1f, 2, BND_CORNER_ALL);
     col2_y += BND_WIDGET_HEIGHT - 2.f;
-    new bui_number_field(bui_page, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
+    new bui_number_field(bui_wnd, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
         "Z", -2.3f, -100.f, 100.f, 0.1f, 2, BND_CORNER_TOP);
     col2_y += BND_WIDGET_HEIGHT + 8.f;
 
     // Slider
-    new bui_slider(bui_page, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
+    new bui_slider(bui_wnd, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
         "Opacity", 0.75f, 0.f, 1.f, 2, BND_CORNER_NONE,
         [](bui_slider* s, float v) { printf("[bui] Opacity: %.2f\n", v); });
     col2_y += BND_WIDGET_HEIGHT + 4.f;
 
-    new bui_slider(bui_page, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
+    new bui_slider(bui_wnd, (int)col2_x, (int)col2_y, 240, (int)BND_WIDGET_HEIGHT,
         "Scale", 50.f, 0.f, 100.f, 1, BND_CORNER_NONE, nullptr);
     col2_y += BND_WIDGET_HEIGHT + 8.f;
 
     // Horizontal scrollbar
-    new bui_scrollbar(bui_page, (int)col2_x, (int)col2_y, 240, (int)BND_SCROLLBAR_HEIGHT,
+    new bui_scrollbar(bui_wnd, (int)col2_x, (int)col2_y, 240, (int)BND_SCROLLBAR_HEIGHT,
         false, 0.3f, nullptr);
     col2_y += BND_SCROLLBAR_HEIGHT + 8.f;
 
     // Knobs
-    new bui_knob(bui_page, (int)col2_x, (int)col2_y, 50,
+    new bui_knob(bui_wnd, (int)col2_x, (int)col2_y, 50,
         "Volume", 0.7f, 0.f, 1.f, nullptr);
-    new bui_knob(bui_page, (int)col2_x + 70, (int)col2_y, 50,
+    new bui_knob(bui_wnd, (int)col2_x + 70, (int)col2_y, 50,
         "Pan", 0.5f, -1.f, 1.f, nullptr);
-    new bui_knob(bui_page, (int)col2_x + 140, (int)col2_y, 50,
+    new bui_knob(bui_wnd, (int)col2_x + 140, (int)col2_y, 50,
         "Gain", 0.3f, 0.f, 1.f, nullptr);
     col2_y += 70.f;
 
@@ -593,30 +611,30 @@ void example_widgets(rm_surface* gui)
     float col3_x = 490.f;
     float col3_y = 10.f;
 
-    new bui_menu_label(bui_page, (int)col3_x, (int)col3_y, 200, "Color & Picker");
+    new bui_menu_label(bui_wnd, (int)col3_x, (int)col3_y, 200, "Color & Picker");
     col3_y += BND_WIDGET_HEIGHT + 4.f;
 
-    new bui_separator(bui_page, (int)col3_x, (int)col3_y, 200);
+    new bui_separator(bui_wnd, (int)col3_x, (int)col3_y, 200);
     col3_y += 8.f;
 
     // Color buttons
-    new bui_color_button(bui_page, (int)col3_x, (int)col3_y, 40, 40,
+    new bui_color_button(bui_wnd, (int)col3_x, (int)col3_y, 40, 40,
         NVGcolor::RGB(255, 80, 80), BND_CORNER_NONE, nullptr);
-    new bui_color_button(bui_page, (int)col3_x + 44, (int)col3_y, 40, 40,
+    new bui_color_button(bui_wnd, (int)col3_x + 44, (int)col3_y, 40, 40,
         NVGcolor::RGB(80, 200, 80), BND_CORNER_NONE, nullptr);
-    new bui_color_button(bui_page, (int)col3_x + 88, (int)col3_y, 40, 40,
+    new bui_color_button(bui_wnd, (int)col3_x + 88, (int)col3_y, 40, 40,
         NVGcolor::RGB(80, 120, 255), BND_CORNER_NONE, nullptr);
-    new bui_color_button(bui_page, (int)col3_x + 132, (int)col3_y, 40, 40,
+    new bui_color_button(bui_wnd, (int)col3_x + 132, (int)col3_y, 40, 40,
         NVGcolor::RGB(255, 200, 50), BND_CORNER_NONE, nullptr);
     col3_y += 48.f;
 
     // Color picker
-    new bui_color_picker(bui_page, (int)col3_x, (int)col3_y, 180,
+    new bui_color_picker(bui_wnd, (int)col3_x, (int)col3_y, 180,
         NVGcolor::RGB(200, 100, 50), nullptr);
     col3_y += 190.f;
 
     // Toolbar
-    bui_toolbar* toolbar = new bui_toolbar(bui_page, (int)col3_x, (int)col3_y, 200, (int)BND_WIDGET_HEIGHT,
+    bui_toolbar* toolbar = new bui_toolbar(bui_wnd, (int)col3_x, (int)col3_y, 200, (int)BND_WIDGET_HEIGHT,
         false, [](bui_toolbar* tb, int id) { printf("[bui] Toolbar: %d\n", id); });
     toolbar->add_button(0, BND_ICONID(0, 10), nullptr);
     toolbar->add_button(1, BND_ICONID(1, 10), nullptr);
@@ -628,7 +646,7 @@ void example_widgets(rm_surface* gui)
     col3_y += BND_WIDGET_HEIGHT + 8.f;
 
     // Radio Toolbar (horizontal)
-    bui_radio_toolbar* rtoolbar = new bui_radio_toolbar(bui_page, (int)col3_x, (int)col3_y, 200, (int)BND_WIDGET_HEIGHT,
+    bui_radio_toolbar* rtoolbar = new bui_radio_toolbar(bui_wnd, (int)col3_x, (int)col3_y, 200, (int)BND_WIDGET_HEIGHT,
         false, [](bui_radio_toolbar* tb, int id) { printf("[bui] RadioToolbar: %d\n", id); });
     rtoolbar->add_button(0, BND_ICONID(6, 10), "File");
     rtoolbar->add_button(1, BND_ICONID(7, 10), "Edit");
@@ -638,7 +656,7 @@ void example_widgets(rm_surface* gui)
     col3_y += BND_WIDGET_HEIGHT + 8.f;
 
     // Radio Toolbar (vertical)
-    bui_radio_toolbar* rtoolbar_v = new bui_radio_toolbar(bui_page, (int)col3_x, (int)col3_y, 120, (int)(BND_WIDGET_HEIGHT * 4 - 3),
+    bui_radio_toolbar* rtoolbar_v = new bui_radio_toolbar(bui_wnd, (int)col3_x, (int)col3_y, 120, (int)(BND_WIDGET_HEIGHT * 4 - 3),
         true, [](bui_radio_toolbar* tb, int id) { printf("[bui] RadioToolbarV: %d\n", id); });
     rtoolbar_v->add_button(0, BND_ICONID(0, 10), nullptr);
     rtoolbar_v->add_button(1, BND_ICONID(1, 10), nullptr);
@@ -650,40 +668,47 @@ void example_widgets(rm_surface* gui)
     // ---------- Bottom: Node editor area ----------
     float node_y = rm_max(cy, col2_y) + 10.f;
 
-    new bui_menu_label(bui_page, 10, (int)node_y, 200, "Node Editor");
+    new bui_menu_label(bui_wnd, 10, (int)node_y, 200, "Node Editor");
     node_y += BND_WIDGET_HEIGHT + 4.f;
 
-    new bui_separator(bui_page, 10, (int)node_y, 680);
+    new bui_separator(bui_wnd, 10, (int)node_y, 680);
     node_y += 8.f;
 
     // Create nodes
-    bui_node* node1 = new bui_node(bui_page, 30, (int)node_y, 150,
+    bui_node* node1 = new bui_node(bui_wnd, 30, (int)node_y, 150,
         "Mix Shader", -1, NVGcolor::RGBA(180, 60, 60, 255), nullptr);
     node1->add_input("Fac", NVGcolor::RGB(200, 200, 200));
     node1->add_input("Shader", NVGcolor::RGB(80, 200, 80));
     node1->add_input("Shader", NVGcolor::RGB(80, 200, 80));
     node1->add_output("Shader", NVGcolor::RGB(80, 200, 80));
 
-    bui_node* node2 = new bui_node(bui_page, 250, (int)node_y + 30, 150,
+    bui_node* node2 = new bui_node(bui_wnd, 250, (int)node_y + 30, 150,
         "Diffuse BSDF", -1, NVGcolor::RGBA(60, 120, 180, 255), nullptr);
     node2->add_input("Color", NVGcolor::RGB(200, 200, 80));
     node2->add_input("Roughness", NVGcolor::RGB(200, 200, 200));
     node2->add_input("Normal", NVGcolor::RGB(120, 120, 200));
     node2->add_output("BSDF", NVGcolor::RGB(80, 200, 80));
 
-    bui_node* node3 = new bui_node(bui_page, 470, (int)node_y + 10, 150,
+    bui_node* node3 = new bui_node(bui_wnd, 470, (int)node_y + 10, 150,
         "Material Output", -1, NVGcolor::RGBA(100, 100, 100, 255), nullptr);
     node3->add_input("Surface", NVGcolor::RGB(80, 200, 80));
     node3->add_input("Volume", NVGcolor::RGB(80, 200, 80));
     node3->add_input("Displacement", NVGcolor::RGB(200, 200, 200));
 
+    // Node wire connections (added last so it draws on top of nodes)
+    bui_node_wires* wires = new bui_node_wires(bui_wnd);
+    // Mix Shader output → Material Output "Surface"
+    wires->add_connection(node1->get_output(0), node3->get_input(0));
+    // Diffuse BSDF output → Mix Shader "Shader" input #1
+    wires->add_connection(node2->get_output(0), node1->get_input(1));
+
     // Splitter at the bottom
     float splitter_y = node_y + 180.f;
-    new bui_splitter(bui_page, 10, (int)splitter_y, 680, 60,
+    new bui_splitter(bui_wnd, 10, (int)splitter_y, 680, 60,
         true, 0.5f, 6.f, nullptr);
 
     // Panel (collapsible)
-    bui_panel* panel = new bui_panel(bui_page, (int)col3_x, (int)(col3_y + 10.f), 200, 120,
+    bui_panel* panel = new bui_panel(bui_wnd, (int)col3_x, (int)(col3_y + 10.f), 200, 120,
         "Properties", -1, nullptr);
     new bui_option_button(panel, 10, 30, 180, (int)BND_WIDGET_HEIGHT,
         "Smooth Shading", true, nullptr);
@@ -691,8 +716,15 @@ void example_widgets(rm_surface* gui)
         "Subdiv", 2.f, 0.f, 6.f, 1.f, 0, BND_CORNER_NONE, nullptr);
 
     // Vertical scrollbar
-    new bui_scrollbar(bui_page, (int)(col3_x + 205.f), (int)(col3_y + 10.f), (int)BND_SCROLLBAR_WIDTH, 120,
+    new bui_scrollbar(bui_wnd, (int)(col3_x + 205.f), (int)(col3_y + 10.f), (int)BND_SCROLLBAR_WIDTH, 120,
         true, 0.4f, nullptr);
+
+    // ---------- Popup window demo ----------
+    bui_window* popup_wnd = new bui_window(gui, 10, 520, 200, 80,
+        BUI_WINDOW_POPUP);
+    new bui_menu_label(popup_wnd, 5, 5, 190, "Popup Window");
+    new bui_option_button(popup_wnd, 5, 30, 190, (int)BND_WIDGET_HEIGHT,
+        "Popup Option", false, nullptr);
 
     // Select this tab by default
     size_t bui_tab_idx = ptabctl->find_tab_idx_in_row(0, ptab_bui->get_id());
@@ -728,6 +760,15 @@ int main() {
 
   // Initialize blendish font for bui_ controls
   bndSetFont(g_gui->get_context()->findFont("default"));
+
+  // Load blendish icon sheet (Blender 2.6 compatible, 602x640 px grid)
+  // Download from Blender sources: blender_icons16.png
+  rm_image icon_sheet = g_gui->load_image("blender_icons16.png", 0);
+  if (icon_sheet.isValid()) {
+    bndSetIconImage(icon_sheet);
+  } else {
+    printf("warning: blender_icons16.png not found, icons will not be displayed\n");
+  }
 
   example_widgets(g_gui);
 
