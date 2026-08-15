@@ -340,106 +340,41 @@ public:
 };
 
 
-/**
-* internal scroll for inheritance
-*/
-
-/*
-    horizontal scroll:
-    <--------------------------------> (WIDTH)
-    .--------------------------------.
-    |[0000]                          |
-    `--------------------------------`
-    
-    vertical scroll
-     <---> (WIDTH)
-     .---.
-     |[0]|
-     |[0]|
-     |   |
-     |   |
-     |   |
-     |   |
-     |   |
-     |   |
-     `---`
-*/
-class rm_scroll_style
-{
-  NVGcolor  m_background_clr;
-  NVGcolor  m_thumb_clr;
-  NVGcolor  m_background_border_clr;
-  NVGcolor  m_thumb_border_clr;
-  float     m_corner_round;
-  float     m_thumb_size;
-  float     m_background_stroke_width;
-  float     m_thumb_stroke_width;
-public:
-  void load_defaults() {
-    m_background_clr = NVGcolor::RGB(30, 30, 30);
-    m_thumb_clr = NVGcolor::RGB(80, 80, 80);
-    m_background_border_clr = NVGcolor::RGB(100, 100, 100);
-    m_thumb_border_clr = NVGcolor::RGB(100, 100, 100);
-    m_corner_round = 0.f;
-    m_thumb_size = 10.f;
-    m_background_stroke_width = 1.f;
-    m_thumb_stroke_width = 1.f;
-  }
-  rm_scroll_style() {
-    load_defaults();
-  }
-
-  /* selectors */
-  inline const NVGcolor &get_scroll_background_color() const { return m_background_clr; }
-  inline const NVGcolor &get_scroll_thumb_color() const { return m_thumb_clr; }
-  inline const NVGcolor &get_scroll_background_border_color() const { return m_background_border_clr; }
-  inline const NVGcolor &get_scroll_thumb_border_color() const { return m_thumb_border_clr; }
-  inline float           get_scroll_corner_radius() const { return m_corner_round; }
-  inline float           get_thumb_size() const { return m_thumb_size; }
-  inline float           get_background_stroke_width() const { return m_background_stroke_width; }
-  inline float           get_thumb_stroke_width() const { return m_thumb_stroke_width; }
-
-  /* modifiers */
-  inline void set_scroll_background_color(NVGcolor color) { m_background_clr = color; }
-  inline void set_scroll_thumb_color(NVGcolor color) { m_thumb_clr = color; }
-  inline void set_scroll_background_border_color(NVGcolor color) { m_background_border_clr = color; }
-  inline void set_scroll_thumb_border_color(NVGcolor color) { m_thumb_border_clr = color; }
-  inline void set_scroll_corner_round(float radius) { m_corner_round = radius; }
-  inline void set_thumb_size(float size) { m_thumb_size= size; }
-  inline void set_background_stroke_width(float width) { m_background_stroke_width = width; }
-  inline void set_thumb_stroke_width(float width) { m_thumb_stroke_width = width; }
-};
-
-class rm_scroll_base
-{
-  RM_ORIENT m_orientation;
-protected:
-  inline void      set_orient(RM_ORIENT orient) { m_orientation = orient; }
-  inline RM_ORIENT get_orient() const { return m_orientation; }
-  void orient_detect(const rm_rect &background);
-  void draw_scroll(NVGcontext* pctx, const rm_vec2&back, rm_scroll_style *pstyle, float pos);
-  void draw_scroll(NVGcontext* pctx, rm_scroll_style* pstyle, rm_vec2 content_size, const rm_vec2& window_size, float thumb_height, float pos);
-};
-
 class rm_scrollbar;
 using rm_scrollbar_cb = void(*)(rm_scrollbar *pscrollbar, float value);
-class rm_scrollbar : public rm_widget,
-  rm_styled<rm_scroll_style>,
-  rm_callback<rm_scrollbar_cb>,
-  public rm_scroll_base
+class rm_scrollbar : public rm_widget, public rm_callback<rm_scrollbar_cb>
 {
-  float m_position;
-  rm_widget* find_other_scrollbars();
-  void       adjust_position();
+  RM_ORIENT m_orientation;
+  RmScrollbarBehaviour m_behaviour;
+  RmThemeRef m_theme;
 
-  virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta);
+  bool is_vertical() const noexcept { return m_orientation == RM_ORIENT_VERT; }
+  float track_length() const noexcept { return is_vertical() ? m_size.y : m_size.x; }
+  float pointer_axis(const rm_vec2& local_cursor) const noexcept {
+    return is_vertical() ? local_cursor.y : local_cursor.x;
+  }
+  void adjust_geometry();
+  void notify_position();
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_pointer_capture_lost() override { m_behaviour.cancel(); }
+  void on_draw(NVGcontext* pctx) override;
+  void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
+  bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
+    rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
-  rm_scrollbar(rm_widget* p_parent, RM_ORIENT orient, rm_scroll_style *p_style, float inital_pos=0.f);
+  rm_scrollbar(rm_widget* p_parent, RM_ORIENT orientation,
+    float initial_position = 0.f, rm_scrollbar_cb p_callback = nullptr,
+    RmThemeRef theme = {});
   ~rm_scrollbar();
 
-  inline void  set_position(float pos) { m_position = pos; }
-  inline float get_position() const { return m_position; }
+  void set_position(float position, bool notify = false);
+  inline float get_position() const { return m_behaviour.position(); }
+  void set_viewport_fraction(float fraction) { m_behaviour.set_viewport_fraction(fraction); }
+  void set_content_metrics(float content_extent, float viewport_extent);
+  float get_viewport_fraction() const { return m_behaviour.viewport_fraction(); }
+  RM_ORIENT get_orientation() const noexcept { return m_orientation; }
+  const RmScrollbarBehaviour& behaviour() const noexcept { return m_behaviour; }
+  void set_theme(RmThemeRef theme);
 };
 
 /**
@@ -776,107 +711,48 @@ public:
   void close() { m_proot_menu->close_tree(); }
 };
 
-/**
- * RADIOBUTTON STYLE
- */
-class rm_radiobutton_style : public rm_corners_style {
-  rm_vec2   m_text_offset;
-  NVGcolor  m_bg_inner;
-  NVGcolor  m_text_color;
-  NVGcolor  m_border_active_outer;
-  NVGcolor  m_border_active_inner;
-  float     m_border_width_outer;
-  float     m_border_width_inner;
-  NVGcolor  m_border_inactive;
-  float     m_border_width_inactive;
-  NVGcolor  m_mark_color;
-  float     m_circle_radius;
-  float     m_font_size;
-  float     m_shadow_offset;
-  float     m_shadow_size;
-  NVGcolor  m_shadow_color;
-
-public:
-  rm_radiobutton_style() : m_text_offset(0.f, 0.f), 
-    m_bg_inner(NVGcolor::RGBA(0, 0, 0, 60)), m_text_color(NVGcolor::RGB(255, 255, 255)),
-    m_border_active_outer(NVGcolor::RGB(0, 122, 255)),
-    m_border_active_inner(NVGcolor::RGB(102, 204, 255)), m_border_width_outer(2.f),
-    m_border_width_inner(1.f),
-    m_border_inactive(NVGcolor::RGBA(255, 255, 255, 192)),
-    m_border_width_inactive(2.f),
-    m_mark_color(NVGcolor::RGB(255, 255, 255)), m_circle_radius(8.0f), m_font_size(18.f),
-    m_shadow_offset(5.f), m_shadow_size(6.f),
-    m_shadow_color(NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.25f)) {}
-
-  /* selectors */
-  inline const rm_vec2& get_text_offset()       const { return m_text_offset; }
-  inline NVGcolor       get_bg_inner()          const { return m_bg_inner; }
-  inline NVGcolor       get_text_color()        const { return m_text_color; }
-  inline NVGcolor       get_border_active_outer() const { return m_border_active_outer; }
-  inline NVGcolor       get_border_active_inner() const { return m_border_active_inner; }
-  inline float          get_border_width_outer()  const { return m_border_width_outer; }
-  inline float          get_border_width_inner()  const { return m_border_width_inner; }
-  inline NVGcolor       get_border_inactive()   const { return m_border_inactive; }
-  inline float          get_border_width_inactive() const { return m_border_width_inactive; }
-  inline NVGcolor       get_mark_color()        const { return m_mark_color; }
-  inline float          get_circle_radius()     const { return m_circle_radius; }
-  inline float          get_font_size()         const { return m_font_size; }
-  inline float          get_shadow_offset() const { return m_shadow_offset; }
-  inline float          get_shadow_size()   const { return m_shadow_size; }
-  inline NVGcolor       get_shadow_color()  const { return m_shadow_color; }
-
-  /* modificators */
-  inline void set_text_offset(const rm_vec2& v) { m_text_offset = v; }
-  inline void set_bg_inner(NVGcolor c) { m_bg_inner = c; }
-  inline void set_text_color(NVGcolor c) { m_text_color = c; }
-  inline void set_border_active_outer(NVGcolor c) { m_border_active_outer = c; }
-  inline void set_border_active_inner(NVGcolor c) { m_border_active_inner = c; }
-  inline void set_border_width_outer(float w) { m_border_width_outer = w; }
-  inline void set_border_width_inner(float w) { m_border_width_inner = w; }
-  inline void set_border_inactive(NVGcolor c) { m_border_inactive = c; }
-  inline void set_border_width_inactive(float w) { m_border_width_inactive = w; }
-  inline void set_mark_color(NVGcolor c) { m_mark_color = c; }
-  inline void set_circle_radius(float r) { m_circle_radius = r; }
-  inline void set_font_size(float s) { m_font_size = s; }
-  inline void set_shadow_offset(float offset) { m_shadow_offset = offset; }
-  inline void set_shadow_size(float size) { m_shadow_size = size; }
-  inline void set_shadow_color(NVGcolor c) { m_shadow_color = c; }
-};
-
 class rm_radiobutton;
 using rm_radiobutton_cb = bool(*)(rm_radiobutton*);
 /**
  * RADIOBUTTON
  */
-class rm_radiobutton : public rm_widget, public rm_styled<rm_radiobutton_style>, public rm_callback<rm_radiobutton_cb>
+class rm_radiobutton : public rm_widget, public rm_callback<rm_radiobutton_cb>
 {
   std::string m_label;
-  bool        m_checked;
-  bool        m_allow_uncheck;
+  RmRadioButtonBehaviour m_behaviour;
+  RmThemeRef m_theme;
   static std::map<const rm_widget*, std::vector<rm_radiobutton*>> s_groups;
+
+  void uncheck_siblings();
+  void notify_activation();
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
+  void on_pointer_capture_lost() override { m_behaviour.cancel(); }
+  void on_draw(NVGcontext* pctx) override;
+  void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
+  bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
+    rm_vec2& pos, rm_vec2 delta) override;
 
 public:
   rm_radiobutton(rm_widget* parent, int x, int y, int width, int height,
-    rm_radiobutton_style* style,
-    const std::string& label,
-    rm_radiobutton_cb cb = nullptr);
+    const std::string& label, rm_radiobutton_cb cb = nullptr,
+    RmThemeRef theme = {});
 
   virtual ~rm_radiobutton();
 
-  inline bool is_checked() const { return m_checked; }
-  inline void set_checked(bool v) { m_checked = v; }
-  inline void set_allow_uncheck(bool v) { m_allow_uncheck = v; }
+  inline bool is_checked() const { return m_behaviour.is_checked(); }
+  void set_checked(bool checked);
+  inline void set_allow_uncheck(bool allow) { m_behaviour.set_allow_uncheck(allow); }
 
   static void select_default(rm_widget* parent, int index);
   static void select_by_label(rm_widget* parent, const std::string& label);
 
   inline const char* get_label() const { return m_label.c_str(); }
-  inline void        set_label(const char* s) { m_label = s; }
-
-  inline static std::map<const rm_widget*, std::vector<rm_radiobutton*>> get_groups() { return s_groups; }
-
-  virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& pos, rm_vec2 delta) override;
+  inline void set_label(const char* p_text) { m_label = p_text ? p_text : ""; }
+  const RmRadioButtonBehaviour& behaviour() const noexcept { return m_behaviour; }
+  void set_theme(RmThemeRef theme) {
+    m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+  }
 };
 
 class rm_switch;
@@ -910,63 +786,40 @@ public:
 };
 
 /**
- * LISTVIEW STYLE
-*/
-class rm_listview_style : public rm_corners_style {
-  float     m_padding;
-  float     m_row_height;
-  NVGcolor  m_bg_color;
-  NVGcolor  m_text_color;
-  NVGcolor  m_hover_color;
-  NVGcolor  m_selected_color;
-  float     m_font_size;
-public:
-  rm_listview_style(): m_padding(8.f), m_row_height(24.f), 
-    m_bg_color(NVGcolor::RGB(255, 255, 255)), 
-    m_text_color(NVGcolor::RGB(0, 0, 0)), m_hover_color(NVGcolor::RGB(240, 240, 240)), 
-    m_selected_color(NVGcolor::RGB(200, 200, 255)), m_font_size(16.f){
-  }
-
-  /* selectors */
-  inline float            get_text_padding()        const { return m_padding; }
-  inline float            get_row_height()          const { return m_row_height; }
-  inline const NVGcolor&  get_background_color()    const { return m_bg_color; }
-  inline const NVGcolor&  get_text_color()          const { return m_text_color; }
-  inline const NVGcolor&  get_hover_color()         const { return m_hover_color; }
-  inline const NVGcolor&  get_selected_color()      const { return m_selected_color; }
-  inline float            get_font_size()           const { return m_font_size; }
-
-  /* modifiers */
-  inline void set_text_padding(float p) { m_padding = p; }
-  inline void set_row_height(float h) { m_row_height = h; }
-  inline void set_background_color(NVGcolor c) { m_bg_color = c; }
-  inline void set_text_color(NVGcolor c) { m_text_color = c; }
-  inline void set_hover_color(NVGcolor c) { m_hover_color = c; }
-  inline void set_selected_color(NVGcolor c) { m_selected_color = c; }
-  inline void set_font_size(float f) { m_font_size = f; }
-};
-
-/**
  * LISTVIEW
 */
 class rm_listview;
 using rm_listview_cb = void(*)(rm_listview* lv, size_t index);
-class rm_listview : public rm_widget, public rm_styled<rm_listview_style>, public rm_callback<rm_listview_cb>
+class rm_listview : public rm_widget, public rm_callback<rm_listview_cb>
 {
   std::vector<std::string> m_items;
-  size_t m_hover_index;
-  size_t m_selected_index;
+  RmListViewBehaviour m_behaviour;
+  RmThemeRef m_theme;
 
-  virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
+  size_t hit_test_row(const rm_vec2& local_cursor) const;
+  void notify_selection();
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
+  void on_pointer_capture_lost() override { m_behaviour.cancel(); }
+  void on_draw(NVGcontext* pctx) override;
+  void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
+  bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
+    rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
-  rm_listview(rm_widget* parent, int x, int y, int width, int height, rm_listview_style* pstyle, rm_listview_cb cb = nullptr);
+  rm_listview(rm_widget* parent, int x, int y, int width, int height,
+    rm_listview_cb cb = nullptr, RmThemeRef theme = {});
   ~rm_listview() {};
 
   void add_item(const std::string& text);
+  bool remove_item(size_t index);
   void clear_items();
 
-  float get_item_height() const { return m_pstyle->get_row_height(); }
-  size_t get_selected_index() const { return m_selected_index; }
-  std::vector<std::string> get_items() const { return m_items; }
+  float get_item_height() const { return m_theme->listview.row_height; }
+  size_t get_selected_index() const { return m_behaviour.selected_index(); }
+  bool set_selected_index(size_t index, bool notify = false);
+  const std::vector<std::string>& get_items() const { return m_items; }
+  const RmListViewBehaviour& behaviour() const noexcept { return m_behaviour; }
+  void set_theme(RmThemeRef theme) {
+    m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+  }
 };

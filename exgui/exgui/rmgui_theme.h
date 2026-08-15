@@ -180,6 +180,26 @@ struct RmCheckboxStyle {
   float focus_ring_width = 0.0f;
 };
 
+struct RmRadioButtonStyle {
+  RmStateColors background;
+  RmStateColors indicator_background;
+  RmStateColors indicator_border;
+  RmStateColors mark;
+  RmStateColors text;
+  NVGcolor focus_ring;
+  NVGcolor shadow;
+  float indicator_size = 0.0f;
+  float mark_radius = 0.0f;
+  float border_width = 0.0f;
+  float horizontal_padding = 0.0f;
+  float text_gap = 0.0f;
+  float corner_radius = 0.0f;
+  float focus_ring_width = 0.0f;
+  float shadow_offset = 0.0f;
+  float shadow_size = 0.0f;
+  float font_size = 0.0f;
+};
+
 struct RmComboBoxStyle {
   RmStateColors field_background;
   RmStateColors field_border;
@@ -206,6 +226,24 @@ struct RmComboBoxStyle {
   float font_size = 0.0f;
 };
 
+struct RmListViewStyle {
+  RmStateColors row_background;
+  RmStateColors row_text;
+  RmStateColors selected_background;
+  RmStateColors selected_text;
+  NVGcolor background;
+  NVGcolor border;
+  NVGcolor focus_ring;
+  float row_height = 0.0f;
+  float horizontal_padding = 0.0f;
+  float vertical_padding = 0.0f;
+  float corner_radius = 0.0f;
+  float row_corner_radius = 0.0f;
+  float border_width = 0.0f;
+  float focus_ring_width = 0.0f;
+  float font_size = 0.0f;
+};
+
 struct RmSliderStyle {
   RmStateColors track;
   RmStateColors fill;
@@ -215,6 +253,21 @@ struct RmSliderStyle {
   float track_height = 0.0f;
   float padding = 0.0f;
   float thumb_radius = 0.0f;
+  float thumb_border_width = 0.0f;
+  float focus_ring_width = 0.0f;
+};
+
+struct RmScrollbarStyle {
+  RmStateColors track;
+  RmStateColors track_border;
+  RmStateColors thumb;
+  RmStateColors thumb_border;
+  NVGcolor focus_ring;
+  float thickness = 0.0f;
+  float minimum_thumb_length = 0.0f;
+  float padding = 0.0f;
+  float corner_radius = 0.0f;
+  float border_width = 0.0f;
   float thumb_border_width = 0.0f;
   float focus_ring_width = 0.0f;
 };
@@ -303,6 +356,11 @@ struct RmControlMetricsTokens {
   float focus_ring_width = 2.0f;
   float checkbox_size = 20.0f;
   float checkbox_mark_width = 2.25f;
+  float radiobutton_indicator_size = 20.0f;
+  float radiobutton_mark_radius = 5.0f;
+  float radiobutton_horizontal_padding = 6.0f;
+  float radiobutton_shadow_offset = 2.0f;
+  float radiobutton_shadow_size = 5.0f;
   float combobox_horizontal_padding = 10.0f;
   float combobox_popup_padding = 5.0f;
   float combobox_popup_gap = 4.0f;
@@ -310,10 +368,17 @@ struct RmControlMetricsTokens {
   float combobox_indicator_size = 5.0f;
   float combobox_selected_mark_width = 2.0f;
   float combobox_shadow_size = 10.0f;
+  float listview_row_height = 32.0f;
+  float listview_horizontal_padding = 10.0f;
+  float listview_vertical_padding = 5.0f;
   float slider_track_height = 4.0f;
   float slider_padding = 8.0f;
   float slider_thumb_radius = 10.0f;
   float slider_thumb_border_width = 2.0f;
+  float scrollbar_thickness = 12.0f;
+  float scrollbar_minimum_thumb_length = 28.0f;
+  float scrollbar_padding = 2.0f;
+  float scrollbar_thumb_border_width = 1.0f;
   float progress_corner_radius = 4.0f;
   float switch_track_height = 24.0f;
   float switch_padding = 4.0f;
@@ -366,8 +431,11 @@ struct RmThemeSnapshot {
   RmMenuStyle menu;
   RmLabelStyle label;
   RmCheckboxStyle checkbox;
+  RmRadioButtonStyle radiobutton;
   RmComboBoxStyle combobox;
+  RmListViewStyle listview;
   RmSliderStyle slider;
+  RmScrollbarStyle scrollbar;
   RmProgressStyle progress;
   RmSwitchStyle switch_control;
 
@@ -470,6 +538,11 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.focus_ring_width, 0.0f, 32.0f, "tokens.controls.focus_ring_width", diagnostics);
     sanitize_metric(tokens.controls.checkbox_size, 1.0f, 256.0f, "tokens.controls.checkbox_size", diagnostics);
     sanitize_metric(tokens.controls.checkbox_mark_width, 0.0f, 32.0f, "tokens.controls.checkbox_mark_width", diagnostics);
+    sanitize_metric(tokens.controls.radiobutton_indicator_size, 1.0f, 256.0f, "tokens.controls.radiobutton_indicator_size", diagnostics);
+    sanitize_metric(tokens.controls.radiobutton_mark_radius, 0.0f, 128.0f, "tokens.controls.radiobutton_mark_radius", diagnostics);
+    sanitize_metric(tokens.controls.radiobutton_horizontal_padding, 0.0f, 256.0f, "tokens.controls.radiobutton_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.radiobutton_shadow_offset, 0.0f, 256.0f, "tokens.controls.radiobutton_shadow_offset", diagnostics);
+    sanitize_metric(tokens.controls.radiobutton_shadow_size, 0.0f, 256.0f, "tokens.controls.radiobutton_shadow_size", diagnostics);
     sanitize_metric(tokens.controls.combobox_horizontal_padding, 0.0f, 256.0f, "tokens.controls.combobox_horizontal_padding", diagnostics);
     sanitize_metric(tokens.controls.combobox_popup_padding, 0.0f, 256.0f, "tokens.controls.combobox_popup_padding", diagnostics);
     sanitize_metric(tokens.controls.combobox_popup_gap, 0.0f, 256.0f, "tokens.controls.combobox_popup_gap", diagnostics);
@@ -477,10 +550,17 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.combobox_indicator_size, 1.0f, 64.0f, "tokens.controls.combobox_indicator_size", diagnostics);
     sanitize_metric(tokens.controls.combobox_selected_mark_width, 0.0f, 32.0f, "tokens.controls.combobox_selected_mark_width", diagnostics);
     sanitize_metric(tokens.controls.combobox_shadow_size, 0.0f, 256.0f, "tokens.controls.combobox_shadow_size", diagnostics);
+    sanitize_metric(tokens.controls.listview_row_height, 16.0f, 256.0f, "tokens.controls.listview_row_height", diagnostics);
+    sanitize_metric(tokens.controls.listview_horizontal_padding, 0.0f, 256.0f, "tokens.controls.listview_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.listview_vertical_padding, 0.0f, 256.0f, "tokens.controls.listview_vertical_padding", diagnostics);
     sanitize_metric(tokens.controls.slider_track_height, 1.0f, 256.0f, "tokens.controls.slider_track_height", diagnostics);
     sanitize_metric(tokens.controls.slider_padding, 0.0f, 256.0f, "tokens.controls.slider_padding", diagnostics);
     sanitize_metric(tokens.controls.slider_thumb_radius, 1.0f, 256.0f, "tokens.controls.slider_thumb_radius", diagnostics);
     sanitize_metric(tokens.controls.slider_thumb_border_width, 0.0f, 32.0f, "tokens.controls.slider_thumb_border_width", diagnostics);
+    sanitize_metric(tokens.controls.scrollbar_thickness, 4.0f, 256.0f, "tokens.controls.scrollbar_thickness", diagnostics);
+    sanitize_metric(tokens.controls.scrollbar_minimum_thumb_length, 4.0f, 1024.0f, "tokens.controls.scrollbar_minimum_thumb_length", diagnostics);
+    sanitize_metric(tokens.controls.scrollbar_padding, 0.0f, 128.0f, "tokens.controls.scrollbar_padding", diagnostics);
+    sanitize_metric(tokens.controls.scrollbar_thumb_border_width, 0.0f, 32.0f, "tokens.controls.scrollbar_thumb_border_width", diagnostics);
     sanitize_metric(tokens.controls.progress_corner_radius, 0.0f, 1024.0f, "tokens.controls.progress_corner_radius", diagnostics);
     sanitize_metric(tokens.controls.switch_track_height, 1.0f, 256.0f, "tokens.controls.switch_track_height", diagnostics);
     sanitize_metric(tokens.controls.switch_padding, 0.0f, 256.0f, "tokens.controls.switch_padding", diagnostics);
@@ -685,6 +765,29 @@ public:
     p_theme->checkbox.font_size = tokens.typography.control;
     p_theme->checkbox.focus_ring_width = controls.focus_ring_width;
 
+    p_theme->radiobutton.background = { transparent, colors.control_hovered,
+      colors.control_pressed, transparent };
+    p_theme->radiobutton.indicator_background = { colors.control,
+      colors.control_hovered, colors.control_pressed, colors.control_disabled };
+    p_theme->radiobutton.indicator_border = { colors.border, colors.border_hovered,
+      colors.border_pressed, colors.border_disabled };
+    p_theme->radiobutton.mark = { colors.accent, colors.accent_hovered,
+      colors.accent_pressed, colors.accent_disabled };
+    p_theme->radiobutton.text = { colors.text, colors.text, colors.text,
+      colors.text_disabled };
+    p_theme->radiobutton.focus_ring = colors.focus_ring;
+    p_theme->radiobutton.shadow = colors.shadow;
+    p_theme->radiobutton.indicator_size = controls.radiobutton_indicator_size;
+    p_theme->radiobutton.mark_radius = controls.radiobutton_mark_radius;
+    p_theme->radiobutton.border_width = controls.border_width;
+    p_theme->radiobutton.horizontal_padding = controls.radiobutton_horizontal_padding;
+    p_theme->radiobutton.text_gap = tokens.spacing.small;
+    p_theme->radiobutton.corner_radius = tokens.radius.medium;
+    p_theme->radiobutton.focus_ring_width = controls.focus_ring_width;
+    p_theme->radiobutton.shadow_offset = controls.radiobutton_shadow_offset;
+    p_theme->radiobutton.shadow_size = controls.radiobutton_shadow_size;
+    p_theme->radiobutton.font_size = tokens.typography.control;
+
     p_theme->combobox.field_background = { colors.control, colors.control_hovered,
       colors.control_pressed, colors.control_disabled };
     p_theme->combobox.field_border = { colors.border, colors.border_hovered,
@@ -715,6 +818,26 @@ public:
     p_theme->combobox.shadow_size = controls.combobox_shadow_size;
     p_theme->combobox.font_size = tokens.typography.control;
 
+    p_theme->listview.row_background = { transparent, colors.control_hovered,
+      colors.control_pressed, transparent };
+    p_theme->listview.row_text = { colors.text, colors.text, colors.text,
+      colors.text_disabled };
+    p_theme->listview.selected_background = { colors.accent,
+      colors.accent_hovered, colors.accent_pressed, colors.accent_disabled };
+    p_theme->listview.selected_text = { colors.text_on_accent,
+      colors.text_on_accent, colors.text_on_accent, colors.text_disabled };
+    p_theme->listview.background = colors.surface_elevated;
+    p_theme->listview.border = colors.border;
+    p_theme->listview.focus_ring = colors.focus_ring;
+    p_theme->listview.row_height = controls.listview_row_height;
+    p_theme->listview.horizontal_padding = controls.listview_horizontal_padding;
+    p_theme->listview.vertical_padding = controls.listview_vertical_padding;
+    p_theme->listview.corner_radius = tokens.radius.medium;
+    p_theme->listview.row_corner_radius = tokens.radius.small;
+    p_theme->listview.border_width = controls.border_width;
+    p_theme->listview.focus_ring_width = controls.focus_ring_width;
+    p_theme->listview.font_size = tokens.typography.control;
+
     p_theme->slider.track = { colors.control, colors.control_hovered,
       colors.control_pressed, colors.control_disabled };
     p_theme->slider.fill = { colors.accent, colors.accent_hovered,
@@ -729,6 +852,23 @@ public:
     p_theme->slider.thumb_radius = controls.slider_thumb_radius;
     p_theme->slider.thumb_border_width = controls.slider_thumb_border_width;
     p_theme->slider.focus_ring_width = controls.focus_ring_width;
+
+    p_theme->scrollbar.track = { colors.control, colors.control_hovered,
+      colors.control_pressed, colors.control_disabled };
+    p_theme->scrollbar.track_border = { colors.border, colors.border_hovered,
+      colors.border_pressed, colors.border_disabled };
+    p_theme->scrollbar.thumb = { colors.text_muted, colors.text,
+      colors.accent_pressed, colors.text_disabled };
+    p_theme->scrollbar.thumb_border = { colors.border_hovered, colors.focus_ring,
+      colors.accent_pressed, colors.border_disabled };
+    p_theme->scrollbar.focus_ring = colors.focus_ring;
+    p_theme->scrollbar.thickness = controls.scrollbar_thickness;
+    p_theme->scrollbar.minimum_thumb_length = controls.scrollbar_minimum_thumb_length;
+    p_theme->scrollbar.padding = controls.scrollbar_padding;
+    p_theme->scrollbar.corner_radius = tokens.radius.pill;
+    p_theme->scrollbar.border_width = controls.border_width;
+    p_theme->scrollbar.thumb_border_width = controls.scrollbar_thumb_border_width;
+    p_theme->scrollbar.focus_ring_width = controls.focus_ring_width;
 
     p_theme->progress.background = { colors.control, colors.control,
       colors.control, colors.control_disabled };

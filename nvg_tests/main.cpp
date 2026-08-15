@@ -157,6 +157,24 @@ void test_theme_document_compilation()
   require(same_color(result.theme->combobox.selected_mark,
     document.tokens.colors.accent),
     "combobox selected mark must use the accent token");
+  require(result.theme->radiobutton.indicator_size ==
+    document.tokens.controls.radiobutton_indicator_size,
+    "radio button recipes must use editable indicator metrics");
+  require(same_color(result.theme->radiobutton.mark.normal,
+    document.tokens.colors.accent),
+    "radio button marks must use the accent token");
+  require(result.theme->listview.row_height ==
+    document.tokens.controls.listview_row_height,
+    "list view recipes must use editable row metrics");
+  require(same_color(result.theme->listview.selected_background.normal,
+    document.tokens.colors.accent),
+    "list view selection must use the accent token");
+  require(result.theme->scrollbar.thickness ==
+    document.tokens.controls.scrollbar_thickness,
+    "scrollbar recipes must use editable thickness metrics");
+  require(same_color(result.theme->scrollbar.thumb.pressed,
+    document.tokens.colors.accent_pressed),
+    "dragged scrollbar thumb must use the pressed accent token");
   require(result.theme->switch_control.track_height == 30.0f,
     "component metric token must drive switch geometry");
   require(result.theme->switch_control.corner_radius == 15.0f,

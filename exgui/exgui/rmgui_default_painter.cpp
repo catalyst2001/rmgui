@@ -330,6 +330,65 @@ void RmDefaultControlPainter::draw_checkbox(NVGcontext& context,
     visual.text ? visual.text : "", nullptr);
 }
 
+void RmDefaultControlPainter::draw_radiobutton(NVGcontext& context,
+  const RmRadioButtonVisual& visual, const RmRadioButtonStyle& style)
+{
+  const RmVisualState state = resolve_state(
+    visual.enabled, visual.hovered, visual.pressed);
+  const NVGcolor row_background = style.background.resolve(state);
+  if (row_background.a > 0.0f) {
+    context.beginPath();
+    context.roundedRect(0.0f, 0.0f, visual.width, visual.height,
+      style.corner_radius);
+    context.fillColor(row_background);
+    context.fill();
+  }
+
+  const float size = std::min(style.indicator_size, visual.height);
+  const float radius = size * 0.5f;
+  const float cx = style.horizontal_padding + radius;
+  const float cy = visual.height * 0.5f;
+  if (style.shadow_size > 0.0f) {
+    const NVGcolor transparent = NVGcolor::RGBA(0, 0, 0, 0);
+    context.beginPath();
+    context.circle(cx, cy + style.shadow_offset, radius + style.shadow_size);
+    context.fillPaint(NVGpaint::radialGradient(cx, cy + style.shadow_offset,
+      radius, radius + style.shadow_size, style.shadow, transparent));
+    context.fill();
+  }
+
+  context.beginPath();
+  context.circle(cx, cy, std::max(0.0f, radius - style.border_width * 0.5f));
+  context.fillColor(style.indicator_background.resolve(state));
+  context.fill();
+  if (style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.indicator_border.resolve(state));
+    context.stroke();
+  }
+  if (visual.checked && style.mark_radius > 0.0f) {
+    context.beginPath();
+    context.circle(cx, cy, std::min(style.mark_radius,
+      std::max(0.0f, radius - style.border_width)));
+    context.fillColor(style.mark.resolve(state));
+    context.fill();
+  }
+  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
+    context.beginPath();
+    context.circle(cx, cy, radius + style.focus_ring_width * 0.5f);
+    context.StrokeWidth(style.focus_ring_width);
+    context.strokeColor(style.focus_ring);
+    context.stroke();
+  }
+
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  context.fillColor(style.text.resolve(state));
+  context.text(style.horizontal_padding + size + style.text_gap,
+    visual.height * 0.5f, visual.text ? visual.text : "", nullptr);
+}
+
 void RmDefaultControlPainter::draw_combobox(NVGcontext& context,
   const RmComboBoxVisual& visual, const RmComboBoxStyle& style)
 {
@@ -456,6 +515,57 @@ void RmDefaultControlPainter::draw_combobox_item(NVGcontext& context,
   }
 }
 
+void RmDefaultControlPainter::draw_listview_surface(NVGcontext& context,
+  const RmListViewSurfaceVisual& visual, const RmListViewStyle& style)
+{
+  context.beginPath();
+  context.roundedRect(0.0f, 0.0f, visual.width, visual.height,
+    style.corner_radius);
+  context.fillColor(style.background);
+  context.fill();
+  if (style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.border);
+    context.stroke();
+  }
+  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
+    context.beginPath();
+    context.roundedRect(style.focus_ring_width * 0.5f,
+      style.focus_ring_width * 0.5f,
+      std::max(0.0f, visual.width - style.focus_ring_width),
+      std::max(0.0f, visual.height - style.focus_ring_width),
+      style.corner_radius);
+    context.StrokeWidth(style.focus_ring_width);
+    context.strokeColor(style.focus_ring);
+    context.stroke();
+  }
+}
+
+void RmDefaultControlPainter::draw_listview_row(NVGcontext& context,
+  const RmListViewRowVisual& visual, const RmListViewStyle& style)
+{
+  const RmVisualState state = resolve_state(
+    visual.enabled, visual.hovered, visual.pressed);
+  const RmStateColors& backgrounds = visual.selected
+    ? style.selected_background : style.row_background;
+  const RmStateColors& text = visual.selected
+    ? style.selected_text : style.row_text;
+  const NVGcolor background = backgrounds.resolve(state);
+  if (background.a > 0.0f) {
+    context.beginPath();
+    context.roundedRect(visual.x, visual.y, visual.width, visual.height,
+      style.row_corner_radius);
+    context.fillColor(background);
+    context.fill();
+  }
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  context.fillColor(text.resolve(state));
+  context.text(visual.x + style.horizontal_padding,
+    visual.y + visual.height * 0.5f, visual.text ? visual.text : "", nullptr);
+}
+
 void RmDefaultControlPainter::draw_slider(NVGcontext& context,
   const RmSliderVisual& visual, const RmSliderStyle& style)
 {
@@ -493,6 +603,56 @@ void RmDefaultControlPainter::draw_slider(NVGcontext& context,
   if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
     context.beginPath();
     context.circle(thumb_x, thumb_y, style.thumb_radius + style.focus_ring_width);
+    context.StrokeWidth(style.focus_ring_width);
+    context.strokeColor(style.focus_ring);
+    context.stroke();
+  }
+}
+
+void RmDefaultControlPainter::draw_scrollbar(NVGcontext& context,
+  const RmScrollbarVisual& visual, const RmScrollbarStyle& style)
+{
+  const RmVisualState state = resolve_state(
+    visual.enabled, visual.hovered, visual.dragging);
+  const float half_border = style.border_width * 0.5f;
+  context.beginPath();
+  context.roundedRect(half_border, half_border,
+    std::max(0.0f, visual.width - style.border_width),
+    std::max(0.0f, visual.height - style.border_width), style.corner_radius);
+  context.fillColor(style.track.resolve(state));
+  context.fill();
+  if (style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.track_border.resolve(state));
+    context.stroke();
+  }
+
+  const float thumb_x = visual.vertical ? style.padding : visual.thumb_offset + style.padding;
+  const float thumb_y = visual.vertical ? visual.thumb_offset + style.padding : style.padding;
+  const float thumb_width = visual.vertical
+    ? std::max(0.0f, visual.width - style.padding * 2.0f)
+    : std::max(0.0f, visual.thumb_length - style.padding * 2.0f);
+  const float thumb_height = visual.vertical
+    ? std::max(0.0f, visual.thumb_length - style.padding * 2.0f)
+    : std::max(0.0f, visual.height - style.padding * 2.0f);
+  context.beginPath();
+  context.roundedRect(thumb_x, thumb_y, thumb_width, thumb_height,
+    style.corner_radius);
+  context.fillColor(style.thumb.resolve(state));
+  context.fill();
+  if (style.thumb_border_width > 0.0f) {
+    context.StrokeWidth(style.thumb_border_width);
+    context.strokeColor(style.thumb_border.resolve(state));
+    context.stroke();
+  }
+
+  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
+    context.beginPath();
+    context.roundedRect(style.focus_ring_width * 0.5f,
+      style.focus_ring_width * 0.5f,
+      std::max(0.0f, visual.width - style.focus_ring_width),
+      std::max(0.0f, visual.height - style.focus_ring_width),
+      style.corner_radius);
     context.StrokeWidth(style.focus_ring_width);
     context.strokeColor(style.focus_ring);
     context.stroke();

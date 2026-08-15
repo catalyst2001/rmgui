@@ -69,6 +69,37 @@ void test_combobox_behaviour()
     "disabled combobox closes and ignores open requests");
 }
 
+void test_radiobutton_behaviour()
+{
+  RmRadioButtonBehaviour radio;
+  radio.pointer_down(true);
+  expect(radio.pointer_up(true).activated && radio.is_checked(),
+    "radio button selects itself on activation");
+
+  radio.pointer_down(true);
+  expect(!radio.pointer_up(true).activated && radio.is_checked(),
+    "selected radio button stays selected by default");
+  radio.set_allow_uncheck(true);
+  radio.key_down(true);
+  expect(radio.key_up(true).activated && !radio.is_checked(),
+    "optional radio button uncheck works with keyboard activation");
+}
+
+void test_listview_behaviour()
+{
+  RmListViewBehaviour list;
+  list.set_count(4);
+  list.pointer_move(2);
+  list.pointer_down(2);
+  expect(list.pointer_up(2).activated && list.selected_index() == 2,
+    "list view selects the pressed row on matching release");
+  expect(list.select_relative(1).activated && list.selected_index() == 3,
+    "list view supports keyboard selection");
+  list.set_count(2);
+  expect(list.selected_index() == RmListViewBehaviour::invalid_index,
+    "list view clears selection removed by a model resize");
+}
+
 void test_slider_behaviour()
 {
   RmSliderBehaviour slider(0.0f, 100.0f, 50.0f);
@@ -86,6 +117,25 @@ void test_slider_behaviour()
   slider.set_range(10.0f, -10.0f);
   expect(slider.minimum() == -10.0f && slider.maximum() == 10.0f,
     "slider normalizes reversed range");
+}
+
+void test_scrollbar_behaviour()
+{
+  RmScrollbarBehaviour scrollbar(0.25f);
+  scrollbar.set_viewport_fraction(0.2f);
+  expect(std::fabs(scrollbar.thumb_length(100.0f, 12.0f) - 20.0f) < 1.0e-6f,
+    "scrollbar derives thumb length from viewport fraction");
+  expect(std::fabs(scrollbar.thumb_offset(100.0f, 12.0f) - 20.0f) < 1.0e-6f,
+    "scrollbar maps normalized position into the available track");
+  scrollbar.begin_drag(25.0f, 100.0f, 12.0f);
+  scrollbar.drag_to(65.0f, 100.0f, 12.0f);
+  expect(std::fabs(scrollbar.position() - 0.75f) < 1.0e-6f,
+    "scrollbar drag preserves the pointer offset inside the thumb");
+  scrollbar.end_drag();
+  scrollbar.set_viewport_fraction(1.0f);
+  expect(scrollbar.position() == 0.0f &&
+    !scrollbar.begin_drag(10.0f, 100.0f, 12.0f).handled,
+    "scrollbar disables dragging when all content is visible");
 }
 
 void test_progress_behaviour()
@@ -179,7 +229,10 @@ int main()
   test_button_behaviour();
   test_toggle_behaviour();
   test_combobox_behaviour();
+  test_radiobutton_behaviour();
+  test_listview_behaviour();
   test_slider_behaviour();
+  test_scrollbar_behaviour();
   test_progress_behaviour();
   test_switch_behaviour();
   test_tab_behaviour();

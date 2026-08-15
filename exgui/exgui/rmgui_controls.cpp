@@ -1009,112 +1009,6 @@ void rm_progress_image::on_draw(NVGcontext* pctx)
 	rm_widget::on_draw(pctx);
 }
 
-void rm_scroll_base::orient_detect(const rm_rect& background)
-{
-	m_orientation = (background.width > background.height) ? RM_ORIENT_HORZ : RM_ORIENT_VERT;
-}
-
-void rm_scroll_base::draw_scroll(NVGcontext* pctx, const rm_vec2& back, rm_scroll_style* pstyle, float pos)
-{
-	rm_rect thumb_rect;
-	assert(m_orientation != RM_ORIENT_AUTO && "[K.D.] m_orientation have undefined value! You called rm_scroll_base::orient_detect() from init/resize?");
-	if (m_orientation == RM_ORIENT_HORZ) {
-		thumb_rect.x = back.x * pos;
-		thumb_rect.y = back.y;
-		thumb_rect.width = pstyle->get_thumb_size();
-		thumb_rect.height = back.y;
-	}
-	else {
-		thumb_rect.x = back.x;
-		thumb_rect.y = back.y * pos;
-		thumb_rect.width = back.x;
-		thumb_rect.height = pstyle->get_thumb_size();
-	}
-
-	/* paint background */
-	pctx->beginPath();
-	pctx->fillColor(pstyle->get_scroll_background_color());
-	pctx->roundedRect(0, 0, back.x, back.y, pstyle->get_scroll_corner_radius());
-	pctx->fill();
-	pctx->StrokeWidth(pstyle->get_background_stroke_width());
-	pctx->strokeColor(pstyle->get_scroll_background_border_color());
-	pctx->stroke();
-
-	/* paint thumb */
-	pctx->beginPath();
-	pctx->fillColor(pstyle->get_scroll_thumb_color());
-	pctx->roundedRect(thumb_rect.x, thumb_rect.y, thumb_rect.width, thumb_rect.height, pstyle->get_scroll_corner_radius());
-	pctx->fill();
-	pctx->StrokeWidth(pstyle->get_thumb_stroke_width());
-	pctx->strokeColor(pstyle->get_scroll_thumb_border_color());
-	pctx->stroke();
-}
-
-void rm_scroll_base::draw_scroll(NVGcontext* pctx, rm_scroll_style* pstyle, rm_vec2 content,
-	const rm_vec2& window, float thumb_thickness, float pos)
-{
-	rm_rect thumb_rect;
-	float   thumb_size;
-	float   background_round;
-	float   thumb_round;
-
-	assert(m_orientation != RM_ORIENT_AUTO && "[K.D.] m_orientation have undefined value! You called rm_scroll_base::orient_detect() from init/resize?");
-	if (m_orientation == RM_ORIENT_HORZ) {
-		if (content.x <= window.x)
-			content.x = window.x;
-
-		float scroll_area = window.x;
-		thumb_size = (window.x / content.x) * scroll_area;
-		thumb_size = std::max(thumb_thickness, thumb_size); // thumb min width
-
-		float max_offset = scroll_area - thumb_size;
-		float thumb_x = pos * max_offset;
-
-		thumb_rect.x = thumb_x;
-		thumb_rect.y = (window.y - thumb_thickness) * 0.5f;
-		thumb_rect.width = thumb_size;
-		thumb_rect.height = thumb_thickness;
-		background_round = (window.y / 2.f) * pstyle->get_scroll_corner_radius();
-		thumb_round = (thumb_rect.height / 2.f) * pstyle->get_scroll_corner_radius();
-	}
-	else {
-		if (content.y <= window.y)
-			content.y = window.y;
-
-		float scroll_area = window.y;
-		thumb_size = (window.y / content.y) * scroll_area;
-		thumb_size = std::max(thumb_thickness, thumb_size); // thumb min height
-
-		float max_offset = scroll_area - thumb_size;
-		float thumb_y = pos * max_offset;
-
-		thumb_rect.x = (window.x - thumb_thickness) * 0.5f;
-		thumb_rect.y = thumb_y;
-		thumb_rect.width = thumb_thickness;
-		thumb_rect.height = thumb_size;
-		background_round = (window.x / 2.f) * pstyle->get_scroll_corner_radius();
-		thumb_round = (thumb_rect.width / 2.f) * pstyle->get_scroll_corner_radius();
-	}
-
-	// paint background
-	pctx->beginPath();
-	pctx->fillColor(pstyle->get_scroll_background_color());
-	pctx->roundedRect(0, 0, window.x, window.y, background_round);
-	pctx->fill();
-	pctx->StrokeWidth(pstyle->get_background_stroke_width());
-	pctx->strokeColor(pstyle->get_scroll_background_border_color());
-	pctx->stroke();
-
-	// paint thumb
-	pctx->beginPath();
-	pctx->fillColor(pstyle->get_scroll_thumb_color());
-	pctx->roundedRect(thumb_rect.x, thumb_rect.y, thumb_rect.width, thumb_rect.height, thumb_round);
-	pctx->fill();
-	pctx->StrokeWidth(pstyle->get_thumb_stroke_width());
-	pctx->strokeColor(pstyle->get_scroll_thumb_border_color());
-	pctx->stroke();
-}
-
 void rm_animation::on_draw(NVGcontext* pctx)
 {
 	rm_vec2 pos(m_size.x / 2.f, m_size.y / 2.f);
@@ -1141,55 +1035,129 @@ rm_animation::~rm_animation()
 {
 }
 
-rm_widget* rm_scrollbar::find_other_scrollbars()
+void rm_scrollbar::adjust_geometry()
 {
-	for (size_t i = 0; i < m_pparent->get_num_childs(); i++) {
-		rm_widget* pchild = m_pparent->get_child(i);
-		if (pchild != this && !strcmp(pchild->get_classname(), "ui_scrollbar")) {
-			return pchild;
-		}
-	}
-	return nullptr;
-}
-
-void rm_scrollbar::adjust_position()
-{
-	/* set position of parent */
-	//rm_widget* pother_scroll = find_other_scrollbars();
-	//rm_vec2& parent_abs = m_pparent->get_absolute();
-	rm_vec2& parent_size = m_pparent->get_size();
-	if (get_orient() == RM_ORIENT_HORZ) {
-		m_size.init(parent_size.x, m_pstyle->get_thumb_size());
-		m_pos_of_parent.init(m_pos_of_parent.x, m_pos_of_parent.y + parent_size.y - m_pstyle->get_thumb_size());
+	if (!m_pparent)
+		return;
+	const rm_vec2& parent_size = m_pparent->get_size();
+	const float thickness = m_theme->scrollbar.thickness;
+	if (is_vertical()) {
+		move({ std::max(0.f, parent_size.x - thickness), 0.f });
+		resize(thickness, parent_size.y);
 	}
 	else {
-		m_size.init(m_pstyle->get_thumb_size(), parent_size.y);
-		m_pos_of_parent.init(m_pos_of_parent.x + parent_size.x - m_pstyle->get_thumb_size(), m_pos_of_parent.y);
+		move({ 0.f, std::max(0.f, parent_size.y - thickness) });
+		resize(parent_size.x, thickness);
 	}
+}
+
+void rm_scrollbar::notify_position()
+{
+	if (is_valid_callback())
+		get_callback()(this, m_behaviour.position());
 }
 
 void rm_scrollbar::on_draw(NVGcontext* pctx)
 {
-	rm_vec2 content_rect = m_pparent ? m_pparent->get_size() : m_size;
-	draw_scroll(pctx, m_pstyle, content_rect, m_size, m_pstyle->get_thumb_size(), m_position);
+	const RmScrollbarStyle& style = m_theme->scrollbar;
+	const float length = track_length();
+	RmDefaultControlPainter::draw_scrollbar(*pctx,
+		{ m_size.x, m_size.y,
+		  m_behaviour.thumb_offset(length, style.minimum_thumb_length),
+		  m_behaviour.thumb_length(length, style.minimum_thumb_length),
+		  is_vertical(), is_enabled(), m_elem_flags.is_hovered(),
+		  m_behaviour.is_dragging(), m_elem_flags.is_focused() }, style);
 	rm_widget::on_draw(pctx);
 }
 
-bool rm_scrollbar::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+void rm_scrollbar::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 {
+	RM_UNUSED(sc);
+	if (state != DOWN)
+		return;
+	RmBehaviourUpdate update;
+	const bool decrease = vk == RM_KEY_LEFT || vk == RM_KEY_UP;
+	const bool increase = vk == RM_KEY_RIGHT || vk == RM_KEY_DOWN;
+	if (decrease || increase)
+		update = m_behaviour.step(increase ? 0.05f : -0.05f);
+	else if (vk == RM_KEY_PAGE_UP || vk == RM_KEY_PAGE_DOWN)
+		update = m_behaviour.step(vk == RM_KEY_PAGE_DOWN
+			? m_behaviour.viewport_fraction() : -m_behaviour.viewport_fraction());
+	else if (vk == RM_KEY_HOME || vk == RM_KEY_END) {
+		update = m_behaviour.set_position(vk == RM_KEY_END ? 1.f : 0.f);
+		update.activated = update.state_changed;
+	}
+	if (update.activated)
+		notify_position();
+}
+
+bool rm_scrollbar::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+	RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+{
+	RM_UNUSED(delta);
+	if (vk != RM_KEY_NONE && vk != RM_KEY_LMOUSE)
+		return true;
+	const RmScrollbarStyle& style = m_theme->scrollbar;
+	const float pointer = pointer_axis(cursor_to_local(cursor_pos));
+	if (event == RM_MOUSE_EVENT_MOVE && m_behaviour.is_dragging()) {
+		const RmBehaviourUpdate update = m_behaviour.drag_to(
+			pointer, track_length(), style.minimum_thumb_length);
+		if (update.state_changed)
+			notify_position();
+		return false;
+	}
+	if (event != RM_MOUSE_EVENT_CLICK)
+		return true;
+	if (state == DOWN && m_bbox.inside(cursor_pos)) {
+		const float previous = m_behaviour.position();
+		const RmBehaviourUpdate update = m_behaviour.begin_drag(
+			pointer, track_length(), style.minimum_thumb_length);
+		if (update.handled && get_root())
+			get_root()->capture_pointer(this);
+		if (std::fabs(previous - m_behaviour.position()) > FLT_EPSILON)
+			notify_position();
+		return !update.handled;
+	}
+	if (state == UP) {
+		const RmBehaviourUpdate update = m_behaviour.end_drag();
+		return !update.handled;
+	}
 	return true;
 }
 
-rm_scrollbar::rm_scrollbar(rm_widget* p_parent, RM_ORIENT orient, rm_scroll_style* p_style, float inital_pos) :
-	rm_widget(0, 0, 0, 0, p_parent, "ui_scrollbar", RM_FLAG_DEFAULT | RM_FLAG_GLOBAL), m_position(inital_pos)
+rm_scrollbar::rm_scrollbar(rm_widget* p_parent, RM_ORIENT orientation,
+	float initial_position, rm_scrollbar_cb p_callback, RmThemeRef theme) :
+	rm_widget(0, 0, 0, 0, p_parent, "ui_scrollbar", RM_FLAG_DEFAULT),
+	m_orientation(orientation == RM_ORIENT_HORZ ? RM_ORIENT_HORZ : RM_ORIENT_VERT),
+	m_behaviour(initial_position),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
 {
-	set_style(p_style);
-	set_orient(orient);
-	adjust_position();
+	set_callback(p_callback);
+	adjust_geometry();
 }
 
 rm_scrollbar::~rm_scrollbar()
 {
+}
+
+void rm_scrollbar::set_position(float position, bool notify)
+{
+	const RmBehaviourUpdate update = m_behaviour.set_position(position);
+	if (notify && update.state_changed)
+		notify_position();
+}
+
+void rm_scrollbar::set_content_metrics(float content_extent, float viewport_extent)
+{
+	const float fraction = content_extent > FLT_EPSILON
+		? viewport_extent / content_extent : 1.f;
+	m_behaviour.set_viewport_fraction(fraction);
+}
+
+void rm_scrollbar::set_theme(RmThemeRef theme)
+{
+	m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+	adjust_geometry();
 }
 
 rm_tabcontrol::rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height,
@@ -2070,19 +2038,18 @@ void rm_menu::set_theme(RmThemeRef theme)
 	update_popup_geometry();
 }
 
-std::map<const rm_widget*, std::vector<rm_radiobutton*>> rm_radiobutton::s_groups; // NOTE: d2 mb need refactoring this..
+std::map<const rm_widget*, std::vector<rm_radiobutton*>> rm_radiobutton::s_groups;
 
 rm_radiobutton::rm_radiobutton(rm_widget* parent, int x, int y, int width, int height,
-	rm_radiobutton_style* pstyle, const std::string& label, rm_radiobutton_cb cb) :
+	const std::string& label, rm_radiobutton_cb cb, RmThemeRef theme) :
 	rm_widget(x, y, width, height, parent, "ui_radiobutton"),
-	m_label(label), m_checked(false), m_allow_uncheck(false) {
-	set_style(pstyle);
+	m_label(label), m_behaviour(false),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()) {
 	set_callback(cb);
-	assert(pstyle && "pstyle must not be null");
 	auto& grp = s_groups[parent];
 	grp.push_back(this);
 	if (grp.size() == 1)
-		m_checked = true;
+		m_behaviour.set_checked(true);
 }
 
 rm_radiobutton::~rm_radiobutton() {
@@ -2096,15 +2063,41 @@ rm_radiobutton::~rm_radiobutton() {
 	}
 }
 
+void rm_radiobutton::uncheck_siblings()
+{
+	auto it = s_groups.find(m_pparent);
+	if (it == s_groups.end())
+		return;
+	for (rm_radiobutton* p_radio : it->second) {
+		if (p_radio != this)
+			p_radio->m_behaviour.set_checked(false);
+	}
+}
+
+void rm_radiobutton::notify_activation()
+{
+	if (m_behaviour.is_checked())
+		uncheck_siblings();
+	if (is_valid_callback())
+		get_callback()(this);
+}
+
+void rm_radiobutton::set_checked(bool checked)
+{
+	if (checked)
+		uncheck_siblings();
+	m_behaviour.set_checked(checked);
+}
+
 void rm_radiobutton::select_default(rm_widget* parent, int index) {
 	auto it = s_groups.find(parent);
 
-	if (it == s_groups.end())
+	if (it == s_groups.end() || index < 0 || static_cast<size_t>(index) >= it->second.size())
 		return;
 
 	auto& grp = it->second;
 	for (size_t i = 0; i < grp.size(); ++i)
-		grp[i]->m_checked = (i == (size_t)index);
+		grp[i]->m_behaviour.set_checked(i == static_cast<size_t>(index));
 }
 
 void rm_radiobutton::select_by_label(rm_widget* parent, const std::string& label) {
@@ -2113,113 +2106,55 @@ void rm_radiobutton::select_by_label(rm_widget* parent, const std::string& label
 	if (it == s_groups.end())
 		return;
 
-	for (auto* rb : it->second)
-		rb->m_checked = (rb->m_label == label);
+	for (rm_radiobutton* p_radio : it->second) {
+		if (p_radio->m_label == label) {
+			p_radio->set_checked(true);
+			return;
+		}
+	}
 }
 
 void rm_radiobutton::on_draw(NVGcontext* pctx) {
-	rm_radiobutton_style& style = *get_style();
-	float w = (float)m_size.x;
-	float h = (float)m_size.y;
-	float circle_radius = style.get_circle_radius();
-
-	/* draw shadow */
-	rm_utl::draw_shadow(pctx, rm_vec2(0.f, 0.f), m_size, rm_vec2(0.f, 1.0f), style.get_shadow_offset(), style.get_shadow_color(), style.get_shadow_size(), style.get_avg_radius());
-
-	/* draw bg */
-	pctx->beginPath();
-	pctx->roundedRectVarying(
-		0.5f, 0.5f, w - 1.0f, h - 1.0f,
-		style.get_corner_radius(LEFT_TOP),
-		style.get_corner_radius(RIGHT_TOP),
-		style.get_corner_radius(RIGHT_BOTTOM),
-		style.get_corner_radius(LEFT_BOTTOM));
-	pctx->fillColor(style.get_bg_inner());
-	pctx->fill();
-
-	float cy = h * 0.5f;
-	float cx = circle_radius + 5.f;
-
-	if (m_checked) {
-		float w_o = style.get_border_width_outer();
-		float w_i = style.get_border_width_inner();
-
-		/* draw active outer border */
-		float r_o = circle_radius - w_o * 0.5f;
-		pctx->beginPath();
-		pctx->circle(cx, cy, r_o);
-		pctx->StrokeWidth(w_o);
-		pctx->strokeColor(style.get_border_active_outer());
-		pctx->stroke();
-
-		/* draw active inner border */
-		float r_i = r_o - w_o * 0.5f - w_i * 0.5f;
-		pctx->beginPath();
-		pctx->circle(cx, cy, r_i);
-		pctx->StrokeWidth(w_i);
-		pctx->strokeColor(style.get_border_active_inner());
-		pctx->stroke();
-
-		/* draw active mark */
-		float r_fill = r_i - w_i * 0.5f;
-		pctx->beginPath();
-		pctx->circle(cx, cy, r_fill);
-		pctx->fillColor(style.get_mark_color());
-		pctx->fill();
-	}
-	else {
-		/* draw inactive border */
-		float w_n = style.get_border_width_inactive();
-		float r_n = circle_radius - w_n * 0.5f;
-		pctx->beginPath();
-		pctx->circle(cx, cy, r_n);
-		pctx->StrokeWidth(w_n);
-		pctx->strokeColor(style.get_border_inactive());
-		pctx->stroke();
-	}
-	float circle_right = cx + circle_radius + style.get_border_width_outer();
-	float bounds[4];
-
-	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
-	pctx->setFontSize(style.get_font_size());
-	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-	pctx->textBounds(0, 0, m_label.c_str(), nullptr, bounds);
-
-	float textWidth = bounds[2] - bounds[0];
-	float avail = w - circle_right;
-	float tx = circle_right + (avail - textWidth) / 2.0f;
-	rm_vec2 offs = style.get_text_offset();
-	tx += offs.x;
-	float ty = cy + offs.y;
-
-	pctx->fillColor(style.get_text_color());
-	pctx->text(tx, ty, m_label.c_str(), nullptr);
-
+	RmDefaultControlPainter::draw_radiobutton(*pctx,
+		{ m_size.x, m_size.y, get_font(), m_label.c_str(), is_enabled(),
+		  m_behaviour.is_hovered(), m_behaviour.is_pressed(),
+		  m_elem_flags.is_focused(), m_behaviour.is_checked() },
+		m_theme->radiobutton);
 	rm_widget::on_draw(pctx);
 }
 
 bool rm_radiobutton::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& pos, rm_vec2 delta)
 {
-	if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(pos)) {
-		if (m_checked) {
-			if (m_allow_uncheck) {
-				m_checked = false;
-			}
-			else {
-				return false;
-			}
-		}
-		else {
-			auto& grp = s_groups[m_pparent];
-			for (auto* rb : grp)
-				rb->m_checked = false;
-			m_checked = true;
-		}
-		if (is_valid_callback())
-			get_callback()(this);
-		return false;
+	RM_UNUSED(delta);
+	const bool inside = m_bbox.inside(pos);
+	if (event == RM_MOUSE_EVENT_MOVE)
+		return !m_behaviour.pointer_move(inside).handled;
+	if (event != RM_MOUSE_EVENT_CLICK || vk != RM_KEY_LMOUSE)
+		return true;
+	if (state == DOWN) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_down(inside);
+		if (update.handled && get_root())
+			get_root()->capture_pointer(this);
+		return !update.handled;
+	}
+	if (state == UP) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_up(inside);
+		if (update.activated)
+			notify_activation();
+		return !update.handled;
 	}
 	return true;
+}
+
+void rm_radiobutton::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
+{
+	RM_UNUSED(sc);
+	const bool activation_key = vk == RM_KEY_ENTER || vk == RM_KEY_SPACE;
+	const RmBehaviourUpdate update = state == UP
+		? m_behaviour.key_up(activation_key)
+		: m_behaviour.key_down(activation_key);
+	if (update.activated)
+		notify_activation();
 }
 
 rm_switch::rm_switch(rm_widget* parent, int x, int y, int width,
@@ -2279,93 +2214,131 @@ void rm_switch::on_keybd(int sc, RM_KEY key, RM_KEY_STATE state)
 		get_callback()(this);
 }
 
-rm_listview::rm_listview(rm_widget* parent, int x, int y, int width, int height, rm_listview_style* pstyle, rm_listview_cb cb) :
-	rm_widget(x, y, width, height, parent, "ui_listview", RM_FLAG_DEFAULT | RM_FLAG_GLOBAL),
-	m_hover_index((size_t)-1), m_selected_index((size_t)-1)
+rm_listview::rm_listview(rm_widget* parent, int x, int y, int width, int height,
+	rm_listview_cb cb, RmThemeRef theme) :
+	rm_widget(x, y, width, height, parent, "ui_listview", RM_FLAG_DEFAULT),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
 {
-	set_style(pstyle);
 	set_callback(cb);
-	assert(pstyle && "style must not be null");
+	m_behaviour.set_count(0);
 }
 
 void rm_listview::add_item(const std::string& text)
 {
 	m_items.push_back(text);
-	float h = m_items.size() * get_style()->get_row_height();
-	resize({ m_size.x, h });
+	m_behaviour.set_count(m_items.size());
+}
+
+bool rm_listview::remove_item(size_t index)
+{
+	if (index >= m_items.size())
+		return false;
+	const size_t selected = m_behaviour.selected_index();
+	m_items.erase(m_items.begin() + static_cast<std::ptrdiff_t>(index));
+	m_behaviour.set_count(m_items.size());
+	if (!m_items.empty() && selected != RmListViewBehaviour::invalid_index) {
+		const size_t replacement = selected > index
+			? selected - 1 : std::min(selected, m_items.size() - 1);
+		m_behaviour.select(replacement);
+	}
+	return true;
 }
 
 void rm_listview::clear_items()
 {
 	m_items.clear();
-	m_hover_index = m_selected_index = (size_t)-1;
-	resize({ m_size.x, 0.f });
+	m_behaviour.set_count(0);
+}
+
+bool rm_listview::set_selected_index(size_t index, bool notify)
+{
+	const RmBehaviourUpdate update = m_behaviour.select(index);
+	if (!update.handled)
+		return false;
+	if (notify && update.state_changed)
+		notify_selection();
+	return true;
+}
+
+size_t rm_listview::hit_test_row(const rm_vec2& local_cursor) const
+{
+	const RmListViewStyle& style = m_theme->listview;
+	if (local_cursor.x < 0.f || local_cursor.x > m_size.x ||
+		local_cursor.y < style.vertical_padding || local_cursor.y > m_size.y ||
+		style.row_height <= 0.f)
+		return RmListViewBehaviour::invalid_index;
+	const size_t index = static_cast<size_t>(
+		(local_cursor.y - style.vertical_padding) / style.row_height);
+	return index < m_items.size() ? index : RmListViewBehaviour::invalid_index;
+}
+
+void rm_listview::notify_selection()
+{
+	const size_t selected = m_behaviour.selected_index();
+	if (selected < m_items.size() && is_valid_callback())
+		get_callback()(this, selected);
 }
 
 void rm_listview::on_draw(NVGcontext* pctx)
 {
-	rm_listview_style& style = *get_style();
-	/* draw background */
-	pctx->beginPath();
-	pctx->rect(0, 0, m_size.x, m_size.y);
-	pctx->fillColor(style.get_background_color());
-	pctx->fill();
-
-	/* draw items */
-	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
-	pctx->setFontSize(style.get_font_size());
-	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-
-	float row_h = style.get_row_height();
-	float pad = style.get_text_padding();
+	const RmListViewStyle& style = m_theme->listview;
+	RmDefaultControlPainter::draw_listview_surface(*pctx,
+		{ m_size.x, m_size.y, m_elem_flags.is_focused(), is_enabled() }, style);
 	for (size_t i = 0; i < m_items.size(); ++i) {
-		float y0 = i * row_h;
-		/* background for hover/selected */
-		if (i == m_selected_index) {
-			pctx->beginPath();
-			pctx->rect(0, y0, m_size.x, row_h);
-			pctx->fillColor(style.get_selected_color());
-			pctx->fill();
-		}
-		else if (i == m_hover_index) {
-			pctx->beginPath();
-			pctx->rect(0, y0, m_size.x, row_h);
-			pctx->fillColor(style.get_hover_color());
-			pctx->fill();
-		}
-		pctx->fillColor(style.get_text_color());
-		pctx->text(pad, y0 + row_h * 0.5f,
-			m_items[i].c_str(), nullptr);
+		const float y = style.vertical_padding + style.row_height * static_cast<float>(i);
+		if (y >= m_size.y)
+			break;
+		RmDefaultControlPainter::draw_listview_row(*pctx,
+			{ style.vertical_padding, y,
+			  std::max(0.f, m_size.x - style.vertical_padding * 2.f),
+			  std::min(style.row_height, m_size.y - y), get_font(),
+			  m_items[i].c_str(), is_enabled(),
+			  m_behaviour.hovered_index() == i,
+			  m_behaviour.pressed_index() == i,
+			  m_behaviour.selected_index() == i }, style);
 	}
-
 	rm_widget::on_draw(pctx);
 }
 
-bool rm_listview::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+void rm_listview::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 {
-	rm_listview_style& style = *get_style();
-	rm_vec2 local = cursor_to_local(cursor_pos);
-	float row_h = style.get_row_height();
-	size_t idx = size_t(local.y / row_h);
-	if (local.x < 0 || local.x > m_size.x || idx >= m_items.size()) {
-		m_hover_index = (size_t)-1;
+	RM_UNUSED(sc);
+	if (state != DOWN || m_items.empty())
+		return;
+	RmBehaviourUpdate update;
+	if (vk == RM_KEY_UP || vk == RM_KEY_DOWN) {
+		update = m_behaviour.select_relative(vk == RM_KEY_DOWN ? 1 : -1);
 	}
-	else {
-		m_hover_index = idx;
+	else if (vk == RM_KEY_HOME || vk == RM_KEY_END) {
+		update = m_behaviour.select(vk == RM_KEY_HOME ? 0 : m_items.size() - 1);
+		update.activated = update.state_changed;
 	}
+	if (update.activated)
+		notify_selection();
+}
 
-	if (event == RM_MOUSE_EVENT_CLICK && state == DOWN) {
-		if (m_bbox.inside(cursor_pos)) {
-			if (m_hover_index < m_items.size()) {
-				m_selected_index = m_hover_index;
-				if (is_valid_callback())
-					get_callback()(this, m_selected_index);
-			}
-		}
-		else {
-			m_selected_index = (size_t)-1;
-		}
-		return false;
+bool rm_listview::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+	RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+{
+	RM_UNUSED(delta);
+	if (vk != RM_KEY_NONE && vk != RM_KEY_LMOUSE)
+		return true;
+	const size_t index = hit_test_row(cursor_to_local(cursor_pos));
+	if (event == RM_MOUSE_EVENT_MOVE)
+		return !m_behaviour.pointer_move(index).handled;
+	if (event != RM_MOUSE_EVENT_CLICK)
+		return true;
+	if (state == DOWN) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_down(index);
+		if (update.handled && get_root())
+			get_root()->capture_pointer(this);
+		return !update.handled;
+	}
+	if (state == UP) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_up(index);
+		if (update.activated)
+			notify_selection();
+		return !update.handled;
 	}
 	return true;
 }

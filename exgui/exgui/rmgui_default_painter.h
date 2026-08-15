@@ -72,6 +72,18 @@ struct RmCheckboxVisual {
   bool checked = false;
 };
 
+struct RmRadioButtonVisual {
+  float width = 0.0f;
+  float height = 0.0f;
+  NVGhandle font;
+  const char* text = nullptr;
+  bool enabled = true;
+  bool hovered = false;
+  bool pressed = false;
+  bool focused = false;
+  bool checked = false;
+};
+
 struct RmComboBoxVisual {
   float width = 0.0f;
   float height = 0.0f;
@@ -102,10 +114,42 @@ struct RmComboBoxItemVisual {
   bool selected = false;
 };
 
+struct RmListViewSurfaceVisual {
+  float width = 0.0f;
+  float height = 0.0f;
+  bool focused = false;
+  bool enabled = true;
+};
+
+struct RmListViewRowVisual {
+  float x = 0.0f;
+  float y = 0.0f;
+  float width = 0.0f;
+  float height = 0.0f;
+  NVGhandle font;
+  const char* text = nullptr;
+  bool enabled = true;
+  bool hovered = false;
+  bool pressed = false;
+  bool selected = false;
+};
+
 struct RmSliderVisual {
   float width = 0.0f;
   float height = 0.0f;
   float fraction = 0.0f;
+  bool enabled = true;
+  bool hovered = false;
+  bool dragging = false;
+  bool focused = false;
+};
+
+struct RmScrollbarVisual {
+  float width = 0.0f;
+  float height = 0.0f;
+  float thumb_offset = 0.0f;
+  float thumb_length = 0.0f;
+  bool vertical = true;
   bool enabled = true;
   bool hovered = false;
   bool dragging = false;
@@ -147,14 +191,22 @@ public:
     const RmLabelStyle& style);
   static void draw_checkbox(NVGcontext& context, const RmCheckboxVisual& visual,
     const RmCheckboxStyle& style);
+  static void draw_radiobutton(NVGcontext& context,
+    const RmRadioButtonVisual& visual, const RmRadioButtonStyle& style);
   static void draw_combobox(NVGcontext& context, const RmComboBoxVisual& visual,
     const RmComboBoxStyle& style);
   static void draw_combobox_popup(NVGcontext& context,
     const RmComboBoxPopupVisual& visual, const RmComboBoxStyle& style);
   static void draw_combobox_item(NVGcontext& context,
     const RmComboBoxItemVisual& visual, const RmComboBoxStyle& style);
+  static void draw_listview_surface(NVGcontext& context,
+    const RmListViewSurfaceVisual& visual, const RmListViewStyle& style);
+  static void draw_listview_row(NVGcontext& context,
+    const RmListViewRowVisual& visual, const RmListViewStyle& style);
   static void draw_slider(NVGcontext& context, const RmSliderVisual& visual,
     const RmSliderStyle& style);
+  static void draw_scrollbar(NVGcontext& context, const RmScrollbarVisual& visual,
+    const RmScrollbarStyle& style);
   static void draw_progress(NVGcontext& context, const RmProgressVisual& visual,
     const RmProgressStyle& style);
   static void draw_switch(NVGcontext& context, const RmSwitchVisual& visual,

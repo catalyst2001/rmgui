@@ -122,6 +122,173 @@ public:
   RmBehaviourUpdate cancel() noexcept { return button_.cancel(); }
 };
 
+class RmRadioButtonBehaviour {
+  RmButtonBehaviour m_button;
+  bool m_checked = false;
+  bool m_allow_uncheck = false;
+
+  RmBehaviourUpdate apply_activation(RmBehaviourUpdate update) noexcept {
+    if (!update.activated)
+      return update;
+    if (m_checked && !m_allow_uncheck) {
+      update.activated = false;
+      return update;
+    }
+    m_checked = !m_checked;
+    update.state_changed = true;
+    return update;
+  }
+
+public:
+  explicit RmRadioButtonBehaviour(bool checked = false) noexcept :
+    m_checked(checked) {}
+
+  bool is_checked() const noexcept { return m_checked; }
+  bool is_hovered() const noexcept { return m_button.is_hovered(); }
+  bool is_pressed() const noexcept { return m_button.is_pressed(); }
+  bool allows_uncheck() const noexcept { return m_allow_uncheck; }
+
+  RmBehaviourUpdate set_enabled(bool enabled) noexcept {
+    return m_button.set_enabled(enabled);
+  }
+  RmBehaviourUpdate set_checked(bool checked) noexcept {
+    const bool changed = m_checked != checked;
+    m_checked = checked;
+    return { false, changed, false };
+  }
+  RmBehaviourUpdate set_allow_uncheck(bool allow) noexcept {
+    const bool changed = m_allow_uncheck != allow;
+    m_allow_uncheck = allow;
+    return { false, changed, false };
+  }
+  RmBehaviourUpdate pointer_move(bool inside) noexcept {
+    return m_button.pointer_move(inside);
+  }
+  RmBehaviourUpdate pointer_down(bool inside) noexcept {
+    return m_button.pointer_down(inside);
+  }
+  RmBehaviourUpdate pointer_up(bool inside) noexcept {
+    return apply_activation(m_button.pointer_up(inside));
+  }
+  RmBehaviourUpdate key_down(bool activation_key) noexcept {
+    return m_button.key_down(activation_key);
+  }
+  RmBehaviourUpdate key_up(bool activation_key) noexcept {
+    return apply_activation(m_button.key_up(activation_key));
+  }
+  RmBehaviourUpdate cancel() noexcept { return m_button.cancel(); }
+};
+
+class RmListViewBehaviour {
+public:
+  static constexpr size_t invalid_index = std::numeric_limits<size_t>::max();
+
+private:
+  size_t m_count = 0;
+  size_t m_hovered = invalid_index;
+  size_t m_pressed = invalid_index;
+  size_t m_selected = invalid_index;
+  bool m_enabled = true;
+
+  bool is_valid(size_t index) const noexcept { return index < m_count; }
+
+public:
+  size_t count() const noexcept { return m_count; }
+  size_t hovered_index() const noexcept { return m_hovered; }
+  size_t pressed_index() const noexcept { return m_pressed; }
+  size_t selected_index() const noexcept { return m_selected; }
+
+  RmBehaviourUpdate set_enabled(bool enabled) noexcept {
+    const bool changed = m_enabled != enabled || (!enabled && m_pressed != invalid_index);
+    m_enabled = enabled;
+    if (!m_enabled) {
+      m_hovered = invalid_index;
+      m_pressed = invalid_index;
+    }
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate set_count(size_t count) noexcept {
+    m_count = count;
+    const size_t old_hovered = m_hovered;
+    const size_t old_pressed = m_pressed;
+    const size_t old_selected = m_selected;
+    if (!is_valid(m_hovered)) m_hovered = invalid_index;
+    if (!is_valid(m_pressed)) m_pressed = invalid_index;
+    if (!is_valid(m_selected)) m_selected = invalid_index;
+    const bool changed = old_hovered != m_hovered || old_pressed != m_pressed ||
+      old_selected != m_selected;
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_move(size_t index) noexcept {
+    if (!is_valid(index)) index = invalid_index;
+    const bool changed = m_hovered != index;
+    m_hovered = index;
+    return { m_enabled && m_pressed != invalid_index, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_down(size_t index) noexcept {
+    if (!m_enabled || !is_valid(index))
+      return {};
+    const bool changed = m_pressed != index || m_hovered != index;
+    m_pressed = index;
+    m_hovered = index;
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_up(size_t index) noexcept {
+    if (m_pressed == invalid_index)
+      return {};
+    const size_t pressed = m_pressed;
+    m_pressed = invalid_index;
+    if (!is_valid(index)) index = invalid_index;
+    m_hovered = index;
+    const bool activated = m_enabled && pressed == index;
+    if (activated)
+      m_selected = index;
+    return { true, true, activated };
+  }
+
+  RmBehaviourUpdate select(size_t index) noexcept {
+    if (!is_valid(index))
+      return {};
+    const bool changed = m_selected != index;
+    m_selected = index;
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate clear_selection() noexcept {
+    const bool changed = m_selected != invalid_index;
+    m_selected = invalid_index;
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate select_relative(int delta, bool wrap = false) noexcept {
+    if (!m_enabled || m_count == 0 || delta == 0)
+      return {};
+    int next = is_valid(m_selected)
+      ? static_cast<int>(m_selected) + delta
+      : (delta > 0 ? 0 : static_cast<int>(m_count) - 1);
+    const int count = static_cast<int>(m_count);
+    if (wrap) {
+      next %= count;
+      if (next < 0) next += count;
+    }
+    else {
+      next = std::clamp(next, 0, count - 1);
+    }
+    const RmBehaviourUpdate update = select(static_cast<size_t>(next));
+    return { update.handled, update.state_changed, update.state_changed };
+  }
+
+  RmBehaviourUpdate cancel() noexcept {
+    const bool changed = m_pressed != invalid_index;
+    m_pressed = invalid_index;
+    return { changed, changed, false };
+  }
+};
+
 class RmComboBoxBehaviour {
 public:
   static constexpr size_t invalid_index = std::numeric_limits<size_t>::max();
@@ -349,6 +516,105 @@ private:
     fraction = std::clamp(fraction, 0.0f, 1.0f);
     return set_value(minimum_ + (maximum_ - minimum_) * fraction);
   }
+};
+
+class RmScrollbarBehaviour {
+  float m_position = 0.0f;
+  float m_viewport_fraction = 1.0f;
+  float m_drag_offset = 0.0f;
+  bool m_dragging = false;
+  bool m_enabled = true;
+
+public:
+  explicit RmScrollbarBehaviour(float position = 0.0f) noexcept {
+    set_position(position);
+  }
+
+  float position() const noexcept { return m_position; }
+  float viewport_fraction() const noexcept { return m_viewport_fraction; }
+  bool is_dragging() const noexcept { return m_dragging; }
+
+  float thumb_length(float track_length, float minimum_length) const noexcept {
+    track_length = std::max(0.0f, track_length);
+    return std::min(track_length, std::max(minimum_length,
+      track_length * m_viewport_fraction));
+  }
+
+  float thumb_offset(float track_length, float minimum_length) const noexcept {
+    const float available = std::max(0.0f,
+      track_length - thumb_length(track_length, minimum_length));
+    return available * m_position;
+  }
+
+  RmBehaviourUpdate set_enabled(bool enabled) noexcept {
+    const bool changed = m_enabled != enabled || (!enabled && m_dragging);
+    m_enabled = enabled;
+    if (!m_enabled)
+      m_dragging = false;
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate set_position(float position) noexcept {
+    const float clamped = std::clamp(position, 0.0f, 1.0f);
+    const bool changed = std::fabs(m_position - clamped) > 1.0e-6f;
+    m_position = clamped;
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate set_viewport_fraction(float fraction) noexcept {
+    const float clamped = std::clamp(fraction, 0.0f, 1.0f);
+    const bool changed = std::fabs(m_viewport_fraction - clamped) > 1.0e-6f;
+    m_viewport_fraction = clamped;
+    if (m_viewport_fraction >= 1.0f)
+      m_position = 0.0f;
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate begin_drag(float pointer, float track_length,
+    float minimum_length) noexcept {
+    if (!m_enabled || track_length <= 0.0f || m_viewport_fraction >= 1.0f)
+      return {};
+    const float length = thumb_length(track_length, minimum_length);
+    const float offset = thumb_offset(track_length, minimum_length);
+    if (pointer >= offset && pointer <= offset + length) {
+      m_drag_offset = pointer - offset;
+    }
+    else {
+      m_drag_offset = length * 0.5f;
+      const float available = track_length - length;
+      if (available > 0.0f)
+        set_position((pointer - m_drag_offset) / available);
+    }
+    m_dragging = true;
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate drag_to(float pointer, float track_length,
+    float minimum_length) noexcept {
+    if (!m_enabled || !m_dragging)
+      return {};
+    const float available = track_length - thumb_length(track_length, minimum_length);
+    const RmBehaviourUpdate update = available > 0.0f
+      ? set_position((pointer - m_drag_offset) / available)
+      : set_position(0.0f);
+    return { true, update.state_changed, false };
+  }
+
+  RmBehaviourUpdate end_drag() noexcept {
+    if (!m_dragging)
+      return {};
+    m_dragging = false;
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate step(float delta) noexcept {
+    if (!m_enabled)
+      return {};
+    const RmBehaviourUpdate update = set_position(m_position + delta);
+    return { true, update.state_changed, update.state_changed };
+  }
+
+  RmBehaviourUpdate cancel() noexcept { return end_drag(); }
 };
 
 class RmProgressBehaviour {

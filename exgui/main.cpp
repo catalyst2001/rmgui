@@ -361,12 +361,6 @@ void example_core_widgets(rm_surface* gui)
   combobox->add_item("Item 2");
   combobox->add_item("Item 3");
 
-  //static rm_scroll_style scrollbar_style;
-  //scrollbar_style.set_scroll_corner_round(1.f);
-  //scrollbar_style.set_scroll_thumb_color(NVGcolor::RGB(90, 90, 90));
-  //scrollbar_style.set_thumb_size(10);
-  //rm_scrollbar* pscroll = new rm_scrollbar(pwindow, RM_ORIENT_VERT, &scrollbar_style);
-   
   rm_slider* slider = new rm_slider(pwindow, 50, 400, 400, 40, 0.0f, 100.0f, 50.0f,
     [](rm_slider* psilder) {
       psilder->get_userptr<rm_output_text>()->printf("slider value changed: %f", psilder->get_value());
@@ -545,6 +539,12 @@ void example_widgets(rm_surface* gui)
   pdisabled_combo->set_enabled(false);
   new rm_label(pcombo_panel, 20, 222,
     "Mouse, arrows, Home/End, Enter, Esc and F4", controls_theme);
+  rm_scrollbar* pscrollbar = new rm_scrollbar(
+    pcombo_panel, RM_ORIENT_VERT, 0.35f,
+    [](rm_scrollbar*, float position) {
+      printf("Scrollbar position: %.3f\n", position);
+    }, controls_theme);
+  pscrollbar->set_content_metrics(900.f, 260.f);
 
   rm_checkbox *pcb = new rm_checkbox(pdiv, 10, 100, 200, "This is checkbox",
     [](rm_checkbox* pcheckbox) {
@@ -554,28 +554,15 @@ void example_widgets(rm_surface* gui)
 
   ptabctl->set_selected_index(1);
 
-  static rm_radiobutton_style style_rb;
-  style_rb.set_all_corners_radius(8.f);
-  style_rb.set_border_width_inner(3.f);
-  style_rb.set_border_width_outer(1.5f);
-  style_rb.set_border_active_outer(NVGcolor::RGB(57, 76, 195));
-  style_rb.set_border_active_inner(NVGcolor::RGB(40, 60, 196));
-  style_rb.set_border_inactive(NVGcolor::RGB(255, 255, 255));
-  style_rb.set_border_width_inactive(1.5f);
-  style_rb.set_bg_inner(NVGcolor::RGBAf(33.0f / 255.0f, 36.0f / 255.0f, 71.0f / 255.0f, 0.27f));
-  style_rb.set_circle_radius(9.5f);
-
-  new rm_radiobutton(pdiv, 10, 10, 150, 25, &style_rb, "Holding",
+  new rm_radiobutton(pdiv, 10, 10, 150, 30, "Holding",
     [](rm_radiobutton* rb) {
       return true;
-    });
+    }, controls_theme);
 
-  new rm_radiobutton(pdiv, 10, 70, 150, 25, &style_rb, "Always",
+  new rm_radiobutton(pdiv, 10, 70, 150, 30, "Always",
     [](rm_radiobutton* rb) {
       return true;
-    });
-  //rm_radiobutton* first = rm_radiobutton::get_groups()[pdiv][0];
-  //first->set_allow_uncheck(true);
+    }, controls_theme);
   rm_radiobutton::select_default(pdiv, 0);
 
   rm_switch* sw = new rm_switch(pdiv, 10, 120, 60, false,
@@ -594,19 +581,10 @@ void example_widgets(rm_surface* gui)
   );
   slider->set_max_size({ 200*2, 40 });
 
-  static rm_listview_style lv_style;
-  lv_style.set_row_height(30.f);
-  lv_style.set_text_padding(12.f);
-  lv_style.set_background_color(NVGcolor::RGB(250, 250, 250));
-  lv_style.set_text_color(NVGcolor::RGB(30, 30, 30));
-  lv_style.set_hover_color(NVGcolor::RGB(230, 230, 255));
-  lv_style.set_selected_color(NVGcolor::RGB(180, 200, 255));
-  lv_style.set_font_size(14.f);
-
-  rm_listview *list = new rm_listview(pdiv, 20, 210, 200, 150, &lv_style,
+  rm_listview *list = new rm_listview(pdiv, 20, 210, 200, 150,
     [](rm_listview* lv, size_t idx) {
       printf("Selected item #%zu: %s\n", idx, lv->get_selected_index() == idx ? lv->get_items()[idx].c_str() : "");
-    }
+    }, controls_theme
   );
   list->set_max_size({ 200 * 2, 150 * 2 });
 
