@@ -121,6 +121,30 @@ void test_number_input_behaviour()
     "number input places decrement and increment around a centered field");
 }
 
+void test_window_behaviour()
+{
+  expect(rm_window_resize_edges(2.0f, 98.0f, 120.0f, 100.0f,
+    5.0f, WCF_RESIZABLE) == (WCF_LRESIZE | WCF_BRESIZE),
+    "window detects resize corners from allowed edge flags");
+
+  RmWindowBehaviour window;
+  window.begin_drag(30.0f, 30.0f, { 10.0f, 10.0f, 100.0f, 80.0f });
+  expect(window.pointer_move(70.0f, 50.0f, 200.0f, 160.0f,
+    50.0f, 40.0f, 0.0f, 0.0f).state_changed &&
+    window.geometry().x == 50.0f && window.geometry().y == 30.0f,
+    "window dragging updates geometry inside its parent");
+  window.end_interaction();
+
+  window.begin_resize(WCF_LRESIZE | WCF_BRESIZE, 50.0f, 30.0f,
+    { 50.0f, 30.0f, 100.0f, 80.0f });
+  window.pointer_move(80.0f, 70.0f, 200.0f, 160.0f,
+    60.0f, 40.0f, 0.0f, 0.0f);
+  expect(window.geometry().x == 80.0f && window.geometry().width == 70.0f &&
+    window.geometry().height == 120.0f,
+    "window resizing preserves the opposite edge and applies constraints");
+  window.end_interaction();
+}
+
 void test_treeview_behaviour()
 {
   RmTreeViewBehaviour tree;
@@ -445,6 +469,7 @@ int main()
   test_button_behaviour();
   test_text_input_behaviour();
   test_number_input_behaviour();
+  test_window_behaviour();
   test_treeview_behaviour();
   test_propertyview_behaviour();
   test_small_delegate();

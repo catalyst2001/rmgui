@@ -8,6 +8,16 @@
 #include <string>
 #include <vector>
 
+struct RmWindowVisual {
+  float width = 0.0f;
+  float height = 0.0f;
+  bool enabled = true;
+  bool hovered = false;
+  bool focused = false;
+  bool dragging = false;
+  bool resizing = false;
+};
+
 struct RmButtonVisual {
   float width = 0.0f;
   float height = 0.0f;
@@ -360,6 +370,8 @@ public:
     NVGcolor color);
   static void draw_circle_focus_ring(NVGcontext& context, float center_x,
     float center_y, float radius, float width, NVGcolor color);
+  static void draw_window(NVGcontext& context, const RmWindowVisual& visual,
+    const RmWindowStyle& style);
   static void draw_button(NVGcontext& context, const RmButtonVisual& visual,
     const RmButtonStyle& style);
   static void draw_tab_bar(NVGcontext& context, float x, float y, float width,

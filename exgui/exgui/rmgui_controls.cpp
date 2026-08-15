@@ -12,6 +12,95 @@
 
 #include "stb_image.h"
 
+RmWindowGeometry rm_window::current_geometry() const noexcept
+{
+	return { m_pos_of_parent.x, m_pos_of_parent.y, m_size.x, m_size.y };
+}
+
+void rm_window::apply_geometry(const RmWindowGeometry& geometry)
+{
+	m_pos_of_parent.init(geometry.x, geometry.y);
+	m_size.init(geometry.width, geometry.height);
+	m_bbox.init(m_pos_of_parent, m_size);
+	m_content_area.width = m_size.x;
+	m_content_area.height = m_size.y;
+	perform_layout();
+}
+
+void rm_window::on_draw(NVGcontext* pctx)
+{
+	RmDefaultControlPainter::draw_window(*pctx,
+		{ m_size.x, m_size.y, is_enabled(), m_elem_flags.is_hovered(),
+		  m_elem_flags.is_focused(), m_behaviour.is_dragging(),
+		  m_behaviour.is_resizing() }, m_theme->window);
+	rm_widget::on_draw(pctx);
+}
+
+void rm_window::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmWindowStyle& style = m_theme->window;
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ 0.0f, 0.0f, m_size.x, m_size.y }, style.corner_radius,
+		style.focus_ring_width, style.focus_ring);
+}
+
+bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+	RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+{
+	RM_UNUSED(delta);
+	if (vk != RM_KEY_NONE && vk != RM_KEY_LMOUSE)
+		return true;
+
+	if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::DOWN) {
+		const rm_vec2 local = cursor_to_local(cursor_pos);
+		const uint32_t edges = rm_window_resize_edges(local.x, local.y,
+			m_size.x, m_size.y, m_theme->window.resize_grip_extent, m_flags);
+		const RmBehaviourUpdate update = edges != WCF_NONE
+			? m_behaviour.begin_resize(edges, cursor_pos.x, cursor_pos.y,
+				current_geometry())
+			: (local.y >= 0.0f && local.y <= m_theme->window.titlebar_height
+				? m_behaviour.begin_drag(cursor_pos.x, cursor_pos.y,
+					current_geometry())
+				: RmBehaviourUpdate{});
+		if (update.handled && get_root())
+			get_root()->capture_pointer(this);
+		return !update.handled;
+	}
+
+	if (event == RM_MOUSE_EVENT_MOVE && m_behaviour.is_interacting() && m_pparent) {
+		const rm_vec2& parent_size = m_pparent->get_size();
+		const rm_vec2& minimum = get_min_size();
+		const rm_vec2& maximum = get_max_size();
+		const RmBehaviourUpdate update = m_behaviour.pointer_move(
+			cursor_pos.x, cursor_pos.y, parent_size.x, parent_size.y,
+			minimum.x > 0.0f ? minimum.x : 50.0f,
+			minimum.y > 0.0f ? minimum.y : 50.0f,
+			maximum.x, maximum.y);
+		if (update.state_changed)
+			apply_geometry(m_behaviour.geometry());
+		return !update.handled;
+	}
+
+	if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::UP) {
+		const RmBehaviourUpdate update = m_behaviour.end_interaction();
+		return !update.handled;
+	}
+	return true;
+}
+
+rm_window::rm_window(rm_widget* p_parent, int x, int y, int width, int height,
+	uint32_t flags, RmThemeRef theme) :
+	rm_widget(x, y, width, height, p_parent, "ui_window",
+		RM_FLAG_DEFAULT | RM_FLAG_GLOBAL),
+	m_flags(flags & WCF_RESIZABLE),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
+{
+	set_min_size(rm_vec2(0.0f, 0.0f));
+	set_max_size(rm_vec2(0.0f, 0.0f));
+}
+
 /**
 * drawImage
 *

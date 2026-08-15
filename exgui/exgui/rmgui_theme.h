@@ -59,6 +59,18 @@ struct RmStateColors {
   }
 };
 
+struct RmWindowStyle {
+  RmStateColors background;
+  RmStateColors border;
+  RmStateColors titlebar_background;
+  NVGcolor focus_ring;
+  float corner_radius = 0.0f;
+  float border_width = 0.0f;
+  float focus_ring_width = 0.0f;
+  float titlebar_height = 0.0f;
+  float resize_grip_extent = 0.0f;
+};
+
 struct RmButtonStyle {
   RmStateColors background;
   RmStateColors border;
@@ -518,6 +530,8 @@ struct RmAnimationTokens {
 struct RmControlMetricsTokens {
   float border_width = 1.0f;
   float focus_ring_width = 1.0f;
+  float window_titlebar_height = 30.0f;
+  float window_resize_grip_extent = 5.0f;
   float text_input_horizontal_padding = 10.0f;
   float text_input_vertical_padding = 7.0f;
   float text_input_caret_width = 1.5f;
@@ -634,6 +648,7 @@ struct RmThemeSnapshot {
   std::string name;
   RmThemeMode mode = RmThemeMode::dark;
   RmThemeTokens tokens;
+  RmWindowStyle window;
   RmButtonStyles buttons;
   RmTabStyles tabs;
   RmMenuStyle menu;
@@ -753,6 +768,8 @@ class RmThemeCompiler {
     sanitize_metric(tokens.animation.slow, 0.0001f, 10.0f, "tokens.animation.slow", diagnostics);
     sanitize_metric(tokens.controls.border_width, 0.0f, 32.0f, "tokens.controls.border_width", diagnostics);
     sanitize_metric(tokens.controls.focus_ring_width, 0.0f, 32.0f, "tokens.controls.focus_ring_width", diagnostics);
+    sanitize_metric(tokens.controls.window_titlebar_height, 0.0f, 256.0f, "tokens.controls.window_titlebar_height", diagnostics);
+    sanitize_metric(tokens.controls.window_resize_grip_extent, 1.0f, 64.0f, "tokens.controls.window_resize_grip_extent", diagnostics);
     sanitize_metric(tokens.controls.text_input_horizontal_padding, 0.0f, 256.0f, "tokens.controls.text_input_horizontal_padding", diagnostics);
     sanitize_metric(tokens.controls.text_input_vertical_padding, 0.0f, 256.0f, "tokens.controls.text_input_vertical_padding", diagnostics);
     sanitize_metric(tokens.controls.text_input_caret_width, 0.0f, 32.0f, "tokens.controls.text_input_caret_width", diagnostics);
@@ -870,6 +887,20 @@ public:
     const RmControlMetricsTokens& controls = tokens.controls;
 
     const NVGcolor transparent = NVGcolor::RGBA(0, 0, 0, 0);
+    p_theme->window.background = { colors.surface_elevated,
+      colors.surface_elevated, colors.surface_elevated,
+      colors.control_disabled };
+    p_theme->window.border = { colors.border, colors.border_hovered,
+      colors.border_pressed, colors.border_disabled };
+    p_theme->window.titlebar_background = { colors.control,
+      colors.control_hovered, colors.control_pressed, colors.control_disabled };
+    p_theme->window.focus_ring = colors.focus_ring;
+    p_theme->window.corner_radius = tokens.radius.medium;
+    p_theme->window.border_width = controls.border_width;
+    p_theme->window.focus_ring_width = controls.focus_ring_width;
+    p_theme->window.titlebar_height = controls.window_titlebar_height;
+    p_theme->window.resize_grip_extent = controls.window_resize_grip_extent;
+
     const auto configure_button = [&](RmButtonStyle& style,
       const RmStateColors& background, const RmStateColors& border,
       const RmStateColors& text, float border_width) {

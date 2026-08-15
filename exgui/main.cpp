@@ -360,10 +360,7 @@ void drawParagraph(NVGcontext* vg, float x, float y, float width, float height, 
 
 void example_core_widgets(rm_surface* gui)
 {
-  static rm_window_style default_style;
-  default_style.apply_defaults();
   rm_window* pwindow = new rm_window(gui, 20, 20, 1024, 768);
-  pwindow->set_style(&default_style);
 
   rm_image_button* imgButton = new rm_image_button(pwindow, 20, 20, 200, 40, "idle-button-login.png");
   rm_button* textButton = new rm_button(pwindow, 200 + 20 + 10, 20, 200, 40, "Test Button");
@@ -527,9 +524,8 @@ void example_widgets(rm_surface* gui)
     nullptr, shell_theme, RmTabVariant::underline, RmTabPlacement::top);
   rm_widget* ptab01 = ptabctl->add_tab("Window", 0);
 
-  static rm_window_style wstyle;
-  rm_window *pwindow = new rm_window(ptab01, 0, 0, 300, 300);
-  pwindow->set_style(&wstyle);
+  rm_window *pwindow = new rm_window(
+    ptab01, 0, 0, 300, 300, WCF_RESIZABLE, shell_theme);
 
   rm_widget* ptab11 = ptabctl->add_tab("Controls", 1);
   rm_widget* ptab12 = ptabctl->add_tab("Effects", 2);
@@ -587,7 +583,6 @@ void example_widgets(rm_surface* gui)
   pflexlayout->set_fill_y(rm_flex_fill::Clamp);
 
   rm_window* pdiv = new rm_window(ptab11, 10, 10, 200, 300);
-  pdiv->set_style(&wstyle);
   pdiv->set_layout(pflexlayout);
 
   RmThemeDocument controls_theme_document = RmThemeDocument::dark_theme();
@@ -608,6 +603,7 @@ void example_widgets(rm_surface* gui)
   controls_theme_document.tokens.controls.treeview_draw_border = false;
   controls_theme_document.tokens.animation.normal = 0.25f;
   const RmThemeRef controls_theme = RmThemeCompiler::compile(controls_theme_document).theme;
+  pdiv->set_theme(controls_theme);
 
   rm_theme_preview_panel* pcombo_panel = new rm_theme_preview_panel(
     ptab11, 240, 10, 360, 260, controls_theme);

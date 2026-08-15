@@ -99,6 +99,40 @@ void RmDefaultControlPainter::draw_circle_focus_ring(NVGcontext& context,
   context.stroke();
 }
 
+void RmDefaultControlPainter::draw_window(NVGcontext& context,
+  const RmWindowVisual& visual, const RmWindowStyle& style)
+{
+  const RmVisualState state = resolve_state(visual.enabled,
+    visual.hovered || visual.focused, visual.dragging || visual.resizing);
+  const float width = std::max(0.0f, visual.width);
+  const float height = std::max(0.0f, visual.height);
+  const float titlebar_height = std::min(style.titlebar_height, height);
+
+  context.beginPath();
+  context.roundedRect(0.0f, 0.0f, width, height, style.corner_radius);
+  context.fillColor(style.background.resolve(state));
+  context.fill();
+
+  if (titlebar_height > 0.0f) {
+    context.beginPath();
+    context.roundedRectVarying(0.0f, 0.0f, width, titlebar_height,
+      style.corner_radius, style.corner_radius, 0.0f, 0.0f);
+    context.fillColor(style.titlebar_background.resolve(state));
+    context.fill();
+  }
+
+  if (style.border_width > 0.0f) {
+    const float inset = style.border_width * 0.5f;
+    context.beginPath();
+    context.roundedRect(inset, inset,
+      std::max(0.0f, width - style.border_width),
+      std::max(0.0f, height - style.border_width), style.corner_radius);
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.border.resolve(state));
+    context.stroke();
+  }
+}
+
 void RmDefaultControlPainter::draw_button(NVGcontext& context, const RmButtonVisual& visual,
   const RmButtonStyle& style)
 {

@@ -18,6 +18,169 @@ struct RmBehaviourUpdate {
   bool activated = false;
 };
 
+enum rm_window_flags : uint32_t {
+  WCF_NONE = 0,
+  WCF_LRESIZE = 1u << 0,
+  WCF_TRESIZE = 1u << 1,
+  WCF_RRESIZE = 1u << 2,
+  WCF_BRESIZE = 1u << 3,
+  WCF_HRESIZE = WCF_LRESIZE | WCF_RRESIZE,
+  WCF_VRESIZE = WCF_TRESIZE | WCF_BRESIZE,
+  WCF_RESIZABLE = WCF_HRESIZE | WCF_VRESIZE
+};
+
+struct RmWindowGeometry {
+  float x = 0.0f;
+  float y = 0.0f;
+  float width = 0.0f;
+  float height = 0.0f;
+};
+
+inline uint32_t rm_window_resize_edges(float x, float y, float width,
+  float height, float extent, uint32_t allowed_edges) noexcept
+{
+  extent = std::max(0.0f, extent);
+  uint32_t edges = WCF_NONE;
+  if ((allowed_edges & WCF_LRESIZE) && x >= 0.0f && x <= extent)
+    edges |= WCF_LRESIZE;
+  if ((allowed_edges & WCF_RRESIZE) && x >= width - extent && x <= width)
+    edges |= WCF_RRESIZE;
+  if ((allowed_edges & WCF_TRESIZE) && y >= 0.0f && y <= extent)
+    edges |= WCF_TRESIZE;
+  if ((allowed_edges & WCF_BRESIZE) && y >= height - extent && y <= height)
+    edges |= WCF_BRESIZE;
+  return edges;
+}
+
+class RmWindowBehaviour {
+  bool m_enabled = true;
+  bool m_dragging = false;
+  uint32_t m_resize_edges = WCF_NONE;
+  RmWindowGeometry m_start_geometry;
+  RmWindowGeometry m_geometry;
+  float m_start_pointer_x = 0.0f;
+  float m_start_pointer_y = 0.0f;
+
+public:
+  bool is_enabled() const noexcept { return m_enabled; }
+  bool is_dragging() const noexcept { return m_dragging; }
+  bool is_resizing() const noexcept { return m_resize_edges != WCF_NONE; }
+  bool is_interacting() const noexcept { return is_dragging() || is_resizing(); }
+  uint32_t resize_edges() const noexcept { return m_resize_edges; }
+  const RmWindowGeometry& geometry() const noexcept { return m_geometry; }
+
+  RmBehaviourUpdate set_enabled(bool enabled) noexcept {
+    const bool changed = m_enabled != enabled || (!enabled && is_interacting());
+    m_enabled = enabled;
+    if (!m_enabled) {
+      m_dragging = false;
+      m_resize_edges = WCF_NONE;
+    }
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate begin_drag(float pointer_x, float pointer_y,
+    RmWindowGeometry geometry) noexcept
+  {
+    if (!m_enabled)
+      return {};
+    m_dragging = true;
+    m_resize_edges = WCF_NONE;
+    m_start_pointer_x = pointer_x;
+    m_start_pointer_y = pointer_y;
+    m_start_geometry = m_geometry = geometry;
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate begin_resize(uint32_t edges, float pointer_x,
+    float pointer_y, RmWindowGeometry geometry) noexcept
+  {
+    edges &= WCF_RESIZABLE;
+    if (!m_enabled || edges == WCF_NONE ||
+      ((edges & WCF_LRESIZE) && (edges & WCF_RRESIZE)) ||
+      ((edges & WCF_TRESIZE) && (edges & WCF_BRESIZE)))
+      return {};
+    m_dragging = false;
+    m_resize_edges = edges;
+    m_start_pointer_x = pointer_x;
+    m_start_pointer_y = pointer_y;
+    m_start_geometry = m_geometry = geometry;
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate pointer_move(float pointer_x, float pointer_y,
+    float parent_width, float parent_height, float minimum_width,
+    float minimum_height, float maximum_width, float maximum_height) noexcept
+  {
+    if (!m_enabled || !is_interacting())
+      return {};
+
+    parent_width = std::max(0.0f, parent_width);
+    parent_height = std::max(0.0f, parent_height);
+    minimum_width = std::clamp(minimum_width, 0.0f, parent_width);
+    minimum_height = std::clamp(minimum_height, 0.0f, parent_height);
+    maximum_width = maximum_width > 0.0f
+      ? std::clamp(maximum_width, minimum_width, parent_width) : parent_width;
+    maximum_height = maximum_height > 0.0f
+      ? std::clamp(maximum_height, minimum_height, parent_height) : parent_height;
+
+    const float dx = pointer_x - m_start_pointer_x;
+    const float dy = pointer_y - m_start_pointer_y;
+    RmWindowGeometry next = m_start_geometry;
+
+    if (m_dragging) {
+      next.x = std::clamp(m_start_geometry.x + dx, 0.0f,
+        std::max(0.0f, parent_width - next.width));
+      next.y = std::clamp(m_start_geometry.y + dy, 0.0f,
+        std::max(0.0f, parent_height - next.height));
+    } else {
+      if (m_resize_edges & WCF_LRESIZE) {
+        next.width = std::clamp(m_start_geometry.width - dx,
+          minimum_width, std::min(maximum_width,
+            m_start_geometry.x + m_start_geometry.width));
+        next.x = m_start_geometry.x + m_start_geometry.width - next.width;
+      } else if (m_resize_edges & WCF_RRESIZE) {
+        next.width = std::clamp(m_start_geometry.width + dx,
+          minimum_width, std::min(maximum_width,
+            parent_width - m_start_geometry.x));
+      }
+
+      if (m_resize_edges & WCF_TRESIZE) {
+        next.height = std::clamp(m_start_geometry.height - dy,
+          minimum_height, std::min(maximum_height,
+            m_start_geometry.y + m_start_geometry.height));
+        next.y = m_start_geometry.y + m_start_geometry.height - next.height;
+      } else if (m_resize_edges & WCF_BRESIZE) {
+        next.height = std::clamp(m_start_geometry.height + dy,
+          minimum_height, std::min(maximum_height,
+            parent_height - m_start_geometry.y));
+      }
+    }
+
+    const bool changed = next.x != m_geometry.x || next.y != m_geometry.y ||
+      next.width != m_geometry.width || next.height != m_geometry.height;
+    m_geometry = next;
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate end_interaction() noexcept {
+    if (!is_interacting())
+      return {};
+    m_dragging = false;
+    m_resize_edges = WCF_NONE;
+    return { true, true, true };
+  }
+
+  RmBehaviourUpdate cancel() noexcept {
+    if (!is_interacting())
+      return {};
+    m_dragging = false;
+    m_resize_edges = WCF_NONE;
+    m_geometry = m_start_geometry;
+    return { false, true, false };
+  }
+};
+
 class RmTextInputBehaviour {
   struct Snapshot {
     std::string text;

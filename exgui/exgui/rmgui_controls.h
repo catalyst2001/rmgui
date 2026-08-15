@@ -12,6 +12,40 @@
 #include <string_view>
 #include <utility>
 
+class rm_window : public rm_widget {
+  uint32_t m_flags;
+  RmWindowBehaviour m_behaviour;
+  RmThemeRef m_theme;
+
+  RmWindowGeometry current_geometry() const noexcept;
+  void apply_geometry(const RmWindowGeometry& geometry);
+  void on_enabled_changed(bool enabled) override {
+    m_behaviour.set_enabled(enabled);
+  }
+  void on_pointer_capture_lost() override {
+    m_behaviour.end_interaction();
+  }
+
+protected:
+  void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
+  bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
+    rm_vec2& cursor_pos, rm_vec2 delta) override;
+
+public:
+  rm_window(rm_widget* p_parent, int x, int y, int width, int height,
+    uint32_t flags = WCF_RESIZABLE, RmThemeRef theme = {});
+
+  uint32_t get_window_flags() const noexcept { return m_flags; }
+  void set_window_flags(uint32_t flags) noexcept {
+    m_flags = flags & WCF_RESIZABLE;
+  }
+  const RmWindowBehaviour& behaviour() const noexcept { return m_behaviour; }
+  void set_theme(RmThemeRef theme) {
+    m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+  }
+};
+
 class rmgui_image {
 public:
   NVGhandle imageId;
