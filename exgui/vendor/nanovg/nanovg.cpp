@@ -896,6 +896,16 @@ void NVGcontext::resetScissor()
 	state->scissor.extent[1] = -1.0f;
 }
 
+static bool nvg__isScissorEmpty(const NVGscissor& scissor)
+{
+	// Negative extents mean that scissoring is disabled. A non-negative
+	// scissor with either zero extent is the empty intersection and must not
+	// reach an antialiased renderer: its soft mask would otherwise produce a
+	// half-covered one-pixel line at the collapsed edge.
+	return scissor.extent[0] >= 0.0f &&
+		(scissor.extent[0] <= 0.0f || scissor.extent[1] <= 0.0f);
+}
+
 // Global composite operation.
 void NVGcontext::globalCompositeOp(int op)
 {
@@ -1594,6 +1604,8 @@ void NVGcontext::debugDumpPathCache()
 void NVGcontext::fill()
 {
 	NVGstate* state = getState();
+	if (nvg__isScissorEmpty(state->scissor))
+		return;
 	NVGpaint fillPaint = state->fill;
 	flattenPaths();
 	const int pathCount = static_cast<int>(m_pathCache->getNumPaths());
@@ -1622,6 +1634,8 @@ void NVGcontext::fill()
 void NVGcontext::stroke()
 {
 	NVGstate* state = getState();
+	if (nvg__isScissorEmpty(state->scissor))
+		return;
 	float scale = nvg__getAverageScale(state->xform);
 	float strokeWidth = nvg__clampf(state->strokeWidth * scale, 0.0f, 200.0f);
 	NVGpaint strokePaint = state->stroke;
@@ -1822,6 +1836,8 @@ int NVGcontext::nvg__allocTextAtlas()
 void NVGcontext::nvg__renderText(NVGvertex* verts, int nverts)
 {
 	NVGstate* state = getState();
+	if (nvg__isScissorEmpty(state->scissor))
+		return;
 	NVGpaint paint = state->fill;
 
 	// Render triangles.
@@ -2451,7 +2467,8 @@ NVGhandle NVGcontext::getBuiltinGlassShader()
 void NVGcontext::drawTriangles(const NVGcustomDraw& draw, const NVGvertex* verts, int nverts)
 {
 	NVGstate* state = getState();
-	if (m_renderer && draw.shader.isValid() && verts && nverts > 0) {
+	if (m_renderer && !nvg__isScissorEmpty(state->scissor) &&
+		draw.shader.isValid() && verts && nverts > 0) {
 		m_renderer->setZIndex(state->zIndex);
 		m_renderer->drawCustomTriangles(draw, state->compositeOperation, state->scissor, verts, nverts, m_fringeWidth);
 	}

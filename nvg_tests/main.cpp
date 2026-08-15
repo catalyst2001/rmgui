@@ -22,6 +22,8 @@ public:
   int viewport_calls = 0;
   int flush_calls = 0;
   int fill_calls = 0;
+  int stroke_calls = 0;
+  int triangle_calls = 0;
   int custom_draw_calls = 0;
   int last_z_index = 0;
   NVGcustomDraw last_draw{};
@@ -58,9 +60,9 @@ public:
     }
   }
   void stroke(const NVGpaint&, NVGcompositeOperationState, const NVGscissor&, float,
-    float, const NVGpath*, int) override {}
+    float, const NVGpath*, int) override { ++stroke_calls; }
   void triangles(const NVGpaint&, NVGcompositeOperationState, const NVGscissor&,
-    const NVGvertex*, int, float) override {}
+    const NVGvertex*, int, float) override { ++triangle_calls; }
   NVGhandle createRenderTarget(const NVGrenderTargetDesc&) override { return {}; }
   bool deleteRenderTarget(NVGhandle) override { return false; }
   void setRenderTarget(NVGhandle) override {}
@@ -141,10 +143,32 @@ void test_nested_scissor_intersection()
   context.rect(0.0f, 0.0f, 20.0f, 20.0f);
   context.fillColor(NVGcolor::RGB(255, 255, 255));
   context.fill();
+
+  context.save();
+  context.intersectScissor(150.0f, 150.0f, 10.0f, 10.0f);
+  context.beginPath();
+  context.rect(150.0f, 150.0f, 10.0f, 10.0f);
+  context.fillColor(NVGcolor::RGB(255, 255, 255));
+  context.fill();
+  context.StrokeWidth(1.0f);
+  context.strokeColor(NVGcolor::RGB(255, 255, 255));
+  context.stroke();
+  const NVGvertex hidden_vertices[] = {
+    { 150.0f, 150.0f, 0.0f, 0.0f },
+    { 160.0f, 150.0f, 1.0f, 0.0f },
+    { 150.0f, 160.0f, 0.0f, 1.0f }
+  };
+  context.drawTriangles({
+    NVGhandle(static_cast<NVGhandle::_handle_type>(21)),
+    NVGhandle(static_cast<NVGhandle::_handle_type>(22))
+  }, hidden_vertices, 3);
+  context.restore();
   context.endFrame();
 
   require(recording->fill_scissors.size() == 2,
     "nested clipping test must submit both fills");
+  require(recording->stroke_calls == 0 && recording->custom_draw_calls == 0,
+    "an empty scissor must suppress fill, stroke, and custom geometry calls");
   const NVGscissor& nested = recording->fill_scissors[0];
   require(std::fabs(nested.xform[4] - 80.0f) < 1.0e-4f &&
     std::fabs(nested.xform[5] - 80.0f) < 1.0e-4f &&
