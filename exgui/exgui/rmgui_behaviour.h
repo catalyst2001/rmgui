@@ -2,8 +2,12 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <cmath>
 #include <limits>
+#include <string>
+#include <utility>
+#include <vector>
 
 // Renderer-free interaction state machines. These classes intentionally do
 // not depend on rm_widget, NanoVG, platform key codes, or style data.
@@ -12,6 +16,522 @@ struct RmBehaviourUpdate {
   bool handled = false;
   bool state_changed = false;
   bool activated = false;
+};
+
+class RmTextInputBehaviour {
+  struct Snapshot {
+    std::string text;
+    size_t cursor = 0;
+    size_t selection_start = 0;
+    size_t selection_end = 0;
+  };
+
+  std::string m_text;
+  size_t m_cursor = 0;
+  size_t m_selection_start = 0;
+  size_t m_selection_end = 0;
+  std::vector<Snapshot> m_undo;
+  std::vector<Snapshot> m_redo;
+  bool m_enabled = true;
+  bool m_active = false;
+  bool m_dragging = false;
+
+  static bool is_utf8_continuation(unsigned char value) noexcept {
+    return (value & 0xc0u) == 0x80u;
+  }
+
+  size_t clamp_boundary(size_t index) const noexcept {
+    index = std::min(index, m_text.size());
+    while (index > 0 && index < m_text.size() &&
+      is_utf8_continuation(static_cast<unsigned char>(m_text[index])))
+      --index;
+    return index;
+  }
+
+  size_t previous_boundary(size_t index) const noexcept {
+    index = clamp_boundary(index);
+    if (index == 0)
+      return 0;
+    --index;
+    while (index > 0 &&
+      is_utf8_continuation(static_cast<unsigned char>(m_text[index])))
+      --index;
+    return index;
+  }
+
+  size_t next_boundary(size_t index) const noexcept {
+    index = clamp_boundary(index);
+    if (index >= m_text.size())
+      return m_text.size();
+    ++index;
+    while (index < m_text.size() &&
+      is_utf8_continuation(static_cast<unsigned char>(m_text[index])))
+      ++index;
+    return index;
+  }
+
+  static size_t utf8_column(const std::string& text, size_t begin,
+    size_t end) noexcept
+  {
+    size_t column = 0;
+    for (size_t index = begin; index < end; ++index) {
+      if (!is_utf8_continuation(static_cast<unsigned char>(text[index])))
+        ++column;
+    }
+    return column;
+  }
+
+  static size_t offset_for_column(const std::string& text, size_t begin,
+    size_t end, size_t column) noexcept
+  {
+    size_t index = begin;
+    while (index < end && column > 0) {
+      ++index;
+      while (index < end &&
+        is_utf8_continuation(static_cast<unsigned char>(text[index])))
+        ++index;
+      --column;
+    }
+    return index;
+  }
+
+  Snapshot snapshot() const {
+    return { m_text, m_cursor, m_selection_start, m_selection_end };
+  }
+
+  void restore(Snapshot state) {
+    m_text = std::move(state.text);
+    m_cursor = std::min(state.cursor, m_text.size());
+    m_selection_start = std::min(state.selection_start, m_text.size());
+    m_selection_end = std::min(state.selection_end, m_text.size());
+  }
+
+  void save_undo() {
+    m_undo.push_back(snapshot());
+    if (m_undo.size() > 100)
+      m_undo.erase(m_undo.begin());
+    m_redo.clear();
+  }
+
+  void erase_selection() {
+    if (!has_selection())
+      return;
+    const size_t first = std::min(m_selection_start, m_selection_end);
+    const size_t last = std::max(m_selection_start, m_selection_end);
+    m_text.erase(first, last - first);
+    m_cursor = first;
+    clear_selection();
+  }
+
+  RmBehaviourUpdate move_cursor(size_t index) noexcept {
+    index = clamp_boundary(index);
+    const bool changed = m_cursor != index || has_selection();
+    m_cursor = index;
+    clear_selection();
+    return { changed, changed, false };
+  }
+
+public:
+  bool is_enabled() const noexcept { return m_enabled; }
+  bool is_active() const noexcept { return m_active; }
+  bool is_dragging() const noexcept { return m_dragging; }
+  const std::string& text() const noexcept { return m_text; }
+  size_t cursor() const noexcept { return m_cursor; }
+  size_t selection_start() const noexcept { return m_selection_start; }
+  size_t selection_end() const noexcept { return m_selection_end; }
+  bool has_selection() const noexcept {
+    return m_selection_start != m_selection_end;
+  }
+
+  RmBehaviourUpdate set_enabled(bool enabled) noexcept {
+    const bool changed = m_enabled != enabled || (!enabled && (m_active || m_dragging));
+    m_enabled = enabled;
+    if (!m_enabled) {
+      m_active = false;
+      m_dragging = false;
+      clear_selection();
+    }
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate set_active(bool active) noexcept {
+    active = m_enabled && active;
+    const bool changed = m_active != active || (!active && (m_dragging || has_selection()));
+    m_active = active;
+    if (!m_active) {
+      m_dragging = false;
+      clear_selection();
+    }
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate set_text(std::string text) {
+    const bool changed = m_text != text;
+    m_text = std::move(text);
+    m_cursor = m_text.size();
+    clear_selection();
+    m_undo.clear();
+    m_redo.clear();
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate set_cursor(size_t index) noexcept {
+    return move_cursor(index);
+  }
+
+  void clear_selection() noexcept {
+    m_selection_start = m_selection_end = m_cursor;
+  }
+
+  RmBehaviourUpdate select_all() noexcept {
+    const bool changed = !m_text.empty() &&
+      (m_selection_start != 0 || m_selection_end != m_text.size());
+    m_selection_start = 0;
+    m_selection_end = m_text.size();
+    m_cursor = m_selection_end;
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_down(size_t index, bool select_everything = false) noexcept {
+    if (!m_enabled)
+      return {};
+    m_active = true;
+    m_dragging = true;
+    if (select_everything)
+      return select_all();
+    m_cursor = clamp_boundary(index);
+    m_selection_start = m_selection_end = m_cursor;
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate pointer_drag(size_t index) noexcept {
+    if (!m_enabled || !m_dragging)
+      return {};
+    index = clamp_boundary(index);
+    const bool changed = m_cursor != index || m_selection_end != index;
+    m_cursor = index;
+    m_selection_end = index;
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_up() noexcept {
+    if (!m_dragging)
+      return {};
+    m_dragging = false;
+    if (!has_selection())
+      clear_selection();
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate cancel_pointer() noexcept {
+    if (!m_dragging)
+      return {};
+    m_dragging = false;
+    return { false, true, false };
+  }
+
+  RmBehaviourUpdate insert_codepoint(uint32_t codepoint) {
+    if (!m_enabled || !m_active || codepoint > 0x10ffffu ||
+      (codepoint >= 0xd800u && codepoint <= 0xdfffu))
+      return {};
+
+    std::string encoded;
+    if (codepoint < 0x80u)
+      encoded.push_back(static_cast<char>(codepoint));
+    else if (codepoint < 0x800u) {
+      encoded.push_back(static_cast<char>(0xc0u | (codepoint >> 6)));
+      encoded.push_back(static_cast<char>(0x80u | (codepoint & 0x3fu)));
+    }
+    else if (codepoint < 0x10000u) {
+      encoded.push_back(static_cast<char>(0xe0u | (codepoint >> 12)));
+      encoded.push_back(static_cast<char>(0x80u | ((codepoint >> 6) & 0x3fu)));
+      encoded.push_back(static_cast<char>(0x80u | (codepoint & 0x3fu)));
+    }
+    else {
+      encoded.push_back(static_cast<char>(0xf0u | (codepoint >> 18)));
+      encoded.push_back(static_cast<char>(0x80u | ((codepoint >> 12) & 0x3fu)));
+      encoded.push_back(static_cast<char>(0x80u | ((codepoint >> 6) & 0x3fu)));
+      encoded.push_back(static_cast<char>(0x80u | (codepoint & 0x3fu)));
+    }
+    return insert_text(std::move(encoded));
+  }
+
+  RmBehaviourUpdate insert_text(std::string value) {
+    if (!m_enabled || !m_active || value.empty())
+      return {};
+    save_undo();
+    erase_selection();
+    m_text.insert(m_cursor, value);
+    m_cursor += value.size();
+    clear_selection();
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate backspace() {
+    if (!m_enabled || !m_active || (m_cursor == 0 && !has_selection()))
+      return {};
+    save_undo();
+    if (has_selection())
+      erase_selection();
+    else {
+      const size_t previous = previous_boundary(m_cursor);
+      m_text.erase(previous, m_cursor - previous);
+      m_cursor = previous;
+      clear_selection();
+    }
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate delete_forward() {
+    if (!m_enabled || !m_active ||
+      (m_cursor >= m_text.size() && !has_selection()))
+      return {};
+    save_undo();
+    if (has_selection())
+      erase_selection();
+    else {
+      const size_t next = next_boundary(m_cursor);
+      m_text.erase(m_cursor, next - m_cursor);
+      clear_selection();
+    }
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate move_left() noexcept {
+    return move_cursor(has_selection()
+      ? std::min(m_selection_start, m_selection_end)
+      : previous_boundary(m_cursor));
+  }
+
+  RmBehaviourUpdate move_right() noexcept {
+    return move_cursor(has_selection()
+      ? std::max(m_selection_start, m_selection_end)
+      : next_boundary(m_cursor));
+  }
+
+  RmBehaviourUpdate move_home() noexcept {
+    const size_t newline = m_cursor == 0
+      ? std::string::npos : m_text.rfind('\n', m_cursor - 1);
+    return move_cursor(newline == std::string::npos ? 0 : newline + 1);
+  }
+
+  RmBehaviourUpdate move_end() noexcept {
+    const size_t newline = m_text.find('\n', m_cursor);
+    return move_cursor(newline == std::string::npos ? m_text.size() : newline);
+  }
+
+  RmBehaviourUpdate move_up() noexcept {
+    const size_t current_start = m_cursor == 0 ? 0 :
+      (m_text.rfind('\n', m_cursor - 1) == std::string::npos ? 0 :
+        m_text.rfind('\n', m_cursor - 1) + 1);
+    if (current_start == 0)
+      return {};
+    const size_t previous_end = current_start - 1;
+    const size_t previous_break = previous_end == 0 ? std::string::npos :
+      m_text.rfind('\n', previous_end - 1);
+    const size_t previous_start = previous_break == std::string::npos
+      ? 0 : previous_break + 1;
+    const size_t column = utf8_column(m_text, current_start, m_cursor);
+    return move_cursor(offset_for_column(m_text, previous_start, previous_end, column));
+  }
+
+  RmBehaviourUpdate move_down() noexcept {
+    const size_t current_start = m_cursor == 0 ? 0 :
+      (m_text.rfind('\n', m_cursor - 1) == std::string::npos ? 0 :
+        m_text.rfind('\n', m_cursor - 1) + 1);
+    const size_t current_end = m_text.find('\n', m_cursor);
+    if (current_end == std::string::npos)
+      return {};
+    const size_t next_start = current_end + 1;
+    const size_t next_break = m_text.find('\n', next_start);
+    const size_t next_end = next_break == std::string::npos
+      ? m_text.size() : next_break;
+    const size_t column = utf8_column(m_text, current_start, m_cursor);
+    return move_cursor(offset_for_column(m_text, next_start, next_end, column));
+  }
+
+  std::string selected_text() const {
+    if (!has_selection())
+      return {};
+    const size_t first = std::min(m_selection_start, m_selection_end);
+    const size_t last = std::max(m_selection_start, m_selection_end);
+    return m_text.substr(first, last - first);
+  }
+
+  std::pair<std::string, RmBehaviourUpdate> cut_selection() {
+    std::string selected = selected_text();
+    if (selected.empty())
+      return { {}, {} };
+    save_undo();
+    erase_selection();
+    return { std::move(selected), { true, true, false } };
+  }
+
+  RmBehaviourUpdate undo() {
+    if (!m_enabled || !m_active || m_undo.empty())
+      return {};
+    m_redo.push_back(snapshot());
+    Snapshot state = std::move(m_undo.back());
+    m_undo.pop_back();
+    restore(std::move(state));
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate redo() {
+    if (!m_enabled || !m_active || m_redo.empty())
+      return {};
+    m_undo.push_back(snapshot());
+    Snapshot state = std::move(m_redo.back());
+    m_redo.pop_back();
+    restore(std::move(state));
+    return { true, true, false };
+  }
+};
+
+enum class RmNumberInputType {
+  integer,
+  floating_point
+};
+
+enum class RmNumberInputPart {
+  none,
+  field,
+  decrement,
+  increment
+};
+
+class RmNumberInputBehaviour {
+  RmNumberInputType m_type = RmNumberInputType::floating_point;
+  RmNumberInputPart m_hovered = RmNumberInputPart::none;
+  RmNumberInputPart m_pressed = RmNumberInputPart::none;
+  float m_value = 0.0f;
+  float m_minimum = 0.0f;
+  float m_maximum = 100.0f;
+  float m_step = 0.1f;
+  bool m_enabled = true;
+
+  float normalize(float value) const noexcept {
+    value = std::clamp(value, m_minimum, m_maximum);
+    if (m_type == RmNumberInputType::integer)
+      value = std::round(value);
+    return std::clamp(value, m_minimum, m_maximum);
+  }
+
+public:
+  RmNumberInputBehaviour(RmNumberInputType type = RmNumberInputType::floating_point,
+    float value = 0.0f, float step = 0.1f, float minimum = 0.0f,
+    float maximum = 100.0f) noexcept : m_type(type)
+  {
+    if (minimum > maximum)
+      std::swap(minimum, maximum);
+    m_minimum = minimum;
+    m_maximum = maximum;
+    m_step = std::max(std::fabs(step), std::numeric_limits<float>::epsilon());
+    m_value = normalize(value);
+  }
+
+  RmNumberInputType type() const noexcept { return m_type; }
+  RmNumberInputPart hovered_part() const noexcept { return m_hovered; }
+  RmNumberInputPart pressed_part() const noexcept { return m_pressed; }
+  float value() const noexcept { return m_value; }
+  float minimum() const noexcept { return m_minimum; }
+  float maximum() const noexcept { return m_maximum; }
+  float step() const noexcept { return m_step; }
+  bool is_enabled() const noexcept { return m_enabled; }
+
+  RmBehaviourUpdate set_enabled(bool enabled) noexcept {
+    const bool changed = m_enabled != enabled || (!enabled &&
+      (m_hovered != RmNumberInputPart::none ||
+        m_pressed != RmNumberInputPart::none));
+    m_enabled = enabled;
+    if (!m_enabled) {
+      m_hovered = RmNumberInputPart::none;
+      m_pressed = RmNumberInputPart::none;
+    }
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate set_type(RmNumberInputType type) noexcept {
+    const float previous = m_value;
+    const bool changed = m_type != type;
+    m_type = type;
+    m_value = normalize(m_value);
+    return { false, changed || previous != m_value, false };
+  }
+
+  RmBehaviourUpdate set_range(float minimum, float maximum) noexcept {
+    if (minimum > maximum)
+      std::swap(minimum, maximum);
+    const float previous_value = m_value;
+    const bool changed = m_minimum != minimum || m_maximum != maximum;
+    m_minimum = minimum;
+    m_maximum = maximum;
+    m_value = normalize(m_value);
+    return { false, changed || previous_value != m_value, false };
+  }
+
+  RmBehaviourUpdate set_step(float step) noexcept {
+    step = std::max(std::fabs(step), std::numeric_limits<float>::epsilon());
+    const bool changed = m_step != step;
+    m_step = step;
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate set_value(float value) noexcept {
+    value = normalize(value);
+    const bool changed = m_value != value;
+    m_value = value;
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate step_by(int steps) noexcept {
+    if (!m_enabled || steps == 0)
+      return {};
+    RmBehaviourUpdate update = set_value(m_value + m_step * static_cast<float>(steps));
+    update.handled = true;
+    update.activated = update.state_changed;
+    return update;
+  }
+
+  RmBehaviourUpdate pointer_move(RmNumberInputPart part) noexcept {
+    part = m_enabled ? part : RmNumberInputPart::none;
+    const bool changed = m_hovered != part;
+    m_hovered = part;
+    return { m_pressed != RmNumberInputPart::none, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_down(RmNumberInputPart part) noexcept {
+    if (!m_enabled || (part != RmNumberInputPart::increment &&
+      part != RmNumberInputPart::decrement))
+      return {};
+    const bool changed = m_pressed != part || m_hovered != part;
+    m_hovered = part;
+    m_pressed = part;
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_up(RmNumberInputPart part) noexcept {
+    if (m_pressed == RmNumberInputPart::none)
+      return {};
+    const RmNumberInputPart pressed = m_pressed;
+    m_pressed = RmNumberInputPart::none;
+    m_hovered = m_enabled ? part : RmNumberInputPart::none;
+    RmBehaviourUpdate update{ true, true, false };
+    if (m_enabled && pressed == part) {
+      const RmBehaviourUpdate stepped = step_by(
+        part == RmNumberInputPart::increment ? 1 : -1);
+      update.state_changed = true;
+      update.activated = stepped.activated;
+    }
+    return update;
+  }
+
+  RmBehaviourUpdate cancel() noexcept {
+    if (m_pressed == RmNumberInputPart::none)
+      return {};
+    m_pressed = RmNumberInputPart::none;
+    return { false, true, false };
+  }
 };
 
 class RmButtonBehaviour {

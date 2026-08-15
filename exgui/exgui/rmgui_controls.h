@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "rmgui.h"
 #include "rmgui_behaviour.h"
+#include "rmgui_default_painter.h"
 #include "rmgui_theme.h"
 #include <string>
 #include <vector>
@@ -71,81 +72,33 @@ enum RMGUI_TEXT_INPUT_FLAGS {
   RMGUI_TEXT_INPUT_MULTILINE = 1 << 0
 };
 
-class rm_text_input_style : public rm_corners_style {
-  NVGcolor      m_text_color;
-  NVGcolor      m_active_bg_color;
-  NVGcolor      m_unactive_bg_color;
-  NVGcolor      m_border_color;
-  NVGcolor      m_blink_color;
-  NVGcolor      m_selection_color;
-  float         m_font_size;
-  float         m_border_width;
-  float         m_text_offset;
-  float         m_blink_width;
-  bool          m_rounded_selection;
-public:
-  rm_text_input_style() :
-    m_text_color(NVGcolor::RGB(0, 0, 0)),
-    m_active_bg_color(NVGcolor::RGB(255, 255, 255)),
-    m_unactive_bg_color(NVGcolor::RGBA(220, 220, 220, 255)),
-    m_border_color(NVGcolor::RGBA(255, 255, 255, 255)),
-    m_blink_color(NVGcolor::RGB(0, 0, 0)),
-    m_selection_color(NVGcolor::RGBA(51, 153, 255, 128)),
-    m_font_size(14.f), 
-    m_border_width(1.f), 
-    m_text_offset(1.f), m_blink_width(1.f), m_rounded_selection(false) {
-  }
-
-  inline const void     set_rounded_selection(bool enable) { m_rounded_selection = enable; }
-  inline bool           has_rounded_selection() const { return m_rounded_selection; }
-
-  /* selectors  */
-  inline const NVGcolor& get_text_color() const { return m_text_color; }
-  inline const NVGcolor& get_active_bgr_color() const { return m_active_bg_color; }
-  inline const NVGcolor& get_unactive_bgr_color() const { return m_unactive_bg_color; }
-  inline const NVGcolor& get_border_color() const { return m_border_color; }
-  inline const NVGcolor& get_blink_color() const { return m_blink_color; }
-  inline const NVGcolor& get_selection_color() const { return m_selection_color; }
-  inline float           get_font_size() const { return m_font_size; }
-  inline float           get_border_width() const { return m_border_width; }
-  inline float           get_blink_width() const { return m_blink_width; }
-  inline float           get_text_offset() const { return m_text_offset; }
-
-  /* modifiers */
-  inline void set_text_color(NVGcolor clr) { m_text_color = clr; }
-  inline void set_active_bgr_color(NVGcolor clr) { m_active_bg_color = clr; }
-  inline void set_unactive_bgr_color(NVGcolor clr) { m_unactive_bg_color = clr; }
-  inline void set_border_color(NVGcolor clr) { m_border_color = clr; }
-  inline void set_blink_color(NVGcolor clr) { m_blink_color = clr; }
-  inline void set_selection_color(NVGcolor clr) { m_selection_color = clr; }
-  inline void set_font_size(float fsize) { m_font_size = fsize; }
-  inline void set_border_width(float bsize) { m_border_width = bsize; }
-  inline void set_blink_width(float offset) { m_blink_width = offset; }
-  inline void set_text_offsets(float offset) { m_text_offset = offset; }
-};
-
-class rm_text_input : public rm_widget, public rm_styled<rm_text_input_style> {
-  std::vector<float>              m_glyph_positions;
-  rmgui_textbuffer                m_buffer;
-  bool                            m_ctrl_pressed;
-  bool                            m_active;
-  bool                            m_dragging;
-  rmgui_timer                     m_timer;
-  bool                            m_blink_state;
-  uint32_t                        m_flags;
-  float                           m_scroll_offset;
-  double                          m_last_click_time;
-  rm_vec2                         m_last_click_pos;
-
-  std::vector<size_t>             m_line_starts;
-  std::vector<std::vector<float>> m_line_glyphs;
-  float                           m_asc;
-  float                           m_line_h;
+class rm_text_input : public rm_widget {
+  RmTextInputBehaviour m_behaviour;
+  RmThemeRef           m_theme;
+  RmTextInputLayout    m_layout;
+  bool                 m_ctrl_pressed;
+  rmgui_timer          m_timer;
+  bool                 m_blink_state;
+  uint32_t             m_flags;
+  float                m_scroll_offset;
+  double               m_last_click_time;
+  rm_vec2              m_last_click_pos;
 
   static constexpr double DOUBLE_CLICK_THRESHOLD = 0.35;
   static constexpr float  CLICK_MOVE_THRESHOLD = 4.f;
+
+  void reset_caret(bool visible = true);
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_focus_changed(bool focused) override {
+    m_behaviour.set_active(focused);
+    if (!focused)
+      m_ctrl_pressed = false;
+  }
+  void on_pointer_capture_lost() override { m_behaviour.cancel_pointer(); }
 public:
-  rm_text_input(rm_widget* p_parent, int x, int y, int width, int height, rm_text_input_style* pstyle, uint32_t flags/* = RMGUI_TEXT_INPUT_SINGLELINE*/, float blink_cursor_interval = 0.5f);
+  rm_text_input(rm_widget* p_parent, int x, int y, int width, int height,
+    uint32_t flags = RMGUI_TEXT_INPUT_SINGLELINE, RmThemeRef theme = {},
+    float blink_cursor_interval = 0.5f);
   virtual ~rm_text_input();
   virtual void on_draw(NVGcontext* pctx) override;
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
@@ -156,6 +109,12 @@ public:
   size_t hit_test_index(float px, float py = NAN) const;
 
   void ensure_visible(size_t idx);
+  const RmTextInputBehaviour& behaviour() const noexcept { return m_behaviour; }
+  const std::string& get_text() const noexcept { return m_behaviour.text(); }
+  void set_text(std::string text) { m_behaviour.set_text(std::move(text)); }
+  void set_theme(RmThemeRef theme) {
+    m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+  }
 };
 
 /**
@@ -610,31 +569,35 @@ public:
 */
 class rm_number_input : public rm_widget
 {
-public:
-  enum input_type : uint32_t {
-    type_int = 0,
-    type_float
-  };
 protected:
-  input_type       m_type;
-  float            m_value;
-  float            m_minval;
-  float            m_maxval;
-  float            m_step;
-  rmgui_textbuffer m_buffer;
+  RmNumberInputBehaviour m_behaviour;
+  RmThemeRef              m_theme;
 
-  void draw_buttons(NVGcontext* pctx);
+  RmNumberInputPart hit_test_part(const rm_vec2& cursor_pos) const;
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
+  void on_pointer_capture_lost() override { m_behaviour.cancel(); }
   void on_draw(NVGcontext* pctx) override;
+  void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
   rm_number_input(rm_widget* p_parent, int x, int y, int width, int height, 
-    input_type type = type_float, float value = 0.f, float step = 0.1f, float minval = 0.f, float maxval = 100.f);
+    RmNumberInputType type = RmNumberInputType::floating_point,
+    float value = 0.f, float step = 0.1f, float minval = 0.f,
+    float maxval = 100.f, RmThemeRef theme = {});
 
-  inline input_type           get_type() const { return m_type; }
-  template<class _type> _type get_value() const { return static_cast<_type>(m_value); }
-  template<class _type> _type get_min() const { return static_cast<_type>(m_minval); }
-  template<class _type> _type get_max() const { return static_cast<_type>(m_maxval); }
-  template<class _type> _type get_step() const { return static_cast<_type>(m_step); }
+  RmNumberInputType get_type() const noexcept { return m_behaviour.type(); }
+  template<class _type> _type get_value() const { return static_cast<_type>(m_behaviour.value()); }
+  template<class _type> _type get_min() const { return static_cast<_type>(m_behaviour.minimum()); }
+  template<class _type> _type get_max() const { return static_cast<_type>(m_behaviour.maximum()); }
+  template<class _type> _type get_step() const { return static_cast<_type>(m_behaviour.step()); }
+  void set_value(float value) { m_behaviour.set_value(value); }
+  void set_range(float minimum, float maximum) { m_behaviour.set_range(minimum, maximum); }
+  void set_step(float step) { m_behaviour.set_step(step); }
+  const RmNumberInputBehaviour& behaviour() const noexcept { return m_behaviour; }
+  void set_theme(RmThemeRef theme) {
+    m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+  }
 };
 
 

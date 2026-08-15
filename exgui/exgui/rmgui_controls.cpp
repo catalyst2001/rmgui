@@ -3,6 +3,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <cstdarg>
 #include <cmath>
@@ -195,399 +196,231 @@ void rm_label::on_draw(NVGcontext* pctx) {
 }
 
 rm_text_input::rm_text_input(rm_widget* p_parent, int x, int y, int width, int height,
-	rm_text_input_style* pstyle, uint32_t flags, float blink_cursor_interval)
-	: rm_widget(x, y, width, height, p_parent, "ui_text_input", RM_FLAG_DEFAULT | RM_FLAG_GLOBAL), m_active(false), m_ctrl_pressed(false), m_dragging(false),
-	m_scroll_offset(0.f), m_last_click_time(0.0), m_last_click_pos({ 0,0 }), m_asc(0.f), m_line_h(0.f) {
-	set_style(pstyle);
-	m_blink_state = false;
+	uint32_t flags, RmThemeRef theme, float blink_cursor_interval)
+	: rm_widget(x, y, width, height, p_parent, "ui_text_input",
+		RM_FLAG_DEFAULT | RM_FLAG_GLOBAL | RM_FLAG_OPAQUE),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()),
+	m_ctrl_pressed(false), m_blink_state(false), m_flags(flags),
+	m_scroll_offset(0.0f), m_last_click_time(0.0), m_last_click_pos({ 0.0f, 0.0f })
+{
 	m_timer.set_interval(blink_cursor_interval);
-	m_flags = flags;
 }
 
 rm_text_input::~rm_text_input() {}
 
-void rm_text_input::on_draw(NVGcontext* pctx) {
-	const std::string& txt = m_buffer.str();
-	float desc;
-	std::vector<std::string> lines;
-	std::vector<size_t>      starts;
+void rm_text_input::reset_caret(bool visible)
+{
+	m_blink_state = visible;
+	m_timer.reset(m_psysdf);
+}
 
-	pctx->setFontFaceId(((int)get_font().getValue()));
-	pctx->setFontSize(m_pstyle->get_font_size());
-	pctx->textMetrics(&m_asc, &desc, &m_line_h);
-
-	// background & border
-	pctx->beginPath();
-	float stroke_width = m_pstyle->get_border_width();
-	pctx->roundedRectVarying(stroke_width, stroke_width, m_size.x - stroke_width * 2, m_size.y - stroke_width * 2,
-		m_pstyle->get_corner_radius(LEFT_TOP),
-		m_pstyle->get_corner_radius(RIGHT_TOP),
-		m_pstyle->get_corner_radius(RIGHT_BOTTOM),
-		m_pstyle->get_corner_radius(LEFT_BOTTOM));
-	pctx->fillColor(m_active
-		? m_pstyle->get_active_bgr_color()
-		: m_pstyle->get_unactive_bgr_color());
-	pctx->fill();
-	pctx->strokeColor(m_pstyle->get_border_color());
-	pctx->StrokeWidth(m_pstyle->get_border_width());
-	pctx->stroke();
-
-	bool multiline = (m_flags & RMGUI_TEXT_INPUT_MULTILINE);
-	float offset = 0.f;
-	size_t ci = m_buffer.has_selection() ? m_buffer.sel_end : m_buffer.pos();
-	if (!multiline) {
-		// single-line glyph positions
-		m_glyph_positions.clear();
-		m_glyph_positions.push_back(0.f);
-		for (size_t i = 1; i <= txt.size(); ++i) {
-			float w = pctx->textBounds(0, 0, txt.substr(0, i).c_str(), nullptr, nullptr);
-			m_glyph_positions.push_back(w);
-		}
-
-		float avail = m_size.x - 10.f;
-		float caret_x = m_glyph_positions[ci];
-
-		if (caret_x - m_scroll_offset > avail)
-			m_scroll_offset = caret_x - avail;
-		else if (caret_x < m_scroll_offset)
-			m_scroll_offset = caret_x;
-
-		offset = m_scroll_offset;
-	}
-	else {
-		lines.reserve(8);
-		starts.reserve(8);
-		size_t pos = 0;
-		while (pos <= txt.size()) {
-			size_t nl = txt.find('\n', pos);
-			if (nl == std::string::npos) nl = txt.size();
-			starts.push_back(pos);
-			lines.push_back(txt.substr(pos, nl - pos));
-			pos = nl + 1;
-		}
-
-		m_line_starts = starts;
-		m_line_glyphs.clear();
-		m_line_glyphs.reserve(lines.size());
-		float max_w = 0.f;
-
-		for (auto& line : lines) {
-			std::vector<float> gp;
-			gp.reserve(line.size() + 1);
-			gp.push_back(0.f);
-			for (size_t i = 1; i <= line.size(); ++i) {
-				float w = pctx->textBounds(0, 0,
-					line.substr(0, i).c_str(),
-					nullptr, nullptr);
-				gp.push_back(w);
-			}
-			max_w = std::max(max_w, gp.back());
-			m_line_glyphs.push_back(std::move(gp));
-		}
-
-		float avail = m_size.x - 10.f;
-		float max_offset = std::max(0.f, max_w - avail);
-		m_scroll_offset = std::clamp(m_scroll_offset, 0.f, max_offset);
-		offset = m_scroll_offset;
-	}
-
-	// update blink state
-	if (m_timer.has_elapsed(get_sysdf())) {
+void rm_text_input::on_draw(NVGcontext* pctx)
+{
+	if (m_behaviour.is_active() && m_timer.has_elapsed(get_sysdf()))
 		m_blink_state = !m_blink_state;
-	}
 
-	// draw selection
-	if (m_buffer.has_selection()) {
-		pctx->fillColor(m_pstyle->get_selection_color());
-		if (!multiline) {
-			size_t a = std::min(m_buffer.sel_start, m_buffer.sel_end);
-			size_t b = std::max(m_buffer.sel_start, m_buffer.sel_end);
-			float x0 = 5.f - offset + m_glyph_positions[a] + m_pstyle->get_text_offset();
-			float x1 = 5.f - offset + m_glyph_positions[b] + m_pstyle->get_text_offset();
-			float baseline = m_size.y * 0.5f + (m_asc + desc) * 0.5f;
-			pctx->beginPath();
-			pctx->rect(x0, baseline - m_asc, x1 - x0, m_asc - desc);
-			pctx->fill();
-		}
-		else {
-			size_t sel_a = std::min(m_buffer.sel_start, m_buffer.sel_end);
-			size_t sel_b = std::max(m_buffer.sel_start, m_buffer.sel_end);
-			float top_pad = 5.f + m_asc;
-			for (size_t i = 0; i < lines.size(); ++i) {
-				const auto& line = lines[i];
-				size_t ls = starts[i], le = ls + line.size();
-				if (sel_a < le && sel_b > ls) {
-					size_t a = std::max(sel_a, ls) - ls;
-					size_t b = std::min(sel_b, le) - ls;
-					std::string pre = line.substr(0, a);
-					std::string sel = line.substr(a, b - a);
-					float x0 = 5.f - offset + pctx->textBounds(0, 0, pre.c_str(), nullptr, nullptr);
-					float w = pctx->textBounds(0, 0, sel.c_str(), nullptr, nullptr);
-					float y0 = top_pad + i * m_line_h - m_asc;
-					pctx->beginPath();
-					pctx->rect(x0 + m_pstyle->get_text_offset(), y0, w, m_line_h);
-					pctx->fill();
-				}
-			}
-		}
-	}
-
-	// draw text and cursor
-	pctx->fillColor(m_pstyle->get_text_color());
-	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
-	if (!multiline) {
-		float baseline = m_size.y * 0.5f + (m_asc + desc) * 0.5f;
-		pctx->text(5.f - offset + m_pstyle->get_text_offset(),
-			baseline, txt.c_str(), nullptr);
-		if (m_active && m_blink_state) {
-			float cw = m_glyph_positions[ci];
-			pctx->beginPath();
-			pctx->moveTo(5.f - offset + cw + m_pstyle->get_text_offset() + 1, baseline - m_asc);
-			pctx->lineTo(5.f - offset + cw + m_pstyle->get_text_offset() + 1, baseline - desc);
-			pctx->StrokeWidth(m_pstyle->get_blink_width());
-			pctx->strokeColor(m_pstyle->get_blink_color());
-			pctx->stroke();
-		}
-	}
-	else {
-		float top_pad = 5.f + m_asc;
-		for (size_t i = 0; i < lines.size(); ++i) {
-			float y = top_pad + i * m_line_h;
-			pctx->text(5.f - offset + m_pstyle->get_text_offset(), y, lines[i].c_str(), nullptr);
-		}
-
-		if (m_active && m_blink_state) {
-			int cli = int(std::upper_bound(m_line_starts.begin(), m_line_starts.end(), ci) - m_line_starts.begin()) - 1;
-			size_t off = ci - m_line_starts[cli];
-			float cx = m_line_glyphs[cli][off];
-			float cy = 5.f + m_asc + cli * m_line_h;
-			pctx->beginPath();
-			pctx->moveTo(5.f - offset + cx + m_pstyle->get_text_offset() + 1, cy - m_asc);
-			pctx->lineTo(5.f - offset + cx + m_pstyle->get_text_offset() + 1, cy - m_asc + m_line_h);
-			pctx->StrokeWidth(m_pstyle->get_blink_width());
-			pctx->strokeColor(m_pstyle->get_blink_color());
-			pctx->stroke();
-		}
-	}
-
+	const bool multiline = (m_flags & RMGUI_TEXT_INPUT_MULTILINE) != 0;
+	const RmTextInputVisual visual{
+		m_size.x,
+		m_size.y,
+		m_scroll_offset,
+		get_font(),
+		m_behaviour.text().c_str(),
+		m_behaviour.cursor(),
+		m_behaviour.selection_start(),
+		m_behaviour.selection_end(),
+		multiline,
+		is_enabled(),
+		m_elem_flags.is_hovered(),
+		m_behaviour.is_dragging(),
+		m_elem_flags.is_focused(),
+		m_behaviour.is_active() && m_blink_state
+	};
+	m_layout = RmDefaultControlPainter::layout_text_input(
+		*pctx, visual, m_theme->text_input);
+	m_scroll_offset = m_layout.scroll_offset;
+	RmDefaultControlPainter::draw_text_input(
+		*pctx, visual, m_layout, m_theme->text_input);
 	rm_widget::on_draw(pctx);
 }
 
 void rm_text_input::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 {
-	if (!m_active) {
+	RM_UNUSED(sc);
+	if (!m_behaviour.is_active())
+		return;
+
+	if (vk == RM_KEY_LCTRL || vk == RM_KEY_RCTRL || vk == RM_KEY_CONTROL) {
+		m_ctrl_pressed = state != RM_KEY_STATE::UP;
 		return;
 	}
 
-	if (vk == RM_KEY_LCTRL || vk == RM_KEY_RCTRL) {
-		m_ctrl_pressed = (state != RM_KEY_STATE::UP);
+	if (state != RM_KEY_STATE::DOWN && state != RM_KEY_STATE::REPEAT)
 		return;
-	}
 
-	if ((state == RM_KEY_STATE::DOWN || state == RM_KEY_STATE::REPEAT)) {
-		if (!m_ctrl_pressed) {
-			bool handled = true;
+	RmBehaviourUpdate update;
+	if (m_ctrl_pressed) {
+		if (state == RM_KEY_STATE::DOWN) {
 			switch (vk) {
-			case RM_KEY_BACKSPACE:
-				m_buffer.backspace();
+			case RM_KEY_A:
+				update = m_behaviour.select_all();
 				break;
-			case RM_KEY_DELETE:
-				m_buffer.delete_forward();
+			case RM_KEY_C: {
+				const std::string selected = m_behaviour.selected_text();
+				if (!selected.empty()) {
+					m_psysdf->set_clipboard_data_ex(
+						reinterpret_cast<const uint8_t*>(selected.data()), selected.size());
+					update.handled = true;
+				}
 				break;
-			case RM_KEY_LEFT:
-				m_buffer.move_cursor_left();
-				break;
-			case RM_KEY_RIGHT:
-				m_buffer.move_cursor_right();
-				break;
-			case RM_KEY_UP:
-				m_buffer.move_cursor_up();
-				break;
-			case RM_KEY_DOWN:
-				m_buffer.move_cursor_down();
-				break;
-			default:
-				handled = false;
 			}
-			if (handled) {
-				m_timer.reset(m_psysdf);
-				m_blink_state = true;
-				return;
+			case RM_KEY_X: {
+				auto cut = m_behaviour.cut_selection();
+				if (!cut.first.empty()) {
+					m_psysdf->set_clipboard_data_ex(
+						reinterpret_cast<const uint8_t*>(cut.first.data()), cut.first.size());
+				}
+				update = cut.second;
+				break;
 			}
-		}
-		else {
-			switch (vk) {
+			case RM_KEY_V: {
+				size_t size = 0;
+				RM_CB_DATA_TYPE type = RM_CLIPBOARD_DATA_TYPE_NONE;
+				const char* text = reinterpret_cast<const char*>(
+					m_psysdf->get_clipboard_data_ex(type, size));
+				if (text && size > 0 && type == RM_CLIPBOARD_DATA_TYPE_TEXT)
+					update = m_behaviour.insert_text(std::string(text, size));
+				break;
+			}
 			case RM_KEY_Z:
-				m_buffer.undo();
+				update = m_behaviour.undo();
 				break;
 			case RM_KEY_Y:
-				m_buffer.redo();
+				update = m_behaviour.redo();
+				break;
+			default:
 				break;
 			}
 		}
 	}
-
-	if (state != RM_KEY_STATE::DOWN)
-		return;
-
-	if (m_ctrl_pressed && vk == RM_KEY_A) {
-		m_buffer.select_all();
-		m_timer.reset(m_psysdf);
-		m_blink_state = false;
-		return;
-	}
-
-	if (m_ctrl_pressed) {
+	else {
 		switch (vk) {
-		case RM_KEY_C:
-			m_buffer.copy_all(m_psysdf);
+		case RM_KEY_BACKSPACE:
+			update = m_behaviour.backspace();
 			break;
-
-		case RM_KEY_V:
-			m_buffer.paste(m_psysdf);
+		case RM_KEY_DELETE:
+			update = m_behaviour.delete_forward();
 			break;
-
-		case RM_KEY_X:
-			if (m_buffer.has_selection())
-				m_buffer.cut_selection(m_psysdf);
+		case RM_KEY_LEFT:
+			update = m_behaviour.move_left();
 			break;
-
+		case RM_KEY_RIGHT:
+			update = m_behaviour.move_right();
+			break;
+		case RM_KEY_UP:
+			update = m_behaviour.move_up();
+			break;
+		case RM_KEY_DOWN:
+			update = m_behaviour.move_down();
+			break;
+		case RM_KEY_HOME:
+			update = m_behaviour.move_home();
+			break;
+		case RM_KEY_END:
+			update = m_behaviour.move_end();
+			break;
+		case RM_KEY_ENTER:
+			if ((m_flags & RMGUI_TEXT_INPUT_MULTILINE) != 0)
+				update = m_behaviour.insert_codepoint('\n');
+			break;
 		default:
-			return;
+			break;
 		}
-
-		m_timer.reset(m_psysdf);
-		m_blink_state = false;
-		return;
 	}
 
-	if (vk == RM_KEY_ENTER && (m_flags & RMGUI_TEXT_INPUT_MULTILINE)) {
-		m_buffer.insert_cp('\n');
-		m_timer.reset(m_psysdf);
-		m_blink_state = false;
-		return;
-	}
+	if (update.handled || update.state_changed)
+		reset_caret();
 }
 
-bool rm_text_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
-	bool inside = m_bbox.inside(cursor_pos);
-	float offset = m_pstyle->get_text_offset();
-	float text_draw_x = m_pos_of_parent.x + 5.f + offset;
-	float local_x = cursor_pos.x - text_draw_x;
-	float local_y = cursor_pos.y - m_pos_of_parent.y;
-	const double now = m_psysdf->get_time();
-	bool multiline = (m_flags & RMGUI_TEXT_INPUT_MULTILINE);
+bool rm_text_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+	RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+{
+	RM_UNUSED(vk);
+	RM_UNUSED(delta);
+	const bool inside = m_bbox.inside(cursor_pos);
+	const float local_x = cursor_pos.x - m_pos_of_parent.x;
+	const float local_y = cursor_pos.y - m_pos_of_parent.y;
 
-	if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::DOWN) {
-		if (inside) {
-			float dx = cursor_pos.x - m_last_click_pos.x;
-			float dy = cursor_pos.y - m_last_click_pos.y;
-			double dt = now - m_last_click_time;
-			if (dt <= DOUBLE_CLICK_THRESHOLD && (dx * dx + dy * dy) <= CLICK_MOVE_THRESHOLD * CLICK_MOVE_THRESHOLD)
-			{
-				m_buffer.select_all();
-				m_timer.reset(m_psysdf);
-				return true;
-			}
-			m_active = true;
-			m_dragging = true;
-			size_t idx = multiline ? hit_test_index(local_x + m_scroll_offset, local_y) : hit_test_index(local_x);
-			m_buffer.set_cursor(idx);
-			m_buffer.sel_start = idx;
-			m_buffer.sel_end = idx;
-			m_blink_state = true;
-			m_timer.reset(m_psysdf);
-			m_last_click_time = now;
-			m_last_click_pos = cursor_pos;
-			return true;
+	if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::DOWN && inside) {
+		const double now = m_psysdf->get_time();
+		const float dx = cursor_pos.x - m_last_click_pos.x;
+		const float dy = cursor_pos.y - m_last_click_pos.y;
+		const bool double_click = now - m_last_click_time <= DOUBLE_CLICK_THRESHOLD &&
+			(dx * dx + dy * dy) <= CLICK_MOVE_THRESHOLD * CLICK_MOVE_THRESHOLD;
+		const size_t index = hit_test_index(local_x, local_y);
+		const RmBehaviourUpdate update =
+			m_behaviour.pointer_down(index, double_click);
+		if (update.handled) {
+			get_root()->capture_pointer(this);
+			reset_caret();
 		}
-		else {
-			m_active = false;
-			m_dragging = false;
-			m_buffer.clear_selection();
-			return true;
-		}
+		m_last_click_time = now;
+		m_last_click_pos = cursor_pos;
+		return !update.handled;
 	}
 
-	if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::DOWN) {
-		m_buffer.select_all();
-		m_timer.reset(m_psysdf);
-		m_blink_state = false;
-		return true;
-	}
-
-	if (event == RM_MOUSE_EVENT_MOVE && state == RM_KEY_STATE::DOWN && m_dragging) {
-		size_t idx = multiline ? hit_test_index(local_x + m_scroll_offset, local_y) : hit_test_index(local_x);
-		m_buffer.sel_end = idx;
-		if (!multiline) {
-			ensure_visible(idx);
+	if (event == RM_MOUSE_EVENT_MOVE && m_behaviour.is_dragging()) {
+		const size_t index = hit_test_index(local_x, local_y);
+		const RmBehaviourUpdate update = m_behaviour.pointer_drag(index);
+		if (update.state_changed) {
+			ensure_visible(index);
+			reset_caret();
 		}
-		return true;
+		return !update.handled;
 	}
 
 	if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::UP) {
-		if (m_dragging) {
-			if (m_buffer.sel_start == m_buffer.sel_end)
-				m_buffer.clear_selection();
-			m_dragging = false;
-			return true;
-		}
-		return true;
+		const RmBehaviourUpdate update = m_behaviour.pointer_up();
+		return !update.handled;
 	}
 	return true;
 }
 
 size_t rm_text_input::hit_test_index(float px, float py) const
 {
-	float x = px + m_scroll_offset - m_pstyle->get_text_offset();
-
-	if (!(m_flags & RMGUI_TEXT_INPUT_MULTILINE)) {
-		auto it = std::lower_bound(m_glyph_positions.begin(), m_glyph_positions.end(), x);
-		size_t idx = it - m_glyph_positions.begin();
-		if (idx >= m_glyph_positions.size())
-			idx = m_glyph_positions.size() - 1;
-		return idx;
-	}
-
-	float top_pad = 5.f + m_asc;
-	int   li = int((py - top_pad + (m_line_h * 0.5f)) / m_line_h);
-	li = std::clamp(li, 0, int(m_line_starts.size()) - 1);
-
-	size_t start = m_line_starts[li];
-	size_t end = (static_cast<size_t>(li + 1) < m_line_starts.size())
-		? m_line_starts[li + 1] - 1
-		: m_buffer.str().size();
-
-	const auto& gp = m_line_glyphs[li];
-	auto it2 = std::lower_bound(gp.begin(), gp.end(), x);
-	size_t ci = it2 - gp.begin();
-	if (ci >= gp.size()) ci = gp.size() - 1;
-
-	return start + ci;
+	return RmDefaultControlPainter::hit_test_text_input(
+		m_layout, px, std::isnan(py) ? m_size.y * 0.5f : py, m_theme->text_input);
 }
 
-void rm_text_input::ensure_visible(size_t idx) {
-	float avail = m_size.x - 10.f;
-
-	if (idx >= m_glyph_positions.size())
-		idx = m_glyph_positions.size() - 1;
-	float x = m_glyph_positions[idx];
-
-	if (x - m_scroll_offset > avail)
-		m_scroll_offset = x - avail;
+void rm_text_input::ensure_visible(size_t idx)
+{
+	if (m_layout.lines.empty())
+		return;
+	const RmTextInputLineLayout& line = m_layout.lines.front();
+	const size_t local = idx <= line.text_start
+		? 0 : std::min(idx - line.text_start, line.text.size());
+	const auto found = std::lower_bound(
+		line.byte_offsets.begin(), line.byte_offsets.end(), local);
+	if (found == line.byte_offsets.end())
+		return;
+	const float x = line.glyph_positions[
+		static_cast<size_t>(found - line.byte_offsets.begin())];
+	const float available = std::max(0.0f,
+		m_size.x - m_theme->text_input.horizontal_padding * 2.0f);
+	if (x - m_scroll_offset > available)
+		m_scroll_offset = x - available;
 	else if (x < m_scroll_offset)
 		m_scroll_offset = x;
 }
 
-void rm_text_input::on_text_input(int sym) {
-	if (m_active) {
-		//printf("keycode: %d\n", sym);
-		if (sym >= 32) {
-			m_buffer.insert_cp(sym);
-		}
+void rm_text_input::on_text_input(int sym)
+{
+	if (sym >= 32) {
+		const RmBehaviourUpdate update =
+			m_behaviour.insert_codepoint(static_cast<uint32_t>(sym));
+		if (update.state_changed)
+			reset_caret();
 	}
-	m_timer.reset(m_psysdf);
-	m_blink_state = false;
 }
 
 rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width,
@@ -1690,27 +1523,100 @@ void rm_output_text::printf(const char* pformat, ...)
 	m_linesbuf.append_text(m_textbuf);
 }
 
-void rm_number_input::draw_buttons(NVGcontext* pctx)
-{
-	//pctx->BeginPath();
-
-}
-
 void rm_number_input::on_draw(NVGcontext* pctx)
 {
-	//pctx->BeginPath();
+	char text[64] = {};
+	if (m_behaviour.type() == RmNumberInputType::integer)
+		std::snprintf(text, sizeof(text), "%.0f", m_behaviour.value());
+	else
+		std::snprintf(text, sizeof(text), "%.6g", m_behaviour.value());
 
+	const RmNumberInputPart hovered = m_behaviour.hovered_part();
+	const RmNumberInputPart pressed = m_behaviour.pressed_part();
+	const RmNumberInputVisual visual{
+		m_size.x,
+		m_size.y,
+		get_font(),
+		text,
+		is_enabled(),
+		m_elem_flags.is_hovered(),
+		m_elem_flags.is_focused(),
+		hovered == RmNumberInputPart::increment,
+		pressed == RmNumberInputPart::increment,
+		hovered == RmNumberInputPart::decrement,
+		pressed == RmNumberInputPart::decrement
+	};
+	RmDefaultControlPainter::draw_number_input(
+		*pctx, visual, m_theme->number_input);
+	rm_widget::on_draw(pctx);
+}
+
+RmNumberInputPart rm_number_input::hit_test_part(const rm_vec2& cursor_pos) const
+{
+	if (!m_bbox.inside(cursor_pos))
+		return RmNumberInputPart::none;
+	const float local_x = cursor_pos.x - m_pos_of_parent.x;
+	const float local_y = cursor_pos.y - m_pos_of_parent.y;
+	const float button_x = m_size.x -
+		std::min(m_theme->number_input.button_width, m_size.x);
+	if (local_x < button_x)
+		return RmNumberInputPart::field;
+	return local_y < m_size.y * 0.5f
+		? RmNumberInputPart::increment : RmNumberInputPart::decrement;
+}
+
+void rm_number_input::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
+{
+	RM_UNUSED(sc);
+	if (state != RM_KEY_STATE::DOWN && state != RM_KEY_STATE::REPEAT)
+		return;
+	switch (vk) {
+	case RM_KEY_UP:
+		m_behaviour.step_by(1);
+		break;
+	case RM_KEY_DOWN:
+		m_behaviour.step_by(-1);
+		break;
+	case RM_KEY_HOME:
+		m_behaviour.set_value(m_behaviour.minimum());
+		break;
+	case RM_KEY_END:
+		m_behaviour.set_value(m_behaviour.maximum());
+		break;
+	default:
+		break;
+	}
 }
 
 bool rm_number_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
 {
-	return false;
+	RM_UNUSED(vk);
+	RM_UNUSED(delta);
+	const RmNumberInputPart part = hit_test_part(cursor_pos);
+	if (event == RM_MOUSE_EVENT_MOVE) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_move(part);
+		return !update.handled;
+	}
+	if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::DOWN) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_down(part);
+		if (update.handled)
+			get_root()->capture_pointer(this);
+		return !update.handled;
+	}
+	if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::UP) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_up(part);
+		return !update.handled;
+	}
+	return true;
 }
 
 rm_number_input::rm_number_input(rm_widget* p_parent, int x, int y, int width, int height,
-	input_type type, float value, float step, float minval, float maxval) :
-	rm_widget(x, y, width, height, p_parent, "ui_number_input", RM_FLAG_DEFAULT),
-	m_type(type), m_value(value), m_step(step), m_minval(minval), m_maxval(maxval)
+	RmNumberInputType type, float value, float step, float minval, float maxval,
+	RmThemeRef theme) :
+	rm_widget(x, y, width, height, p_parent, "ui_number_input",
+		RM_FLAG_DEFAULT | RM_FLAG_OPAQUE),
+	m_behaviour(type, value, step, minval, maxval),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
 {
 }
 

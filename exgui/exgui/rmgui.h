@@ -1333,52 +1333,6 @@ public:
 
 };
 
-class rmgui_textbuffer {
-private:
-  struct state { 
-    std::string text; 
-    size_t cur, sel_start, sel_end; 
-  };
-
-  std::string         text;
-  size_t              cursor;
-  std::vector<state>  undos;
-  std::vector<state>  redos;
-public:
-  rmgui_textbuffer() : cursor(0), sel_start(0), sel_end(0) {}
-  void set_cursor(size_t pos) {cursor = pos; clear_selection();}
-  void insert_cp(uint32_t cp);
-  void backspace();
-
-  //void cut_all();
-  void cut_selection(irm_sysdf* psysdf);
-  void copy_all(irm_sysdf* psysdf);
-  void paste(irm_sysdf* psysdf);
-  void select_all() { sel_start = 0; sel_end = text.size(); cursor = sel_end; }
-
-  void undo();
-  void redo();
-
-  void move_cursor_left();
-  void move_cursor_right();
-  void move_cursor_up();
-  void move_cursor_down();
-
-  void delete_forward();
-
-  void clear_selection() { sel_start = sel_end = cursor; }
-  bool has_selection() const { return sel_start != sel_end; }
-
-  const std::string& str() const { return text; }
-  size_t pos() const { return cursor; }
-  size_t sel_start, sel_end;
-
-private:
-  void save_undo();
-  void clear_redo() { redos.clear(); }
-  void delete_selection();
-};
-
 /**
 * class utils
 */

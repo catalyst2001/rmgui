@@ -32,6 +32,73 @@ void test_button_behaviour()
   expect(!button.pointer_down(true).handled, "disabled button ignores pointer press");
 }
 
+void test_text_input_behaviour()
+{
+  RmTextInputBehaviour input;
+  input.set_active(true);
+  input.insert_codepoint('A');
+  input.insert_codepoint(0x416u);
+  input.insert_codepoint('B');
+  expect(input.text() == "A\xd0\x96" "B", "text input inserts UTF-8 codepoints");
+
+  input.move_left();
+  input.delete_forward();
+  expect(input.text() == "A\xd0\x96",
+    "Delete removes the codepoint to the right of the caret");
+  input.backspace();
+  expect(input.text() == "A",
+    "Backspace removes the complete UTF-8 codepoint to the left");
+  input.undo();
+  expect(input.text() == "A\xd0\x96", "text input restores edits through undo");
+  input.redo();
+  expect(input.text() == "A", "text input reapplies edits through redo");
+
+  input.set_text("hello");
+  input.pointer_down(1);
+  input.pointer_drag(4);
+  input.pointer_up();
+  expect(input.selected_text() == "ell", "pointer drag creates a text selection");
+  const auto cut = input.cut_selection();
+  expect(cut.first == "ell" && input.text() == "ho",
+    "cut returns and removes only the selected text");
+
+  input.set_text("ab\nx\nwxyz");
+  input.set_cursor(input.text().size());
+  input.move_up();
+  expect(input.cursor() == 4,
+    "vertical navigation clamps the caret to the previous short line");
+  input.move_up();
+  expect(input.cursor() == 1,
+    "vertical navigation preserves the UTF-8 character column");
+}
+
+void test_number_input_behaviour()
+{
+  RmNumberInputBehaviour number(RmNumberInputType::floating_point,
+    5.0f, 0.5f, 0.0f, 6.0f);
+  expect(number.step_by(1).activated &&
+    std::fabs(number.value() - 5.5f) < 1.0e-6f,
+    "number input applies its configured step");
+  number.step_by(10);
+  expect(number.value() == 6.0f, "number input clamps stepped values to its range");
+
+  number.pointer_down(RmNumberInputPart::decrement);
+  expect(!number.pointer_up(RmNumberInputPart::increment).activated &&
+    number.value() == 6.0f,
+    "number input ignores a button release over a different spinner part");
+  number.pointer_down(RmNumberInputPart::decrement);
+  expect(number.pointer_up(RmNumberInputPart::decrement).activated &&
+    std::fabs(number.value() - 5.5f) < 1.0e-6f,
+    "number input activates a matched spinner press and release");
+
+  number.set_range(10.0f, -10.0f);
+  expect(number.minimum() == -10.0f && number.maximum() == 10.0f,
+    "number input normalizes a reversed range");
+  number.set_type(RmNumberInputType::integer);
+  number.set_value(3.6f);
+  expect(number.value() == 4.0f, "integer number input rounds assigned values");
+}
+
 void test_toggle_behaviour()
 {
   RmToggleBehaviour toggle;
@@ -227,6 +294,8 @@ void test_menu_behaviour()
 int main()
 {
   test_button_behaviour();
+  test_text_input_behaviour();
+  test_number_input_behaviour();
   test_toggle_behaviour();
   test_combobox_behaviour();
   test_radiobutton_behaviour();

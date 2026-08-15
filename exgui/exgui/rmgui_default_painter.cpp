@@ -37,6 +37,39 @@ NVGcolor lerp_color(const NVGcolor& from, const NVGcolor& to, float amount)
   return result;
 }
 
+bool is_utf8_continuation(unsigned char value)
+{
+  return (value & 0xc0u) == 0x80u;
+}
+
+void build_text_line_layout(NVGcontext& context, RmTextInputLineLayout& line)
+{
+  line.byte_offsets.clear();
+  line.glyph_positions.clear();
+  line.byte_offsets.push_back(0);
+  line.glyph_positions.push_back(0.0f);
+  for (size_t index = 0; index < line.text.size();) {
+    ++index;
+    while (index < line.text.size() &&
+      is_utf8_continuation(static_cast<unsigned char>(line.text[index])))
+      ++index;
+    line.byte_offsets.push_back(index);
+    line.glyph_positions.push_back(context.textBounds(0.0f, 0.0f,
+      line.text.c_str(), line.text.c_str() + index, nullptr));
+  }
+}
+
+float text_x_at(const RmTextInputLineLayout& line, size_t global_offset)
+{
+  const size_t local_offset = global_offset <= line.text_start
+    ? 0 : std::min(global_offset - line.text_start, line.text.size());
+  const auto found = std::lower_bound(line.byte_offsets.begin(),
+    line.byte_offsets.end(), local_offset);
+  if (found == line.byte_offsets.end())
+    return line.glyph_positions.empty() ? 0.0f : line.glyph_positions.back();
+  return line.glyph_positions[static_cast<size_t>(found - line.byte_offsets.begin())];
+}
+
 } // namespace
 
 void RmDefaultControlPainter::draw_button(NVGcontext& context, const RmButtonVisual& visual,
@@ -278,6 +311,268 @@ void RmDefaultControlPainter::draw_label(NVGcontext& context, const RmLabelVisua
   context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
   context.fillColor(visual.enabled ? style.text : style.disabled_text);
   context.text(0.0f, visual.height * 0.5f, visual.text ? visual.text : "", nullptr);
+}
+
+RmTextInputLayout RmDefaultControlPainter::layout_text_input(NVGcontext& context,
+  const RmTextInputVisual& visual, const RmTextInputStyle& style)
+{
+  RmTextInputLayout layout;
+  const std::string text = visual.text ? visual.text : "";
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.textMetrics(&layout.ascender, &layout.descender, &layout.line_height);
+
+  size_t start = 0;
+  do {
+    const size_t newline = visual.multiline ? text.find('\n', start) : std::string::npos;
+    const size_t end = newline == std::string::npos ? text.size() : newline;
+    RmTextInputLineLayout line;
+    line.text_start = start;
+    line.text = text.substr(start, end - start);
+    build_text_line_layout(context, line);
+    layout.lines.push_back(std::move(line));
+    if (newline == std::string::npos)
+      break;
+    start = newline + 1;
+  } while (start <= text.size());
+
+  if (layout.lines.empty()) {
+    layout.lines.emplace_back();
+    build_text_line_layout(context, layout.lines.back());
+  }
+
+  if (visual.multiline) {
+    for (size_t index = 0; index < layout.lines.size(); ++index)
+      layout.lines[index].baseline = style.vertical_padding + layout.ascender +
+        static_cast<float>(index) * layout.line_height;
+  }
+  else {
+    layout.lines.front().baseline = visual.height * 0.5f +
+      (layout.ascender + layout.descender) * 0.5f;
+  }
+
+  const float available = std::max(0.0f,
+    visual.width - style.horizontal_padding * 2.0f);
+  float maximum_width = 0.0f;
+  for (const RmTextInputLineLayout& line : layout.lines) {
+    if (!line.glyph_positions.empty())
+      maximum_width = std::max(maximum_width, line.glyph_positions.back());
+  }
+  const float maximum_scroll = std::max(0.0f, maximum_width - available);
+  layout.scroll_offset = std::clamp(visual.scroll_offset, 0.0f, maximum_scroll);
+
+  if (!visual.multiline && !layout.lines.empty()) {
+    const float caret = text_x_at(layout.lines.front(), visual.cursor);
+    if (caret - layout.scroll_offset > available)
+      layout.scroll_offset = caret - available;
+    else if (caret < layout.scroll_offset)
+      layout.scroll_offset = caret;
+    layout.scroll_offset = std::clamp(layout.scroll_offset, 0.0f, maximum_scroll);
+  }
+  return layout;
+}
+
+size_t RmDefaultControlPainter::hit_test_text_input(const RmTextInputLayout& layout,
+  float x, float y, const RmTextInputStyle& style)
+{
+  if (layout.lines.empty())
+    return 0;
+
+  size_t line_index = 0;
+  if (layout.lines.size() > 1 && layout.line_height > 0.0f) {
+    const float line = (y - style.vertical_padding) / layout.line_height;
+    line_index = static_cast<size_t>(std::clamp(static_cast<int>(line), 0,
+      static_cast<int>(layout.lines.size()) - 1));
+  }
+  const RmTextInputLineLayout& line = layout.lines[line_index];
+  const float local_x = x - style.horizontal_padding + layout.scroll_offset;
+  const auto found = std::lower_bound(line.glyph_positions.begin(),
+    line.glyph_positions.end(), local_x);
+  size_t glyph = static_cast<size_t>(found - line.glyph_positions.begin());
+  if (glyph > 0 && glyph < line.glyph_positions.size()) {
+    const float left_distance = local_x - line.glyph_positions[glyph - 1];
+    const float right_distance = line.glyph_positions[glyph] - local_x;
+    if (left_distance < right_distance)
+      --glyph;
+  }
+  glyph = std::min(glyph, line.byte_offsets.size() - 1);
+  return line.text_start + line.byte_offsets[glyph];
+}
+
+void RmDefaultControlPainter::draw_text_input(NVGcontext& context,
+  const RmTextInputVisual& visual, const RmTextInputLayout& layout,
+  const RmTextInputStyle& style)
+{
+  const RmVisualState state = resolve_state(visual.enabled,
+    visual.hovered, visual.dragging);
+  const float width = std::max(0.0f, visual.width);
+  const float height = std::max(0.0f, visual.height);
+
+  context.beginPath();
+  context.roundedRect(0.5f, 0.5f, std::max(0.0f, width - 1.0f),
+    std::max(0.0f, height - 1.0f), style.corner_radius);
+  context.fillColor(style.background.resolve(state));
+  context.fill();
+  if (style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.border.resolve(state));
+    context.stroke();
+  }
+
+  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
+    const float inset = style.focus_ring_width * 0.5f;
+    context.beginPath();
+    context.roundedRect(inset, inset, std::max(0.0f, width - inset * 2.0f),
+      std::max(0.0f, height - inset * 2.0f), style.corner_radius);
+    context.StrokeWidth(style.focus_ring_width);
+    context.strokeColor(style.focus_ring);
+    context.stroke();
+  }
+
+  context.save();
+  context.intersectScissor(style.horizontal_padding, style.vertical_padding,
+    std::max(0.0f, width - style.horizontal_padding * 2.0f),
+    std::max(0.0f, height - style.vertical_padding * 2.0f));
+  const float origin_x = style.horizontal_padding - layout.scroll_offset;
+  const size_t selection_first = std::min(visual.selection_start,
+    visual.selection_end);
+  const size_t selection_last = std::max(visual.selection_start,
+    visual.selection_end);
+
+  if (selection_first != selection_last) {
+    context.fillColor(style.selection);
+    for (const RmTextInputLineLayout& line : layout.lines) {
+      const size_t line_first = line.text_start;
+      const size_t line_last = line.text_start + line.text.size();
+      if (selection_last <= line_first || selection_first >= line_last)
+        continue;
+      const size_t first = std::max(selection_first, line_first);
+      const size_t last = std::min(selection_last, line_last);
+      const float x0 = origin_x + text_x_at(line, first);
+      const float x1 = origin_x + text_x_at(line, last);
+      context.beginPath();
+      context.roundedRect(x0, line.baseline - layout.ascender,
+        std::max(0.0f, x1 - x0), layout.line_height,
+        style.selection_corner_radius);
+      context.fill();
+    }
+  }
+
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
+  context.fillColor(style.text.resolve(state));
+  for (const RmTextInputLineLayout& line : layout.lines)
+    context.text(origin_x, line.baseline, line.text.c_str(), nullptr);
+
+  if (visual.focused && visual.enabled && visual.caret_visible) {
+    for (const RmTextInputLineLayout& line : layout.lines) {
+      const size_t line_last = line.text_start + line.text.size();
+      if (visual.cursor < line.text_start || visual.cursor > line_last)
+        continue;
+      const float caret_x = origin_x + text_x_at(line, visual.cursor);
+      context.beginPath();
+      context.moveTo(caret_x, line.baseline - layout.ascender);
+      context.lineTo(caret_x, line.baseline - layout.descender);
+      context.StrokeWidth(style.caret_width);
+      context.strokeColor(style.caret);
+      context.stroke();
+      break;
+    }
+  }
+  context.restore();
+}
+
+void RmDefaultControlPainter::draw_number_input(NVGcontext& context,
+  const RmNumberInputVisual& visual, const RmNumberInputStyle& style)
+{
+  const RmVisualState state = resolve_state(visual.enabled, visual.hovered, false);
+  const float width = std::max(0.0f, visual.width);
+  const float height = std::max(0.0f, visual.height);
+  const float button_width = std::min(style.button_width, width);
+  const float button_x = width - button_width;
+  const float half_height = height * 0.5f;
+
+  context.beginPath();
+  context.roundedRect(0.5f, 0.5f, std::max(0.0f, width - 1.0f),
+    std::max(0.0f, height - 1.0f), style.corner_radius);
+  context.fillColor(style.background.resolve(state));
+  context.fill();
+
+  const RmVisualState increment_state = resolve_state(visual.enabled,
+    visual.increment_hovered, visual.increment_pressed);
+  context.beginPath();
+  context.roundedRectVarying(button_x, 0.5f, button_width - 0.5f,
+    std::max(0.0f, half_height - 0.5f), 0.0f, style.corner_radius,
+    0.0f, 0.0f);
+  context.fillColor(style.button_background.resolve(increment_state));
+  context.fill();
+
+  const RmVisualState decrement_state = resolve_state(visual.enabled,
+    visual.decrement_hovered, visual.decrement_pressed);
+  context.beginPath();
+  context.roundedRectVarying(button_x, half_height, button_width - 0.5f,
+    std::max(0.0f, half_height - 0.5f), 0.0f, 0.0f,
+    style.corner_radius, 0.0f);
+  context.fillColor(style.button_background.resolve(decrement_state));
+  context.fill();
+
+  if (style.separator_width > 0.0f) {
+    context.beginPath();
+    context.moveTo(button_x, 1.0f);
+    context.lineTo(button_x, height - 1.0f);
+    context.moveTo(button_x, half_height);
+    context.lineTo(width - 1.0f, half_height);
+    context.StrokeWidth(style.separator_width);
+    context.strokeColor(style.separator);
+    context.stroke();
+  }
+
+  const float icon_half = style.icon_size * 0.5f;
+  const float icon_x = button_x + button_width * 0.5f;
+  const auto draw_chevron = [&](float center_y, bool upward,
+    RmVisualState icon_state) {
+    const float direction = upward ? -1.0f : 1.0f;
+    context.beginPath();
+    context.moveTo(icon_x - icon_half, center_y - direction * icon_half * 0.4f);
+    context.lineTo(icon_x, center_y + direction * icon_half * 0.6f);
+    context.lineTo(icon_x + icon_half, center_y - direction * icon_half * 0.4f);
+    context.StrokeWidth(std::max(1.0f, style.separator_width * 1.5f));
+    context.strokeColor(style.button_icon.resolve(icon_state));
+    context.stroke();
+  };
+  draw_chevron(half_height * 0.5f, true, increment_state);
+  draw_chevron(half_height + half_height * 0.5f, false, decrement_state);
+
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  context.fillColor(style.text.resolve(state));
+  context.save();
+  context.intersectScissor(style.horizontal_padding, 0.0f,
+    std::max(0.0f, button_x - style.horizontal_padding * 2.0f), height);
+  context.text(style.horizontal_padding, height * 0.5f,
+    visual.text ? visual.text : "", nullptr);
+  context.restore();
+
+  context.beginPath();
+  context.roundedRect(0.5f, 0.5f, std::max(0.0f, width - 1.0f),
+    std::max(0.0f, height - 1.0f), style.corner_radius);
+  if (style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.border.resolve(state));
+    context.stroke();
+  }
+
+  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
+    const float inset = style.focus_ring_width * 0.5f;
+    context.beginPath();
+    context.roundedRect(inset, inset, std::max(0.0f, width - inset * 2.0f),
+      std::max(0.0f, height - inset * 2.0f), style.corner_radius);
+    context.StrokeWidth(style.focus_ring_width);
+    context.strokeColor(style.focus_ring);
+    context.stroke();
+  }
 }
 
 void RmDefaultControlPainter::draw_checkbox(NVGcontext& context,

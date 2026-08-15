@@ -276,17 +276,10 @@ void example_core_widgets(rm_surface* gui)
   rm_button* textButton = new rm_button(pwindow, 200 + 20 + 10, 20, 200, 40, "Test Button");
   rm_label* label = new rm_label(pwindow, 20, 40 + 30, "this is rm_label");
 
-  static rm_text_input_style style_inp;
-  //style_inp.set_text_offsets(10.0f);
-  style_inp.set_all_corners_radius(4.f);
-  style_inp.set_border_color(NVGcolor::RGB(0, 0, 255));
-  style_inp.set_border_width(2.f);
-  style_inp.set_rounded_selection(0);
-  //style_inp.set_active_bgr_color({ 0,0,0 });
-  //style_inp.set_blink_width(1.f);
-
   //RMGUI_TEXT_INPUT_MULTILINE RMGUI_TEXT_INPUT_SINGLELINE
-  rm_text_input* textInput = new rm_text_input(pwindow, 300, 100, 200, 20, &style_inp, RMGUI_TEXT_INPUT_SINGLELINE);
+  rm_text_input* textInput = new rm_text_input(
+    pwindow, 300, 100, 240, 36, RMGUI_TEXT_INPUT_SINGLELINE);
+  textInput->set_text("Editable text input");
 
   RmThemeDocument checkbox_theme_document = RmThemeDocument::dark_theme();
   checkbox_theme_document.name = "Compact checkbox demo";
@@ -545,6 +538,22 @@ void example_widgets(rm_surface* gui)
       printf("Scrollbar position: %.3f\n", position);
     }, controls_theme);
   pscrollbar->set_content_metrics(900.f, 260.f);
+
+  rm_theme_preview_panel* pinput_panel = new rm_theme_preview_panel(
+    ptab11, 240, 290, 360, 230, controls_theme);
+  new rm_label(pinput_panel, 20, 18, "Text and numeric input", controls_theme);
+  rm_text_input* psingle_input = new rm_text_input(pinput_panel,
+    20, 50, 320, 38, RMGUI_TEXT_INPUT_SINGLELINE, controls_theme);
+  psingle_input->set_text("Editable project name");
+  rm_text_input* pmultiline_input = new rm_text_input(pinput_panel,
+    20, 104, 210, 96, RMGUI_TEXT_INPUT_MULTILINE, controls_theme);
+  pmultiline_input->set_text("Multiline notes\nwith selection and undo");
+  new rm_number_input(pinput_panel, 246, 104, 94, 42,
+    RmNumberInputType::integer, 12.0f, 1.0f, 0.0f, 100.0f,
+    controls_theme);
+  new rm_number_input(pinput_panel, 246, 158, 94, 42,
+    RmNumberInputType::floating_point, 0.75f, 0.05f, 0.0f, 1.0f,
+    controls_theme);
 
   rm_checkbox *pcb = new rm_checkbox(pdiv, 10, 100, 200, "This is checkbox",
     [](rm_checkbox* pcheckbox) {

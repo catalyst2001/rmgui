@@ -163,6 +163,8 @@ void test_theme_document_compilation()
   document.tokens.colors.accent = NVGcolor::RGBA(12, 34, 210, 255);
   document.tokens.typography.control = 17.0f;
   document.tokens.controls.switch_track_height = 30.0f;
+  document.tokens.controls.text_input_horizontal_padding = 13.0f;
+  document.tokens.controls.number_input_button_width = 31.0f;
 
   const RmThemeCompileResult result = RmThemeCompiler::compile(document);
   require(result.succeeded(), "a valid theme document must compile");
@@ -178,6 +180,14 @@ void test_theme_document_compilation()
     "subtle buttons must compile as borderless transparent controls");
   require(same_color(result.theme->buttons.destructive.background.normal,
     document.tokens.colors.danger), "destructive buttons must use danger tokens");
+  require(result.theme->text_input.horizontal_padding == 13.0f,
+    "text input recipes must use editable padding metrics");
+  require(same_color(result.theme->text_input.selection,
+    NVGcolor::RGBAf(document.tokens.colors.accent.r,
+      document.tokens.colors.accent.g, document.tokens.colors.accent.b, 0.55f)),
+    "text input selection must derive from the accent token");
+  require(result.theme->number_input.button_width == 31.0f,
+    "number input recipes must use editable spinner metrics");
   require(result.theme->tabs.document.tab_height ==
     document.tokens.controls.tab_height,
     "tab recipes must use shared control metrics");

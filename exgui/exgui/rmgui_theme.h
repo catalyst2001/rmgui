@@ -165,6 +165,41 @@ struct RmLabelStyle {
   float font_size = 0.0f;
 };
 
+struct RmTextInputStyle {
+  RmStateColors background;
+  RmStateColors border;
+  RmStateColors text;
+  NVGcolor selection;
+  NVGcolor caret;
+  NVGcolor focus_ring;
+  float corner_radius = 0.0f;
+  float border_width = 0.0f;
+  float focus_ring_width = 0.0f;
+  float horizontal_padding = 0.0f;
+  float vertical_padding = 0.0f;
+  float font_size = 0.0f;
+  float caret_width = 0.0f;
+  float selection_corner_radius = 0.0f;
+};
+
+struct RmNumberInputStyle {
+  RmStateColors background;
+  RmStateColors border;
+  RmStateColors text;
+  RmStateColors button_background;
+  RmStateColors button_icon;
+  NVGcolor separator;
+  NVGcolor focus_ring;
+  float corner_radius = 0.0f;
+  float border_width = 0.0f;
+  float focus_ring_width = 0.0f;
+  float horizontal_padding = 0.0f;
+  float button_width = 0.0f;
+  float separator_width = 0.0f;
+  float icon_size = 0.0f;
+  float font_size = 0.0f;
+};
+
 struct RmCheckboxStyle {
   RmStateColors background;
   RmStateColors border;
@@ -354,6 +389,14 @@ struct RmAnimationTokens {
 struct RmControlMetricsTokens {
   float border_width = 1.0f;
   float focus_ring_width = 2.0f;
+  float text_input_horizontal_padding = 10.0f;
+  float text_input_vertical_padding = 7.0f;
+  float text_input_caret_width = 1.5f;
+  float text_input_selection_corner_radius = 2.0f;
+  float number_input_horizontal_padding = 10.0f;
+  float number_input_button_width = 28.0f;
+  float number_input_separator_width = 1.0f;
+  float number_input_icon_size = 5.0f;
   float checkbox_size = 20.0f;
   float checkbox_mark_width = 2.25f;
   float radiobutton_indicator_size = 20.0f;
@@ -430,6 +473,8 @@ struct RmThemeSnapshot {
   RmTabStyles tabs;
   RmMenuStyle menu;
   RmLabelStyle label;
+  RmTextInputStyle text_input;
+  RmNumberInputStyle number_input;
   RmCheckboxStyle checkbox;
   RmRadioButtonStyle radiobutton;
   RmComboBoxStyle combobox;
@@ -536,6 +581,14 @@ class RmThemeCompiler {
     sanitize_metric(tokens.animation.slow, 0.0001f, 10.0f, "tokens.animation.slow", diagnostics);
     sanitize_metric(tokens.controls.border_width, 0.0f, 32.0f, "tokens.controls.border_width", diagnostics);
     sanitize_metric(tokens.controls.focus_ring_width, 0.0f, 32.0f, "tokens.controls.focus_ring_width", diagnostics);
+    sanitize_metric(tokens.controls.text_input_horizontal_padding, 0.0f, 256.0f, "tokens.controls.text_input_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.text_input_vertical_padding, 0.0f, 256.0f, "tokens.controls.text_input_vertical_padding", diagnostics);
+    sanitize_metric(tokens.controls.text_input_caret_width, 0.0f, 32.0f, "tokens.controls.text_input_caret_width", diagnostics);
+    sanitize_metric(tokens.controls.text_input_selection_corner_radius, 0.0f, 128.0f, "tokens.controls.text_input_selection_corner_radius", diagnostics);
+    sanitize_metric(tokens.controls.number_input_horizontal_padding, 0.0f, 256.0f, "tokens.controls.number_input_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.number_input_button_width, 8.0f, 256.0f, "tokens.controls.number_input_button_width", diagnostics);
+    sanitize_metric(tokens.controls.number_input_separator_width, 0.0f, 32.0f, "tokens.controls.number_input_separator_width", diagnostics);
+    sanitize_metric(tokens.controls.number_input_icon_size, 1.0f, 64.0f, "tokens.controls.number_input_icon_size", diagnostics);
     sanitize_metric(tokens.controls.checkbox_size, 1.0f, 256.0f, "tokens.controls.checkbox_size", diagnostics);
     sanitize_metric(tokens.controls.checkbox_mark_width, 0.0f, 32.0f, "tokens.controls.checkbox_mark_width", diagnostics);
     sanitize_metric(tokens.controls.radiobutton_indicator_size, 1.0f, 256.0f, "tokens.controls.radiobutton_indicator_size", diagnostics);
@@ -748,6 +801,45 @@ public:
     p_theme->label.text = colors.text;
     p_theme->label.disabled_text = colors.text_disabled;
     p_theme->label.font_size = tokens.typography.body;
+
+    p_theme->text_input.background = { colors.control, colors.control_hovered,
+      colors.control_pressed, colors.control_disabled };
+    p_theme->text_input.border = { colors.border, colors.border_hovered,
+      colors.border_pressed, colors.border_disabled };
+    p_theme->text_input.text = { colors.text, colors.text, colors.text,
+      colors.text_disabled };
+    p_theme->text_input.selection = colors.accent;
+    p_theme->text_input.selection.a = 0.55f;
+    p_theme->text_input.caret = colors.text;
+    p_theme->text_input.focus_ring = colors.focus_ring;
+    p_theme->text_input.corner_radius = tokens.radius.medium;
+    p_theme->text_input.border_width = controls.border_width;
+    p_theme->text_input.focus_ring_width = controls.focus_ring_width;
+    p_theme->text_input.horizontal_padding = controls.text_input_horizontal_padding;
+    p_theme->text_input.vertical_padding = controls.text_input_vertical_padding;
+    p_theme->text_input.font_size = tokens.typography.control;
+    p_theme->text_input.caret_width = controls.text_input_caret_width;
+    p_theme->text_input.selection_corner_radius =
+      controls.text_input_selection_corner_radius;
+
+    p_theme->number_input.background = p_theme->text_input.background;
+    p_theme->number_input.border = p_theme->text_input.border;
+    p_theme->number_input.text = p_theme->text_input.text;
+    p_theme->number_input.button_background = { colors.control,
+      colors.control_hovered, colors.control_pressed, colors.control_disabled };
+    p_theme->number_input.button_icon = { colors.text_muted, colors.text,
+      colors.text, colors.text_disabled };
+    p_theme->number_input.separator = colors.border;
+    p_theme->number_input.focus_ring = colors.focus_ring;
+    p_theme->number_input.corner_radius = tokens.radius.medium;
+    p_theme->number_input.border_width = controls.border_width;
+    p_theme->number_input.focus_ring_width = controls.focus_ring_width;
+    p_theme->number_input.horizontal_padding =
+      controls.number_input_horizontal_padding;
+    p_theme->number_input.button_width = controls.number_input_button_width;
+    p_theme->number_input.separator_width = controls.number_input_separator_width;
+    p_theme->number_input.icon_size = controls.number_input_icon_size;
+    p_theme->number_input.font_size = tokens.typography.control;
 
     p_theme->checkbox.background = { colors.control, colors.control_hovered,
       colors.control_pressed, colors.control_disabled };
