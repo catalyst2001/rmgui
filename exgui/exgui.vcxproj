@@ -69,7 +69,9 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="UserMacros">
+    <RmGuiBuildBlendishDemo Condition="'$(RmGuiBuildBlendishDemo)'==''">false</RmGuiBuildBlendishDemo>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -139,17 +141,26 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="blendish_test.cpp" />
+    <ClCompile Include="blendish_test.cpp">
+      <ExcludedFromBuild Condition="'$(RmGuiBuildBlendishDemo)'!='true'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="exgui\backend\rmgui_glfw_opnegl33.cpp" />
     <ClCompile Include="exgui\backend\rmgui_win32_opnegl33.cpp" />
     <ClCompile Include="exgui\rmgui.cpp" />
+    <ClCompile Include="exgui\rmgui_default_painter.cpp" />
     <ClCompile Include="exgui\rmgui_controls.cpp" />
-    <ClCompile Include="exgui\blend_ui.cpp" />
+    <ClCompile Include="exgui\blend_ui.cpp">
+      <ExcludedFromBuild Condition="'$(RmGuiBuildBlendishDemo)'!='true'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="exgui\rm_effects.cpp" />
     <ClCompile Include="exgui\rmgui_resources.cpp" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="main.cpp">
+      <PreprocessorDefinitions Condition="'$(RmGuiBuildBlendishDemo)'=='true'">RMGUI_ENABLE_LEGACY_BLENDISH_DEMO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
     <ClCompile Include="vendor\glad\src\glad.c" />
-    <ClCompile Include="vendor\nanovg\blendish.cpp" />
+    <ClCompile Include="vendor\nanovg\blendish.cpp">
+      <ExcludedFromBuild Condition="'$(RmGuiBuildBlendishDemo)'!='true'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="vendor\nanovg\nanovg.cpp" />
     <ClCompile Include="vendor\nanovg\nanovg_gl.cpp" />
     <ClCompile Include="vendor\nanovg\nanovg_gl_utils.cpp" />
@@ -159,7 +170,10 @@
     <ClInclude Include="exgui\backend\rmgui_glfw_opnegl33.h" />
     <ClInclude Include="exgui\backend\rmgui_win32_opnegl33.h" />
     <ClInclude Include="exgui\rmgui.h" />
+    <ClInclude Include="exgui\rmgui_behaviour.h" />
+    <ClInclude Include="exgui\rmgui_default_painter.h" />
     <ClInclude Include="exgui\rmgui_controls.h" />
+    <ClInclude Include="exgui\rmgui_theme.h" />
     <ClInclude Include="exgui\blend_ui.h" />
     <ClInclude Include="exgui\rm_effects.h" />
     <ClInclude Include="exgui\rmgui_resources.h" />

@@ -479,7 +479,7 @@ public:
 		if (pdst)
 			*pdst = &m_pool[idx];
 
-		return NVGhandle(idx, m_gens[idx]); //NOTE KD: idx size_t to half_type narrowing conversion
+		return NVGhandle(static_cast<NVGhandle::_half_type>(idx), m_gens[idx]);
 	}
 
 	/**
@@ -877,10 +877,8 @@ struct NVGcontextConfig {
 };
 
 struct NVGcustomDraw {
+	NVGhandle shader;
 	NVGhandle image;
-	const void* uniforms;
-	size_t uniformSize;
-	unsigned int uniformSlot;
 };
 
 enum NVGuniformDataType {

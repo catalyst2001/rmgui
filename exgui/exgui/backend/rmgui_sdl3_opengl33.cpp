@@ -135,6 +135,7 @@ static RM_KEY translate_sdl3_key(SDL_Keycode k)
 
   case SDLK_LCTRL:        return RM_KEY_LCTRL;
   case SDLK_RCTRL:        return RM_KEY_RCTRL;
+  case SDLK_SPACE:        return RM_KEY_SPACE;
 
   case SDLK_F1:  return RM_KEY_F1;
   case SDLK_F2:  return RM_KEY_F2;

@@ -29,6 +29,9 @@
     <ClCompile Include="exgui\rmgui.cpp">
       <Filter>exgui</Filter>
     </ClCompile>
+    <ClCompile Include="exgui\rmgui_default_painter.cpp">
+      <Filter>exgui</Filter>
+    </ClCompile>
     <ClCompile Include="vendor\nanovg\nanovg.cpp">
       <Filter>vendor\nanovg</Filter>
     </ClCompile>
@@ -62,9 +65,21 @@
     <ClCompile Include="vendor\nanovg\nanovg_gl_utils.cpp">
       <Filter>vendor\nanovg</Filter>
     </ClCompile>
+    <ClCompile Include="exgui\blend_ui.cpp">
+      <Filter>exgui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="exgui\rmgui.h">
+      <Filter>exgui</Filter>
+    </ClInclude>
+    <ClInclude Include="exgui\rmgui_behaviour.h">
+      <Filter>exgui</Filter>
+    </ClInclude>
+    <ClInclude Include="exgui\rmgui_default_painter.h">
+      <Filter>exgui</Filter>
+    </ClInclude>
+    <ClInclude Include="exgui\rmgui_theme.h">
       <Filter>exgui</Filter>
     </ClInclude>
     <ClInclude Include="vendor\nanovg\nanovg.h">
@@ -110,5 +125,6 @@
     <ClInclude Include="exgui\backend\rmgui_win32_opnegl33.h">
       <Filter>exgui\backend</Filter>
     </ClInclude>
+    <ClInclude Include="exgui\blend_ui.h" />
   </ItemGroup>
 </Project>

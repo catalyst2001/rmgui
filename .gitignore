@@ -7,3 +7,8 @@
 /.vs
 /algtest
 /designer/x64
+
+# Visual Studio build outputs, including project-local intermediate folders.
+**/Debug/
+**/Release/
+**/x64/

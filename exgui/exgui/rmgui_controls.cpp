@@ -1,4 +1,5 @@
 ﻿#include "rmgui_controls.h"
+#include "rmgui_default_painter.h"
 #include <iostream>
 #include <algorithm>
 #include <cstdlib>
@@ -7,6 +8,79 @@
 #include <cmath>
 
 #include "stb_image.h"
+
+namespace {
+
+template <typename Style>
+RmStateColors same_color_for_all_states(Style color)
+{
+	return { color, color, color, color };
+}
+
+RmThemeRef theme_from_legacy_checkbox(const rm_checkbox_style* legacy)
+{
+	if (!legacy)
+		return RmTheme::default_theme();
+
+	auto theme = std::make_shared<RmTheme>(*RmTheme::default_theme());
+	theme->checkbox.background = same_color_for_all_states(legacy->get_background_color());
+	theme->checkbox.border = same_color_for_all_states(legacy->get_border_color());
+	theme->checkbox.mark = same_color_for_all_states(legacy->get_mark_color());
+	theme->checkbox.text = same_color_for_all_states(legacy->get_text_color());
+	theme->checkbox.box_size = static_cast<float>(legacy->get_check_size());
+	theme->checkbox.corner_radius = legacy->get_avg_radius();
+	theme->checkbox.border_width = legacy->get_border_width();
+	theme->checkbox.text_gap = legacy->get_text_offsets().x;
+	theme->checkbox.font_size = legacy->get_font_size();
+	return theme;
+}
+
+RmThemeRef theme_with_progress_radius(RmThemeRef source, float radius)
+{
+	auto theme = std::make_shared<RmTheme>(
+		source ? *source : *RmTheme::default_theme());
+	theme->progress.corner_radius = std::max(0.0f, radius);
+	return theme;
+}
+
+RmThemeRef theme_from_legacy_switch(const rm_switch_style* legacy)
+{
+	if (!legacy)
+		return RmTheme::default_theme();
+
+	auto theme = std::make_shared<RmTheme>(*RmTheme::default_theme());
+	theme->switch_control.track_on = same_color_for_all_states(legacy->get_track_on());
+	theme->switch_control.track_off = same_color_for_all_states(legacy->get_track_off());
+	theme->switch_control.knob = same_color_for_all_states(legacy->get_knob_color());
+	theme->switch_control.track_height = legacy->get_track_height();
+	theme->switch_control.padding = legacy->get_padding();
+	theme->switch_control.animation_duration = legacy->get_anim_time();
+	theme->switch_control.knob_radius = legacy->get_knob_radius();
+	theme->switch_control.corner_radius = legacy->get_avg_radius();
+	theme->switch_control.shadow_offset = legacy->get_shadow_offset();
+	theme->switch_control.shadow_size = legacy->get_shadow_size();
+	theme->switch_control.shadow = legacy->get_shadow_color();
+	return theme;
+}
+
+RmThemeRef theme_from_legacy_slider(const rm_slider_style* legacy)
+{
+	if (!legacy)
+		return RmTheme::default_theme();
+
+	auto theme = std::make_shared<RmTheme>(*RmTheme::default_theme());
+	theme->slider.track = same_color_for_all_states(legacy->get_track_bg());
+	theme->slider.fill = same_color_for_all_states(legacy->get_track_fill());
+	theme->slider.thumb = same_color_for_all_states(legacy->get_thumb_color());
+	theme->slider.thumb_border = same_color_for_all_states(legacy->get_thumb_border_color());
+	theme->slider.track_height = legacy->get_track_height();
+	theme->slider.padding = legacy->get_padding();
+	theme->slider.thumb_radius = legacy->get_thumb_radius();
+	theme->slider.thumb_border_width = legacy->get_thumb_border_width();
+	return theme;
+}
+
+} // namespace
 
 /**
 * drawImage
@@ -109,55 +183,87 @@ bool rm_image_button::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE sta
 	return true;
 }
 
-rm_button::rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text)
-	: rm_widget(x, y, width, height, p_parent, "ui_button"), m_text(text)
+rm_button::rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text,
+	RmThemeRef theme)
+	: rm_widget(x, y, width, height, p_parent, "ui_button"), m_text(text),
+	m_theme(theme ? std::move(theme) : RmTheme::default_theme())
 {
 }
 
 rm_button::~rm_button() {}
 
 void rm_button::on_draw(NVGcontext* pctx) {
-	//m_bbox.from_rect(m_absolute);  //NOTE: K.D. commented this
-	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
-	pctx->setFontSize(20.0f);
-
-	pctx->beginPath();
-	pctx->roundedRect(0.f, 0.f, m_size.x, m_size.y, 4.0f);
-	NVGcolor fillColor = NVGcolor::RGBA(100, 100, 250, 255);
-	if (m_elem_flags.is_hovered())
-		fillColor = NVGcolor::RGBA(120, 120, 255, 255);
-	pctx->fillColor(fillColor);
-	pctx->fill();
-
-	pctx->setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-	pctx->fillColor(NVGcolor::RGBA(255, 255, 255, 255));
-	float cx = m_size.x / 2.0f;
-	float cy = m_size.y / 2.0f;
-	pctx->text(cx, cy, m_text.c_str(), nullptr);
+	const RmButtonVisual visual{
+		m_size.x,
+		m_size.y,
+		get_font(),
+		m_text.c_str(),
+		is_enabled(),
+		m_elem_flags.is_hovered(),
+		m_behaviour.is_pressed(),
+		m_elem_flags.is_focused()
+	};
+	RmDefaultControlPainter::draw_button(*pctx, visual, m_theme->button);
 	rm_widget::on_draw(pctx);
 }
 
 bool rm_button::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
-	if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
-		std::cout << "Button \"" << m_text << "\" clicked!" << std::endl;
-		return false;
+	RM_UNUSED(delta);
+	const bool inside = m_bbox.inside(cursor_pos);
+
+	if (event == RM_MOUSE_EVENT_MOVE) {
+		const auto update = m_behaviour.pointer_move(inside);
+		return !update.handled;
 	}
+
+	if (event != RM_MOUSE_EVENT_CLICK || vk != RM_KEY_LMOUSE)
+		return true;
+
+	if (state == DOWN) {
+		const auto update = m_behaviour.pointer_down(inside);
+		if (update.handled && get_root())
+			get_root()->capture_pointer(this);
+		return !update.handled;
+	}
+
+	if (state == UP) {
+		const auto update = m_behaviour.pointer_up(inside);
+		if (update.activated)
+			std::cout << "Button \"" << m_text << "\" clicked!" << std::endl;
+		return !update.handled;
+	}
+
 	return true;
 }
 
-rm_label::rm_label(rm_widget* p_parent, int x, int y, const std::string& text)
-	: rm_widget(x, y, 200, 30, p_parent, "ui_label"), m_text(text)
+void rm_button::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
+{
+	RM_UNUSED(sc);
+	const bool activation_key = vk == RM_KEY_ENTER || vk == RM_KEY_SPACE;
+	const auto update = state == UP
+		? m_behaviour.key_up(activation_key)
+		: m_behaviour.key_down(activation_key);
+	if (update.activated)
+		std::cout << "Button \"" << m_text << "\" clicked!" << std::endl;
+}
+
+rm_label::rm_label(rm_widget* p_parent, int x, int y, const std::string& text, RmThemeRef theme)
+	: rm_widget(x, y, 200, 30, p_parent, "ui_label"), m_text(text),
+	m_theme(theme ? std::move(theme) : RmTheme::default_theme())
 {
 }
 
 rm_label::~rm_label() {}
 
 void rm_label::on_draw(NVGcontext* pctx) {
-	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
-	pctx->setFontSize(18.0f);
-	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-	pctx->fillColor(NVGcolor::RGBA(255, 255, 255, 255));
-	pctx->text(0.f, m_size.y * 0.5f, m_text.c_str(), nullptr);
+	const RmLabelVisual visual{
+		m_size.x,
+		m_size.y,
+		get_font(),
+		m_text.c_str(),
+		is_enabled()
+	};
+	RmDefaultControlPainter::draw_label(*pctx, visual, m_theme->label);
 	rm_widget::on_draw(pctx);
 }
 
@@ -521,7 +627,7 @@ size_t rm_text_input::hit_test_index(float px, float py) const
 	li = std::clamp(li, 0, int(m_line_starts.size()) - 1);
 
 	size_t start = m_line_starts[li];
-	size_t end = (li + 1 < m_line_starts.size())
+	size_t end = (static_cast<size_t>(li + 1) < m_line_starts.size())
 		? m_line_starts[li + 1] - 1
 		: m_buffer.str().size();
 
@@ -557,68 +663,77 @@ void rm_text_input::on_text_input(int sym) {
 	m_blink_state = false;
 }
 
-rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style* pstyle, const std::string& label, rm_checkbox_cb pcallback)
-	: rm_widget(x, y, width, pstyle->get_check_size(), p_parent, "ui_checkbox"), m_checked(false), m_label(label)
+rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width,
+	const std::string& label, rm_checkbox_cb pcallback, RmThemeRef theme)
+	: rm_widget(x, y, width,
+		static_cast<int>((theme ? theme : RmTheme::default_theme())->checkbox.box_size),
+		p_parent, "ui_checkbox"),
+	m_behaviour(false), m_label(label),
+	m_theme(theme ? std::move(theme) : RmTheme::default_theme())
 {
-	set_style(pstyle);
 	set_callback(pcallback);
-	assert(m_proot && "m_proot was nullptr! solve this later");
-	m_icon_font = m_proot->find_font("fontawesome");
-	assert(m_icon_font.isValid() && "'fontawesome' not loaded");
 }
+
+rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width,
+	rm_checkbox_style* pstyle, const std::string& label, rm_checkbox_cb pcallback)
+	: rm_checkbox(p_parent, x, y, width, label, pcallback, theme_from_legacy_checkbox(pstyle)) {}
 
 rm_checkbox::~rm_checkbox() {}
 
 void rm_checkbox::on_draw(NVGcontext* pctx) {
-	float xo, yo;
-	//m_bbox.from_rect(m_absolute); //NOTE: K.D. commented this
-	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
-
-	/* paint background */
-	pctx->beginPath();
-	pctx->roundedRectVarying(
-		0.5f, 0.5f, m_size.y - 1.f, m_size.y - 1.f,
-		m_pstyle->get_corner_radius(LEFT_TOP),
-		m_pstyle->get_corner_radius(RIGHT_TOP),
-		m_pstyle->get_corner_radius(RIGHT_BOTTOM),
-		m_pstyle->get_corner_radius(LEFT_BOTTOM)
-	);
-	pctx->fillColor(m_pstyle->get_background_color());
-	pctx->fill();
-	pctx->StrokeWidth(m_pstyle->get_border_width());
-	pctx->strokeColor(m_pstyle->get_border_color());
-	pctx->stroke();
-
-	if (m_checked) {
-		/* draw mark */
-		pctx->setFontFaceId(((int)m_icon_font.getValue())); //FIXME: wait fontstash refactoring!
-		pctx->setFontSize(16.f);
-		pctx->setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-		pctx->fillColor(m_pstyle->get_mark_color());
-		xo = m_size.y / 2.f;
-		yo = m_size.y / 2.f;
-		pctx->text(xo, yo, (const char*)ICON_FA_CHECK, nullptr);
-	}
-
-	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
-	pctx->setFontSize(m_pstyle->get_font_size());
-	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-	pctx->fillColor(m_pstyle->get_text_color());
-
-	const rm_vec2& text_offsets = m_pstyle->get_text_offsets();
-	pctx->text(m_size.y + text_offsets.x, (m_size.y / 2.0f) + text_offsets.y, m_label.c_str(), nullptr);
+	const RmCheckboxVisual visual{
+		m_size.x,
+		m_size.y,
+		get_font(),
+		m_label.c_str(),
+		is_enabled(),
+		m_elem_flags.is_hovered(),
+		m_behaviour.is_pressed(),
+		m_elem_flags.is_focused(),
+		m_behaviour.is_checked()
+	};
+	RmDefaultControlPainter::draw_checkbox(*pctx, visual, m_theme->checkbox);
 	rm_widget::on_draw(pctx);
 }
 
 bool rm_checkbox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
-	if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(cursor_pos)) {
-		m_checked = !m_checked;
-		if (is_valid_callback())
-			get_callback()(this);
+	RM_UNUSED(delta);
+	const bool inside = m_bbox.inside(cursor_pos);
 
-		return false;
+	if (event == RM_MOUSE_EVENT_MOVE) {
+		const auto update = m_behaviour.pointer_move(inside);
+		return !update.handled;
 	}
+
+	if (event != RM_MOUSE_EVENT_CLICK || vk != RM_KEY_LMOUSE)
+		return true;
+
+	if (state == DOWN) {
+		const auto update = m_behaviour.pointer_down(inside);
+		if (update.handled && get_root())
+			get_root()->capture_pointer(this);
+		return !update.handled;
+	}
+
+	if (state == UP) {
+		const auto update = m_behaviour.pointer_up(inside);
+		if (update.activated && is_valid_callback())
+			get_callback()(this);
+		return !update.handled;
+	}
+
 	return true;
+}
+
+void rm_checkbox::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
+{
+	RM_UNUSED(sc);
+	const bool activation_key = vk == RM_KEY_ENTER || vk == RM_KEY_SPACE;
+	const auto update = state == UP
+		? m_behaviour.key_up(activation_key)
+		: m_behaviour.key_down(activation_key);
+	if (update.activated && is_valid_callback())
+		get_callback()(this);
 }
 
 rm_combobox::rm_combobox(rm_widget* p_parent, int x, int y, int width, int height, rm_combobox_cb pcallback)
@@ -739,110 +854,74 @@ bool rm_combobox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, 
 	return true;
 }
 
-void rm_slider::compute_value(rm_vec2& cursor_pos)
+void rm_slider::update_value_from_pointer(const rm_vec2& local_cursor)
 {
-	rm_slider_style& style = *m_pstyle;
-	float pad = style.get_padding();
+	const float pad = m_theme->slider.padding;
 	float track_w = m_size.x - pad * 2.f;
-
-	float x = cursor_pos.x - pad;
-	float frac = x / track_w;
-	frac = rm_clamp(frac, 0.f, 1.f);
-
-	float new_val = m_min + frac * (m_max - m_min);
-	if (new_val != m_value) {
-		m_value = new_val;
-		if (m_pcallback)
-			m_pcallback(this);
-	}
+	const float fraction = track_w > FLT_EPSILON ? (local_cursor.x - pad) / track_w : 0.f;
+	const float previous = m_behaviour.value();
+	if (m_behaviour.is_dragging())
+		m_behaviour.drag_to(fraction);
+	else
+		m_behaviour.begin_drag(fraction);
+	if (m_pcallback && std::fabs(previous - m_behaviour.value()) > FLT_EPSILON)
+		m_pcallback(this);
 }
 
-void rm_slider::compute_inner_and_thumb()
-{
-	m_thumb_size = m_size.y / 2.5f;
-	m_inner_rect.x = m_thumb_size;
-	m_inner_rect.y = 0.f;
-	m_inner_rect.width = m_size.x - m_thumb_size * 2.f;
-	m_inner_rect.height = m_size.y;
+rm_slider::rm_slider(rm_widget* p_parent, int x, int y, int width, int height,
+	float min, float max, float initial, rm_slider_callback pcallback, RmThemeRef theme)
+	: rm_widget(x, y, width, height, p_parent, "ui_slider", RM_FLAG_DEFAULT),
+	m_behaviour(min, max, initial), m_pcallback(pcallback),
+	m_theme(theme ? std::move(theme) : RmTheme::default_theme()) {
 }
 
-rm_slider::rm_slider(rm_widget* p_parent, int x, int y, int width, int height, rm_slider_style* pstyle, float min, float max, float initial, rm_slider_callback pcallback)
-	: rm_widget(x, y, width, height, p_parent, "ui_slider", RM_FLAG_DEFAULT | RM_FLAG_GLOBAL),
-	m_min(min), m_max(max), m_value(initial),
-	m_dragging(false), m_pcallback(pcallback) {
-	set_style(pstyle);
-	compute_inner_and_thumb();
-}
+rm_slider::rm_slider(rm_widget* p_parent, int x, int y, int width, int height,
+	rm_slider_style* pstyle, float min, float max, float initial, rm_slider_callback pcallback)
+	: rm_slider(p_parent, x, y, width, height, min, max, initial, pcallback,
+		theme_from_legacy_slider(pstyle)) {}
 
 rm_slider::~rm_slider() {}
 
 void rm_slider::on_draw(NVGcontext* pctx) {
-	rm_slider_style& style = *m_pstyle;
-	float w = m_size.x;
-	float h = m_size.y;
-	float th = style.get_track_height();
-	float tr = style.get_avg_radius();
-	float pad = style.get_padding();
-	float ty = (h - th) * 0.5f;
-
-	/* draw bg track */
-	NVGpaint bgPaint = NVGpaint::boxGradient(pad + 0.5f, ty + 0.5f, w - 2 * pad - 1.0f, th, tr, 1.0f, style.get_track_bg(), style.get_track_bg());
-	pctx->beginPath();
-	pctx->roundedRect(pad + 0.5f, ty + 0.5f, w - 2 * pad - 1.0f, th, tr);
-	pctx->fillPaint(bgPaint);
-	pctx->fill();
-
-	/* draw fill track */
-	float range = m_max - m_min;
-	float frac = (range > FLT_EPSILON) ? (m_value - m_min) / range : 0.f;
-	frac = std::clamp(frac, 0.f, 1.f);
-	float fill_w = (w - 2 * pad) * frac;
-	NVGpaint fg_paint = NVGpaint::boxGradient(pad + 0.5f, ty + 0.5f, fill_w - 1.0f, th, tr, 1.0f, style.get_track_fill(), style.get_track_fill());
-	pctx->beginPath();
-	pctx->roundedRectVarying(pad + 0.5f, ty + 0.5f, fill_w - 1.0f, th,
-		style.get_corner_radius(LEFT_TOP), style.get_corner_radius(RIGHT_TOP), style.get_corner_radius(RIGHT_BOTTOM), style.get_corner_radius(LEFT_BOTTOM));
-	pctx->fillPaint(fg_paint);
-	pctx->fill();
-
-	/* draw thumb */
-	float cx = pad + fill_w;
-	float cy = h * 0.5f;
-	float kr = style.get_thumb_radius();
-	pctx->beginPath();
-	pctx->circle(cx, cy, kr);
-	pctx->fillColor(style.get_thumb_color());
-	pctx->fill();
-	pctx->StrokeWidth(style.get_thumb_border_width());
-	pctx->strokeColor(style.get_thumb_border_color());
-	pctx->stroke();
+	const RmSliderVisual visual{
+		m_size.x,
+		m_size.y,
+		m_behaviour.fraction(),
+		is_enabled(),
+		m_elem_flags.is_hovered(),
+		m_behaviour.is_dragging(),
+		m_elem_flags.is_focused()
+	};
+	RmDefaultControlPainter::draw_slider(*pctx, visual, m_theme->slider);
 
 	rm_widget::on_draw(pctx);
 }
 
 bool rm_slider::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
+	RM_UNUSED(delta);
 	rm_vec2 local = cursor_to_local(cursor_pos);
-	if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
-		m_dragging = true;
-		compute_value(local);
+	if (event == RM_MOUSE_EVENT_CLICK && vk == RM_KEY_LMOUSE && state == DOWN && m_bbox.inside(cursor_pos)) {
+		update_value_from_pointer(local);
+		if (get_root())
+			get_root()->capture_pointer(this);
 		return false;
 	}
-	if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_dragging) {
-		m_dragging = false;
+	if (event == RM_MOUSE_EVENT_CLICK && vk == RM_KEY_LMOUSE && state == UP && m_behaviour.is_dragging()) {
+		m_behaviour.end_drag();
 		return false;
 	}
-	if (m_dragging && event == RM_MOUSE_EVENT_MOVE) {
-		compute_value(local);
+	if (m_behaviour.is_dragging() && event == RM_MOUSE_EVENT_MOVE) {
+		update_value_from_pointer(local);
 		return false;
 	}
 	return true;
 }
 
-rm_progress_base::rm_progress_base(rm_widget* p_parent, int x, int y, int width, int height, float inital, float corner_round) :
-	rm_widget(x, y, width, height, p_parent, "ui_progress_base")
-{
-	m_round = corner_round;
-	m_percent = inital;
-}
+rm_progress_base::rm_progress_base(rm_widget* p_parent, int x, int y, int width, int height,
+	float initial, float corner_round, RmThemeRef theme) :
+	rm_widget(x, y, width, height, p_parent, "ui_progress_base"),
+	m_behaviour(initial), m_theme(theme_with_progress_radius(std::move(theme), corner_round))
+{}
 
 rm_progress_base::~rm_progress_base()
 {
@@ -850,42 +929,23 @@ rm_progress_base::~rm_progress_base()
 
 void rm_progress_base::on_draw(NVGcontext* pctx)
 {
-	// paint background
-	pctx->beginPath();
-	pctx->fillColor(NVGcolor::RGB(0, 0, 0));
-	pctx->roundedRect(0.f, 0.f, m_size.x, m_size.y, m_round);
-	pctx->fill();
-
-	// paint progres bar
-	float identity_percent = m_percent / 100.f; // 0.f-1.f
-	rm_rect percent_rect(0.f, 0.f, m_size);
-	percent_rect.width *= identity_percent;
-
-	NVGpaint paint = NVGpaint::linearGradient(
-		percent_rect.x, percent_rect.y,
-		percent_rect.x + percent_rect.width, percent_rect.y,
-		NVGcolor::RGB(232, 43, 231), NVGcolor::RGB(40, 5, 229));
-
-	pctx->beginPath();
-	pctx->roundedRect(
-		percent_rect.x, percent_rect.y,
-		percent_rect.width, percent_rect.height, m_round);
-	pctx->fillPaint(paint);
-	pctx->fill();
+	RmDefaultControlPainter::draw_progress(*pctx,
+		{ m_size.x, m_size.y, m_behaviour.fraction(), is_enabled() },
+		m_theme->progress);
 	rm_widget::on_draw(pctx);
 }
 
-bool rm_progress_base::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+void rm_progress_base::set_corner_round(float radius)
 {
-	return true;
+	m_theme = theme_with_progress_radius(m_theme, radius);
 }
 
 rm_progress_image::rm_progress_image(rm_widget* p_parent, int x, int y, int width, int height,
-	rm_image img, float patangle, float patalpha, float inital, float corner_round) :
-	rm_progress_base(p_parent, x, y, width, height, inital, corner_round)
+	rm_image img, float pattern_angle, float pattern_alpha, float initial, float corner_round) :
+	rm_progress_base(p_parent, x, y, width, height, initial, corner_round)
 {
-	m_angle = patangle;
-	m_alpha = patalpha;
+	m_angle = pattern_angle;
+	m_alpha = pattern_alpha;
 	m_image = img;
 }
 
@@ -895,28 +955,31 @@ rm_progress_image::~rm_progress_image()
 
 void rm_progress_image::on_draw(NVGcontext* pctx)
 {
-	int iw, ih;
 	// paint background
 	pctx->beginPath();
-	pctx->fillColor(NVGcolor::RGB(0, 0, 0));
-	pctx->roundedRect(0.f, 0.f, m_size.x, m_size.y, m_round);
+	pctx->fillColor(m_theme->progress.background.resolve(
+		is_enabled() ? RmVisualState::normal : RmVisualState::disabled));
+	pctx->roundedRect(0.f, 0.f, m_size.x, m_size.y, get_corner_round());
 	pctx->fill();
 
 	// paint progres bar
-	float identity_percent = m_percent / 100.f; // 0.f-1.f
 	rm_rect percent_rect(0.f, 0.f, m_size);
-	percent_rect.width *= identity_percent;
+	percent_rect.width *= m_behaviour.fraction();
 
-	pctx->getImageSize(m_image, &iw, &ih);
-	NVGpaint paint = NVGpaint::imagePattern(0, 0, percent_rect.width, percent_rect.height, m_angle, m_image, m_alpha);
-	pctx->beginPath();
-	pctx->roundedRect(
-		percent_rect.x, percent_rect.y,
-		percent_rect.width, percent_rect.height, m_round);
-	pctx->fillPaint(paint);
-	pctx->fill();
+	if (percent_rect.width > 0.0f) {
+		NVGpaint paint = NVGpaint::imagePattern(0, 0, percent_rect.width,
+			percent_rect.height, m_angle, m_image, m_alpha);
+		pctx->beginPath();
+		pctx->roundedRect(
+			percent_rect.x, percent_rect.y,
+			percent_rect.width, percent_rect.height, get_corner_round());
+		pctx->fillPaint(paint);
+		pctx->fill();
 
-	drawSprite(pctx, m_image, m_alpha, 0.f, 0.f, 13.f, 15.f, percent_rect.x, percent_rect.y, percent_rect.width, percent_rect.height, m_round, m_round, m_round, m_round);
+		drawSprite(pctx, m_image, m_alpha, 0.f, 0.f, 13.f, 15.f,
+			percent_rect.x, percent_rect.y, percent_rect.width, percent_rect.height,
+			get_corner_round(), get_corner_round(), get_corner_round(), get_corner_round());
+	}
 	rm_widget::on_draw(pctx);
 }
 
@@ -2348,71 +2411,65 @@ bool rm_radiobutton::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE stat
 }
 
 rm_switch::rm_switch(rm_widget* parent, int x, int y, int width,
-	rm_switch_style* pstyle, bool initial, rm_switch_cb cb) : rm_widget(x, y, width, int(pstyle->get_track_height()), parent, "ui_switch"),
-	m_state(initial), m_progress(initial ? 1.f : 0.f), m_target(m_progress) {
-
-	set_style(pstyle);
+	bool initial, rm_switch_cb cb, RmThemeRef theme) :
+	rm_widget(x, y, width, static_cast<int>((theme ? theme : RmTheme::default_theme())->switch_control.track_height),
+		parent, "ui_switch"),
+	m_behaviour(initial), m_theme(theme ? std::move(theme) : RmTheme::default_theme())
+{
 	set_callback(cb);
-	assert(pstyle && "pstyle must not be null");
 }
+
+rm_switch::rm_switch(rm_widget* parent, int x, int y, int width,
+	rm_switch_style* pstyle, bool initial, rm_switch_cb cb) :
+	rm_switch(parent, x, y, width, initial, cb, theme_from_legacy_switch(pstyle))
+{}
 
 void rm_switch::on_draw(NVGcontext* pctx)
 {
-	rm_switch_style& style = *m_pstyle;
-	float w = float(m_size.x);
-	float h = float(m_size.y);
-	float dt = m_proot->get_delta_time();
-
-	/* shadow */
-	rm_utl::draw_shadow(pctx, rm_vec2(0.f, 0.f), m_size, rm_vec2(0.f, 1.f), style.get_shadow_offset(), style.get_shadow_color(), style.get_shadow_size(), style.get_track_height() * 0.4f);
-
-	/* animation d2: mb use class animation?? */
-	if (m_progress != m_target) {
-		float dir = (m_target > m_progress ? +1.f : -1.f);
-		m_progress += dir * (dt / style.get_anim_time());
-		m_progress = std::clamp(m_progress, 0.f, 1.f);
-	}
-
-	float e = ease_in_out(m_progress);
-
-	/* track */
-	NVGcolor track_color = rm_color::lerp(style.get_track_off(), style.get_track_on(), e);
-	pctx->beginPath();
-	pctx->roundedRectVarying(0.5f, 0.5f, w - 1, h - 1,
-		style.get_corner_radius(LEFT_TOP),
-		style.get_corner_radius(RIGHT_TOP),
-		style.get_corner_radius(RIGHT_BOTTOM),
-		style.get_corner_radius(LEFT_BOTTOM));
-	pctx->fillColor(track_color);
-	pctx->fill();
-
-	/* knob */
-	float pad = style.get_padding();
-	float r = style.get_knob_radius();
-	float x0 = pad + r;
-	float x1 = w - pad - r;
-	float kx = x0 + (x1 - x0) * e;
-	float ky = h * 0.5f;
-	pctx->beginPath();
-	pctx->circle(kx, ky, r);
-	pctx->fillColor(style.get_knob_color());
-	pctx->fill();
+	if (m_proot)
+		m_behaviour.advance(m_proot->get_delta_time(), m_theme->switch_control.animation_duration);
+	RmDefaultControlPainter::draw_switch(*pctx,
+		{ m_size.x, m_size.y, m_behaviour.animation_progress(), is_enabled(),
+		  m_elem_flags.is_hovered(), m_behaviour.is_pressed(), m_elem_flags.is_focused() },
+		m_theme->switch_control);
 
 	rm_widget::on_draw(pctx);
 }
 
 bool rm_switch::on_mouse(RM_MOUSE_EVENT event, RM_KEY key, RM_KEY_STATE state, rm_vec2& pos, rm_vec2 delta)
 {
-	if (event == RM_MOUSE_EVENT_CLICK && state == UP && m_bbox.inside(pos)) {
-		m_state = !m_state;
-		m_target = m_state ? 1.f : 0.f;
-
-		if (is_valid_callback())
+	RM_UNUSED(delta);
+	const bool inside = m_bbox.inside(pos);
+	if (event == RM_MOUSE_EVENT_MOVE) {
+		const auto update = m_behaviour.pointer_move(inside);
+		return !update.handled;
+	}
+	if (event != RM_MOUSE_EVENT_CLICK || key != RM_KEY_LMOUSE)
+		return true;
+	if (state == DOWN) {
+		const auto update = m_behaviour.pointer_down(inside);
+		if (update.handled && get_root())
+			get_root()->capture_pointer(this);
+		return !update.handled;
+	}
+	if (state == UP) {
+		const auto update = m_behaviour.pointer_up(inside);
+		if (update.activated && is_valid_callback())
 			get_callback()(this);
-
-		return false;
+		return !update.handled;
 	}
 	return true;
+}
+
+void rm_switch::on_keybd(int sc, RM_KEY key, RM_KEY_STATE state)
+{
+	RM_UNUSED(sc);
+	const bool activation_key = key == RM_KEY_ENTER || key == RM_KEY_SPACE;
+	const auto update = state == UP
+		? m_behaviour.key_up(activation_key)
+		: m_behaviour.key_down(activation_key);
+	if (update.activated && is_valid_callback())
+		get_callback()(this);
 }
 
 rm_listview::rm_listview(rm_widget* parent, int x, int y, int width, int height, rm_listview_style* pstyle, rm_listview_cb cb) :

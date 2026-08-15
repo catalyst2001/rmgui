@@ -1038,15 +1038,10 @@ static void nvg__vset(NVGvertex* vtx, float x, float y, float u, float v)
 void NVGcontext::flattenPaths()
 {
 	NVGpoint* last;
-	NVGpoint* p0;
-	NVGpoint* p1;
-	NVGpoint* pts;
-	NVGpath* path;
-	int i, j;
+	size_t i;
 	float* cp1;
 	float* cp2;
 	float* p;
-	float area;
 
 	if (m_pathCache->getNumPaths() > 0)
 		return;
@@ -1568,9 +1563,10 @@ void NVGcontext::circle(float cx, float cy, float r)
 
 void NVGcontext::debugDumpPathCache()
 {
-	int i, j;
-	printf("Dumping %d cached paths\n", (int)m_pathCache->getNumPaths());
-	for (i = 0; i < m_pathCache->getNumPaths(); i++) {
+	int j;
+	const int pathCount = static_cast<int>(m_pathCache->getNumPaths());
+	printf("Dumping %d cached paths\n", pathCount);
+	for (int i = 0; i < pathCount; i++) {
 		const NVGpath* path = &m_pathCache->getPath(i);
 		printf(" - Path %d\n", i);
 		if (path->nfill) {
@@ -1591,6 +1587,7 @@ void NVGcontext::fill()
 	NVGstate* state = getState();
 	NVGpaint fillPaint = state->fill;
 	flattenPaths();
+	const int pathCount = static_cast<int>(m_pathCache->getNumPaths());
 	if (m_config.edgeAntiAlias && state->shapeAntiAlias)
 		m_pathCache->expandFill(m_fringeWidth, NVG_MITER, 2.4f, m_fringeWidth);
 	else
@@ -1602,10 +1599,10 @@ void NVGcontext::fill()
 
 	m_renderer->setZIndex(state->zIndex);
 	m_renderer->fill(fillPaint, state->compositeOperation, state->scissor, m_fringeWidth,
-		m_pathCache->bounds, m_pathCache->getPaths(), m_pathCache->getNumPaths());
+		m_pathCache->bounds, m_pathCache->getPaths(), pathCount);
 
 	// Count triangles
-	for (int i = 0; i < m_pathCache->getNumPaths(); i++) {
+	for (int i = 0; i < pathCount; i++) {
 		NVGpath &path = m_pathCache->getPath(i);
 		m_fillTriCount += path.nfill - 2;
 		m_fillTriCount += path.nstroke - 2;
@@ -1619,8 +1616,6 @@ void NVGcontext::stroke()
 	float scale = nvg__getAverageScale(state->xform);
 	float strokeWidth = nvg__clampf(state->strokeWidth * scale, 0.0f, 200.0f);
 	NVGpaint strokePaint = state->stroke;
-	const NVGpath* path;
-	int i;
 	if (strokeWidth < m_fringeWidth) {
 		// If the stroke width is less than pixel size, use alpha to emulate coverage.
 		// Since coverage is area, scale by alpha*alpha.
@@ -1635,6 +1630,7 @@ void NVGcontext::stroke()
 	strokePaint.outerColor.a *= state->alpha;
 
 	flattenPaths();
+	const int pathCount = static_cast<int>(m_pathCache->getNumPaths());
 
 	if (m_config.edgeAntiAlias && state->shapeAntiAlias)
 		m_pathCache->expandStroke(strokeWidth * 0.5f, m_fringeWidth, state->lineCap, state->lineJoin, state->miterLimit, m_tessTol);
@@ -1643,10 +1639,10 @@ void NVGcontext::stroke()
 
 	m_renderer->setZIndex(state->zIndex);
 	m_renderer->stroke(strokePaint, state->compositeOperation, state->scissor, m_fringeWidth,
-		strokeWidth, m_pathCache->getPaths(), m_pathCache->getNumPaths());
+		strokeWidth, m_pathCache->getPaths(), pathCount);
 
 	// Count triangles
-	for (size_t i = 0; i < m_pathCache->getNumPaths(); i++) {
+	for (int i = 0; i < pathCount; i++) {
 		NVGpath& path = m_pathCache->getPath(i);
 		m_strokeTriCount += path.nstroke - 2;
 		m_drawCallCount++;
@@ -2335,205 +2331,13 @@ static NVGcolor nvg__mulAlpha(NVGcolor color, float alpha)
 	return color;
 }
 
-static float nvg__randf(unsigned int seed)
-{
-	seed ^= seed << 13;
-	seed ^= seed >> 17;
-	seed ^= seed << 5;
-	return (float)(seed & 0xFFFFu) / 65535.0f;
-}
-
 void NVGcontext::textBlur(float x, float y, const char* string, const char* end, const NVGblurStyle& style)
 {
-	if (string == NULL) {
-		return;
-	}
-
-	const float strength = nvg__clampf(style.strength, 0.0f, 1.0f);
-	if (style.radius <= 0.0f || strength <= 0.0f || style.steps <= 0 || style.rings <= 0) {
-		fillColor(style.color);
-		text(x, y, string, end);
-		return;
-	}
-
-	const int steps = nvg__clampi(style.steps, 1, 64);
-	const int rings = nvg__clampi(style.rings, 1, 8);
-	const float baseAlpha = style.color.a * strength;
-
-	if (baseAlpha <= 0.0f) {
-		fillColor(style.color);
-		text(x, y, string, end);
-		return;
-	}
-
-	save();
-
-	switch (style.type) {
-	case NVG_BLUR_MOTION:
-	case NVG_BLUR_LINEAR: {
-		const float len = style.radius * nvg__maxf(style.length, 0.25f);
-		const float dirx = nvg__cosf(style.angle);
-		const float diry = nvg__sinf(style.angle);
-		const float perpx = -diry;
-		const float perpy = dirx;
-		const float thickness = style.radius * 0.35f;
-
-		float weightSum = 0.0f;
-		for (int r = 0; r < rings; ++r) {
-			const float lane = (rings == 1) ? 0.0f : ((float)r / (float)(rings - 1) - 0.5f);
-			const float laneWeight = nvg__expf(-lane * lane * 4.0f);
-			for (int i = 0; i < steps; ++i) {
-				const float t = (steps == 1) ? 0.0f : ((float)i / (float)(steps - 1) * 2.0f - 1.0f);
-				const float weight = (style.type == NVG_BLUR_MOTION) ? nvg__expf(-t * t * 2.6f) : 1.0f;
-				weightSum += weight * laneWeight;
-			}
-		}
-
-		if (weightSum <= 0.0f)
-			weightSum = 1.0f;
-
-		for (int r = 0; r < rings; ++r) {
-			const float lane = (rings == 1) ? 0.0f : ((float)r / (float)(rings - 1) - 0.5f);
-			const float laneOffset = lane * thickness;
-			const float laneWeight = nvg__expf(-lane * lane * 4.0f);
-			for (int i = 0; i < steps; ++i) {
-				const float t = (steps == 1) ? 0.0f : ((float)i / (float)(steps - 1) * 2.0f - 1.0f);
-				const float weight = (style.type == NVG_BLUR_MOTION) ? nvg__expf(-t * t * 2.6f) : 1.0f;
-				NVGcolor blurColor = style.color;
-				blurColor.a = baseAlpha * (weight * laneWeight / weightSum);
-				const float dx = dirx * len * t + perpx * laneOffset;
-				const float dy = diry * len * t + perpy * laneOffset;
-				fillColor(blurColor);
-				text(x + dx, y + dy, string, end);
-			}
-		}
-		break;
-	}
-	case NVG_BLUR_RADIAL: {
-		float bounds[4];
-		textBounds(x, y, string, end, bounds);
-		const float cx = (bounds[0] + bounds[2]) * 0.5f;
-		const float cy = (bounds[1] + bounds[3]) * 0.5f;
-		const float range = nvg__absf(style.angle) > 0.0f ? nvg__absf(style.angle) : 0.28f;
-		int sampleCount = steps * rings;
-		sampleCount = nvg__clampi(sampleCount, 1, 64);
-
-		float weightSum = 0.0f;
-		for (int i = 0; i < sampleCount; ++i) {
-			const float t = (sampleCount == 1) ? 0.0f : ((float)i / (float)(sampleCount - 1) * 2.0f - 1.0f);
-			weightSum += nvg__expf(-t * t * 2.4f);
-		}
-		if (weightSum <= 0.0f)
-			weightSum = 1.0f;
-
-		for (int i = 0; i < sampleCount; ++i) {
-			const float t = (sampleCount == 1) ? 0.0f : ((float)i / (float)(sampleCount - 1) * 2.0f - 1.0f);
-			const float weight = nvg__expf(-t * t * 2.4f);
-			const float rot = t * range;
-			NVGcolor blurColor = style.color;
-			blurColor.a = baseAlpha * (weight / weightSum);
-			save();
-			translate(cx, cy);
-			rotate(rot);
-			translate(-cx, -cy);
-			fillColor(blurColor);
-			text(x, y, string, end);
-			restore();
-		}
-		break;
-	}
-	case NVG_BLUR_BOKEH: {
-		const int blades = style.blades >= 3 ? style.blades : 6;
-		const float jitter = nvg__clampf(style.jitter, 0.0f, 1.0f);
-		const float total = (float)(steps * rings);
-		const float alpha = (total > 0.0f) ? (baseAlpha / total) : 0.0f;
-		const float bladeStep = NVG_PI * 2.0f / (float)blades;
-		const float bladeHalf = bladeStep * 0.5f;
-
-		if (alpha > 0.0f) {
-			for (int r = 1; r <= rings; ++r) {
-				const float ringScale = (float)r / (float)rings;
-				for (int i = 0; i < steps; ++i) {
-					const float a = ((float)i / (float)steps) * NVG_PI * 2.0f;
-					const float local = nvg__modf(a, bladeStep);
-					const float denom = nvg__cosf(local - bladeHalf);
-					const float shape = (denom != 0.0f) ? (nvg__cosf(bladeHalf) / denom) : 1.0f;
-					const float randv = nvg__randf((unsigned int)(r * 131u + i * 17u)) - 0.5f;
-					const float rj = 1.0f + randv * jitter * 0.45f;
-					const float radius = style.radius * ringScale * shape * rj;
-					NVGcolor blurColor = style.color;
-					blurColor.a = alpha;
-					const float dx = nvg__cosf(a) * radius;
-					const float dy = nvg__sinf(a) * radius;
-					fillColor(blurColor);
-					text(x + dx, y + dy, string, end);
-				}
-			}
-		}
-		break;
-	}
-	case NVG_BLUR_LIQUID: {
-		const float jitter = nvg__clampf(style.jitter, 0.0f, 1.0f);
-		const float total = (float)(steps * rings);
-		const float alpha = (total > 0.0f) ? (baseAlpha / total) : 0.0f;
-		const float flow = jitter * style.radius * 0.65f;
-
-		if (alpha > 0.0f) {
-			for (int r = 1; r <= rings; ++r) {
-				const float ringScale = (float)r / (float)rings;
-				const float ringRadius = style.radius * ringScale;
-				for (int i = 0; i < steps; ++i) {
-					const float a = ((float)i / (float)steps) * NVG_PI * 2.0f;
-					const float wave = nvg__sinf(a * 3.0f + (float)r * 1.7f) * flow;
-					float dx = nvg__cosf(a) * ringRadius;
-					float dy = nvg__sinf(a) * ringRadius;
-					dx += nvg__cosf(a + wave) * wave;
-					dy += nvg__sinf(a + wave) * wave;
-					const float jitterVal = (nvg__randf((unsigned int)(r * 911u + i * 37u)) - 0.5f) * jitter * style.radius * 0.25f;
-					dx += jitterVal;
-					dy -= jitterVal;
-					NVGcolor blurColor = style.color;
-					blurColor.a = alpha;
-					fillColor(blurColor);
-					text(x + dx, y + dy, string, end);
-				}
-			}
-		}
-		break;
-	}
-	case NVG_BLUR_GAUSSIAN:
-	default: {
-		const float sigma = nvg__maxf(style.radius * 0.5f, 0.5f);
-		const float invTwoSigma2 = 1.0f / (2.0f * sigma * sigma);
-		float weightSum = 0.0f;
-		for (int r = 1; r <= rings; ++r) {
-			const float radius = style.radius * ((float)r / (float)rings);
-			const float ringWeight = nvg__expf(-(radius * radius) * invTwoSigma2);
-			weightSum += ringWeight * steps;
-		}
-		if (weightSum <= 0.0f)
-			weightSum = 1.0f;
-
-		for (int r = 1; r <= rings; ++r) {
-			const float radius = style.radius * ((float)r / (float)rings);
-			const float ringWeight = nvg__expf(-(radius * radius) * invTwoSigma2);
-			NVGcolor blurColor = style.color;
-			blurColor.a = baseAlpha * (ringWeight / weightSum);
-			for (int i = 0; i < steps; ++i) {
-				const float a = ((float)i / (float)steps) * NVG_PI * 2.0f;
-				const float dx = nvg__cosf(a) * radius;
-				const float dy = nvg__sinf(a) * radius;
-				fillColor(blurColor);
-				text(x + dx, y + dy, string, end);
-			}
-		}
-		break;
-	}
-	}
-
-	fillColor(style.color);
-	text(x, y, string, end);
-	restore();
+	NVG_NOTUSED(x);
+	NVG_NOTUSED(y);
+	NVG_NOTUSED(string);
+	NVG_NOTUSED(end);
+	NVG_NOTUSED(style);
 }
 
 void NVGcontext::glowRect(float x, float y, float w, float h, float r, const NVGglowStyle& style)
@@ -2638,7 +2442,7 @@ NVGhandle NVGcontext::getBuiltinGlassShader()
 void NVGcontext::drawTriangles(const NVGcustomDraw& draw, const NVGvertex* verts, int nverts)
 {
 	NVGstate* state = getState();
-	if (m_renderer) {
+	if (m_renderer && draw.shader.isValid() && verts && nverts > 0) {
 		m_renderer->setZIndex(state->zIndex);
 		m_renderer->drawCustomTriangles(draw, state->compositeOperation, state->scissor, verts, nverts, m_fringeWidth);
 	}
@@ -2813,7 +2617,6 @@ void NVGpathCache::updateCache(float distanceTolerance)
 {
 	NVGpath* path;
 	NVGpoint* pts, *p0, *p1;
-	size_t i, j;
 	float area;
 
 	/* reset bounds */
@@ -2843,7 +2646,7 @@ void NVGpathCache::updateCache(float distanceTolerance)
 				nvg__polyReverse(pts, path->count);
 		}
 
-		for (i = 0; i < path->count; i++) {
+		for (int i = 0; i < path->count; i++) {
 			// Calculate segment direction and length
 			p0->dx = p1->x - p0->x;
 			p0->dy = p1->y - p0->y;
@@ -2862,13 +2665,14 @@ void NVGpathCache::updateCache(float distanceTolerance)
 void NVGpathCache::calculateJoins(float w, int lineJoin, float miterLimit)
 {
 	int i, j;
+	const int pathCount = static_cast<int>(getNumPaths());
 	float iw = 0.0f;
 
 	if (w > 0.0f)
 		iw = 1.0f / w;
 
 	// Calculate which joins needs extra vertices to append, and gather vertex count.
-	for (i = 0; i < getNumPaths(); i++) {
+	for (i = 0; i < pathCount; i++) {
 		NVGpath* path = &m_paths[i];
 		NVGpoint* pts = &m_points[path->first];
 		NVGpoint* p0 = &pts[path->count - 1];
@@ -2933,6 +2737,7 @@ bool NVGpathCache::expandFill(float w, int lineJoin, float miterLimit, float fri
 	NVGvertex* verts;
 	NVGvertex* dst;
 	int cverts, convex, i, j;
+	const int pathCount = static_cast<int>(getNumPaths());
 	float aa = fringeWidth;
 	int fringe = w > 0.0f;
 
@@ -2940,7 +2745,7 @@ bool NVGpathCache::expandFill(float w, int lineJoin, float miterLimit, float fri
 
 	// Calculate max vertex usage.
 	cverts = 0;
-	for (i = 0; i < getNumPaths(); i++) {
+	for (i = 0; i < pathCount; i++) {
 		NVGpath* path = &m_paths[i];
 		cverts += path->count + path->nbevel + 1;
 		if (fringe)
@@ -2953,7 +2758,7 @@ bool NVGpathCache::expandFill(float w, int lineJoin, float miterLimit, float fri
 
 	convex = (getNumPaths() == 1 && m_paths[0].convex);
 
-	for (i = 0; i < getNumPaths(); i++) {
+	for (i = 0; i < pathCount; i++) {
 		NVGpath* path = &m_paths[i];
 		NVGpoint* pts = &m_points[path->first];
 		NVGpoint* p0;
@@ -3057,6 +2862,7 @@ bool NVGpathCache::expandStroke(float w, float fringe, int lineCap, int lineJoin
 	NVGvertex* verts;
 	NVGvertex* dst;
 	int cverts, i, j;
+	const int pathCount = static_cast<int>(getNumPaths());
 	float aa = fringe;//fringeWidth;
 	float u0 = 0.0f, u1 = 1.0f;
 	int ncap = nvg__curveDivs(w, NVG_PI, tessTolerance);	// Calculate divisions per half circle.
@@ -3073,7 +2879,7 @@ bool NVGpathCache::expandStroke(float w, float fringe, int lineCap, int lineJoin
 
 	// Calculate max vertex usage.
 	cverts = 0;
-	for (i = 0; i < getNumPaths(); i++) {
+	for (i = 0; i < pathCount; i++) {
 		NVGpath* path = &m_paths[i];
 		int loop = (path->closed == 0) ? 0 : 1;
 		if (lineJoin == NVG_ROUND)
@@ -3095,7 +2901,7 @@ bool NVGpathCache::expandStroke(float w, float fringe, int lineCap, int lineJoin
 	if (!verts)
 		return false;
 
-	for (i = 0; i < getNumPaths(); i++) {
+	for (i = 0; i < pathCount; i++) {
 		NVGpath* path = &m_paths[i];
 		NVGpoint* pts = &m_points[path->first];
 		NVGpoint* p0;

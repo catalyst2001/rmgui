@@ -1,12 +1,14 @@
 ﻿#include "backend/rmgui_glfw_opnegl33.h"
 #include "rmgui_controls.h"
 #include "rm_effects.h"
+#if defined(RMGUI_ENABLE_LEGACY_BLENDISH_DEMO)
 #include "blend_ui.h"
+#include "blendish_test.h"
+#endif
 #define NANOVG_GL3_IMPLEMENTATION
 #include "nanovg_gl.h"
 #include <iostream>
 #include <cmath>
-#include "blendish_test.h"
 
 #define NOMINMAX
 #ifdef APIENTRY
@@ -298,7 +300,8 @@ void example_widgets(rm_surface* gui)
 {
   static class debug_widget : public rm_widget, rm_tab_drawer {
   public:
-    debug_widget(rm_widget *pparent) : rm_widget(0, 0, 800, 800, pparent, "debug_widget") {}
+    debug_widget(rm_widget *pparent) : rm_widget(0, 0, 800, 800, pparent, "debug_widget",
+      RM_FLAG_DEFAULT, 0, nullptr, RmChildOwnership::borrowed) {}
     void on_draw(NVGcontext* pctx) override {
       /*rm_vec2 pos(50.f, 50.f);
       rm_vec2 size(100.f, 100.f);
@@ -342,7 +345,9 @@ void example_widgets(rm_surface* gui)
 
   tc::tab* ptab11 = ptabctl->add_tab("Main page asdasda", 0, 10);
   tc::tab* ptab12 = ptabctl->add_tab("Page 2 asdasdasd", 1, 10);
+#if defined(RMGUI_ENABLE_LEGACY_BLENDISH_DEMO)
   tc::tab* ptab_bui = ptabctl->add_tab("Blendish Controls", 2, 10);
+#endif
 
   rm_widget* effects_page = ptab12->get_page_widget();
   rm_vec2& effects_size = effects_page->get_size();
@@ -463,9 +468,8 @@ void example_widgets(rm_surface* gui)
   list->add_item("Third option");
   list->add_item("Another item");
 
-  // ========================================================================
-  // Blendish Controls Demo Tab
-  // ========================================================================
+#if defined(RMGUI_ENABLE_LEGACY_BLENDISH_DEMO)
+  // Legacy Blendish visualization experiment. Kept out of the default build.
   {
     rm_widget* bui_page = ptab_bui->get_page_widget();
 
@@ -731,6 +735,7 @@ void example_widgets(rm_surface* gui)
     if (tc::is_valid_tab(bui_tab_idx))
       ptabctl->select_tab(0, bui_tab_idx);
   }
+#endif
 
   /* performing layout */
   pdiv->perform_layout();
@@ -758,7 +763,8 @@ int main() {
 
   g_gui->set_font(default_font);
 
-  // Initialize blendish font for bui_ controls
+#if defined(RMGUI_ENABLE_LEGACY_BLENDISH_DEMO)
+  // Initialize the isolated legacy Blendish demo.
   bndSetFont(g_gui->get_context()->findFont("default"));
 
   // Load blendish icon sheet (Blender 2.6 compatible, 602x640 px grid)
@@ -769,6 +775,7 @@ int main() {
   } else {
     printf("warning: blender_icons16.png not found, icons will not be displayed\n");
   }
+#endif
 
   example_widgets(g_gui);
 

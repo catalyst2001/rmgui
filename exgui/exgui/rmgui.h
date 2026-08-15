@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Inradian Developments
+// Copyright (c) 2024-2026 Inradian Developments
 // Retained Mode GUI (RmGUI) based on NanoVG
 // 
 // This software is provided 'as-is', without any express or implied
@@ -139,7 +139,7 @@ public:
 
   inline bool compare_strong(const rm_vec2& vec) const { return x == vec.x && y == vec.y; }
   inline bool operator==(const rm_vec2& vec) const { return fabsf(x - vec.x) < FLT_EPSILON && fabsf(y - vec.y) < FLT_EPSILON; }
-  inline bool operator!=(const rm_vec2& vec) const { return fabsf(x - vec.x) >= FLT_EPSILON && fabsf(y - vec.y) >= FLT_EPSILON; }
+  inline bool operator!=(const rm_vec2& vec) const { return !(*this == vec); }
   inline bool operator<(const rm_vec2& vec) const { return x < vec.x && y < vec.y; }
   inline bool operator<=(const rm_vec2& vec) const { return x <= vec.x && y <= vec.y; }
   inline bool operator>(const rm_vec2& vec) const { return x > vec.x && y > vec.y; }
@@ -196,7 +196,7 @@ public:
   };
   
   rm_bbox() : min(0.f, 0.f), max(0.f, 0.f) {}
-  rm_bbox(rm_vec2 &_max) : max(_max) {}
+  rm_bbox(const rm_vec2 &_max) : min(0.f, 0.f), max(_max) {}
   rm_bbox(rm_vec2 _min, rm_vec2 _max) : min(_min), max(_max) {}
   ~rm_bbox() {}
 
@@ -332,6 +332,7 @@ enum RM_KEY : uint32_t {
   RM_KEY_XMOUSE3,
   RM_KEY_XMOUSE4,
   RM_KEY_XMOUSE5,
+  RM_KEY_SPACE,
 };
 
 /* key state */
@@ -444,7 +445,7 @@ enum RM_CB_DATA_TYPE : uint32_t {
 class irm_sysdf
 {
 public:
-  //virtual                   ~irmgui_sysdf() = 0;
+  virtual                   ~irm_sysdf() = default;
   virtual void               get_cursor_pos(int* p_dst_x, int* p_dst_y) = 0;
   virtual void               set_cursor_pos(int x, int h) = 0;
   virtual uint32_t           num_monitors() = 0;
@@ -552,6 +553,8 @@ public:
 class irm_layout
 {
 public:
+  virtual ~irm_layout() = default;
+
   /**
   * @brief performs measurements and pre-calculations
   * of positioning depending on the selected mode (defined by the class implementer)
@@ -833,6 +836,13 @@ public:
 */
 class rm_surface;
 
+// A widget attached to the tree is parent-owned by default. Use borrowed for
+// stack/static widgets whose lifetime is managed by their caller.
+enum class RmChildOwnership {
+  parent_owned,
+  borrowed
+};
+
 class rm_widget : protected irmgui_widget, public rm_basic_layout_props
 {
   /* allow rmgui_root class to call irmgui_element vmethods */
@@ -855,7 +865,7 @@ protected:
     pctx->beginPath();
     pctx->rect( 0.f, 0.f, m_size.x, m_size.y);
     pctx->strokeColor( colors[get_elem_flags().is_hovered()]);
-    pctx->strokeWidth( 2.f);
+    pctx->StrokeWidth(2.f);
     pctx->stroke();
 #endif
   }
@@ -874,12 +884,16 @@ protected:
     RM_UNUSED(cursor_pos);
     return true;
   }
+  virtual void on_enabled_changed(bool enabled) { RM_UNUSED(enabled); }
+  virtual void on_focus_changed(bool focused) { RM_UNUSED(focused); }
+  virtual void on_pointer_capture_lost() {}
 
 protected:
   using _childs_vec = std::vector<rm_widget*>;
   _childs_vec      m_childs;
   rm_surface      *m_proot;
   rm_widget       *m_pparent;
+  RmChildOwnership m_child_ownership;
   void            *m_puserptr;
   irm_sysdf       *m_psysdf;
   irm_layout      *m_playout;
@@ -908,6 +922,7 @@ protected:
   static void move_childs_relative(rm_widget *pwidget, rm_vec2 deltapos);
   static void move_to(rm_widget* proot_widget, float xpos, float ypos);
   void        resize_nolayout(float width, float height);
+  void        destroy_children();
 
   inline bool dispatch_event(RM_EVENT event, rm_widget* p_from, rm_event_data* pevent_data) {
     return on_event(event, p_from, pevent_data);
@@ -916,27 +931,26 @@ protected:
 public:
   void set_classname(const char* p_clsn) {
     strncpy(m_szclass, p_clsn, sizeof(m_szclass) - 1);
+    m_szclass[sizeof(m_szclass) - 1] = '\0';
   }
   inline rm_surface* get_root() { return m_proot; }
 
   void grab_globals_from(rm_widget* p_parent) {
-    /* get sysdf ifaec from parent */
-    m_psysdf = m_pparent->get_sysdf();
-    /* get root m_pparent from parent */
-    m_proot = m_pparent->get_root();
+    m_psysdf = p_parent ? p_parent->get_sysdf() : nullptr;
+    m_proot = p_parent ? p_parent->get_root() : nullptr;
+    for (rm_widget* child : m_childs)
+      child->grab_globals_from(this);
   }
 
   rm_widget(int x, int y, int width, int height, rm_widget *p_parent, const char *p_classname,
-    uint32_t flags = RM_FLAG_DEFAULT, uint32_t uflags = 0, void *p_userptr = nullptr) : m_proot(nullptr),
-    m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_playout(nullptr), m_zindex(0) {
-    rm_vec2 parent_coord;
-    if (m_pparent) {
-      parent_coord = m_pparent->get_pos_of_parent();
-      m_pparent->add_child(this);
-      grab_globals_from(m_pparent);
-    }
+    uint32_t flags = RM_FLAG_DEFAULT, uint32_t uflags = 0, void *p_userptr = nullptr,
+    RmChildOwnership child_ownership = RmChildOwnership::parent_owned) : m_proot(nullptr),
+    m_pparent(nullptr), m_child_ownership(child_ownership), m_puserptr(p_userptr),
+    m_psysdf(nullptr), m_playout(nullptr), m_zindex(0) {
     m_elem_flags = flags;
     m_user_flags = uflags;
+    if (p_parent)
+      p_parent->add_child(this);
     m_pos_of_parent.init(static_cast<float>(x), static_cast<float>(y));
     m_size.init(static_cast<float>(width), static_cast<float>(height));
     m_bbox.init(m_pos_of_parent, m_size);
@@ -953,16 +967,14 @@ public:
     set_max_size(m_size);
   }
   rm_widget(float x, float y, float width, float height, rm_widget *p_parent, const char *p_classname,
-    uint32_t flags = RM_FLAG_DEFAULT, uint32_t uflags = 0, void *p_userptr = nullptr) : m_proot(nullptr),
-    m_pparent(p_parent), m_puserptr(p_userptr), m_psysdf(nullptr), m_playout(nullptr), m_zindex(0) {
-    rm_vec2 parent_coord;
-    if (m_pparent) {
-      parent_coord = m_pparent->get_pos_of_parent();
-      m_pparent->add_child(this);
-      grab_globals_from(m_pparent);
-    }
+    uint32_t flags = RM_FLAG_DEFAULT, uint32_t uflags = 0, void *p_userptr = nullptr,
+    RmChildOwnership child_ownership = RmChildOwnership::parent_owned) : m_proot(nullptr),
+    m_pparent(nullptr), m_child_ownership(child_ownership), m_puserptr(p_userptr),
+    m_psysdf(nullptr), m_playout(nullptr), m_zindex(0) {
     m_elem_flags = flags;
     m_user_flags = uflags;
+    if (p_parent)
+      p_parent->add_child(this);
     m_pos_of_parent.init(x, y);
     m_size.init(width, height);
     m_bbox.init(m_pos_of_parent, m_size);
@@ -978,7 +990,7 @@ public:
     set_min_size(m_size);
     set_max_size(m_size);
   }
-  virtual ~rm_widget() = default;
+  virtual ~rm_widget();
 
   /* layouts */
   inline void        set_layout(irm_layout* playout) { m_playout = playout; }
@@ -1001,10 +1013,10 @@ public:
 
   /* visual */
   inline bool        is_visible() { return m_elem_flags.has_visible(); }
-  inline void        show(bool b_show = true) { m_elem_flags.toggle_bits(RM_FLAG_VISIBLE, b_show); }
+  void               show(bool b_show = true);
   inline void        hide() { show(false); }
 
-  /* childs */
+  /* Parent-owned children are deleted with the parent; borrowed children are detached. */
   inline size_t      get_num_childs() const { return m_childs.size(); }
   inline rm_widget*  get_child(size_t idx) { return m_childs[idx]; }
   inline rm_widget** get_all_childs() { return m_childs.data(); }
@@ -1014,6 +1026,7 @@ public:
 
   /* parent */
   inline rm_widget  *get_parent() { return m_pparent; }
+  inline RmChildOwnership get_child_ownership() const { return m_child_ownership; }
   void               set_parent(rm_widget* p_parent);
 
   /* flags */
@@ -1021,7 +1034,7 @@ public:
   inline uint32_t       get_user_flags() { return m_user_flags; }
 
   /* state active */
-  inline void       set_enabled(bool enabled) {m_elem_flags.toggle_bits(RM_FLAG_ACTIVE, enabled);}
+  void              set_enabled(bool enabled);
   inline const bool is_enabled() {return m_elem_flags.has_active();}
 
   /* system dependend functions interface */
@@ -1049,20 +1062,23 @@ public:
 
 class rm_surface : public rm_widget
 {
+  friend class rm_widget;
+
   std::unique_ptr<NVGcontext> m_pctx;
   rm_widget  *m_pfocus;
+  rm_widget  *m_pointer_capture;
   float       m_delta_time;
   float       m_device_pixel_ratio;
   rm_vec2     m_last_cursor;
   rm_vec2     m_delta_cursor;
   void       *m_psyswindow;
 
-  /* event notifier functions */
-  static void keybd_dispatcher(rm_widget *p_elem, int sc, 
-    RM_KEY vk, RM_KEY_STATE state);
-#if 0
-  static void text_input_dispatcher(rmgui_widget *p_elem, int sym);
-#endif
+  /* input routing */
+  static void update_hover_states(rm_widget* p_elem, const rm_vec2& cursor_pos);
+  static rm_widget* hit_test(rm_widget* p_elem, const rm_vec2& cursor_pos);
+  static bool contains_widget(const rm_widget* subtree, const rm_widget* widget);
+  rm_vec2 cursor_for_widget(const rm_widget* widget, const rm_vec2& surface_cursor) const;
+  void forget_widget(rm_widget* widget);
   bool mouse_dispatcher(rm_widget *p_elem,
     RM_MOUSE_EVENT event, RM_KEY vk, 
     RM_KEY_STATE state, rm_vec2 &cursor_pos);
@@ -1077,6 +1093,14 @@ public:
   void keybd(int sc, RM_KEY vk, RM_KEY_STATE state);
   void textinput(int sym);
   void mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, int x, int y);
+
+  void set_focus(rm_widget* widget);
+  void clear_focus() { set_focus(nullptr); }
+  rm_widget* get_focus() const { return m_pfocus; }
+
+  bool capture_pointer(rm_widget* widget);
+  void release_pointer(rm_widget* widget = nullptr);
+  rm_widget* get_pointer_capture() const { return m_pointer_capture; }
 
   NVGcontext* get_context() { return m_pctx.get(); }
 

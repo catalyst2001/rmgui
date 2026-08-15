@@ -1,10 +1,13 @@
 ﻿#pragma once
 #include "rmgui.h"
+#include "rmgui_behaviour.h"
+#include "rmgui_theme.h"
 #include <string>
 #include <vector>
 #include <functional>
 #include <type_traits>
 #include <map>
+#include <utility>
 
 class rmgui_image {
 public:
@@ -30,19 +33,30 @@ public:
 
 class rm_button : public rm_widget {
   std::string m_text;
+  RmButtonBehaviour m_behaviour;
+  RmThemeRef m_theme;
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
+  void on_pointer_capture_lost() override { m_behaviour.cancel(); }
 public:
-  rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text);
+  rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text,
+    RmThemeRef theme = {});
   virtual ~rm_button();
   virtual void on_draw(NVGcontext* pctx) override;
+  virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
+  const RmButtonBehaviour& behaviour() const { return m_behaviour; }
+  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmTheme::default_theme(); }
 };
 
 class rm_label : public rm_widget {
   std::string m_text;
+  RmThemeRef m_theme;
 public:
-  rm_label(rm_widget* p_parent, int x, int y, const std::string& text);
+  rm_label(rm_widget* p_parent, int x, int y, const std::string& text, RmThemeRef theme = {});
   virtual ~rm_label();
   virtual void on_draw(NVGcontext* pctx) override;
+  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmTheme::default_theme(); }
 };
 
 /**
@@ -193,20 +207,29 @@ public:
 */
 class rm_checkbox;
 using rm_checkbox_cb = bool (*)(rm_checkbox *pcheckbox);
-class rm_checkbox : public rm_widget, public rm_styled<rm_checkbox_style>, public rm_callback<rm_checkbox_cb> {
-  bool           m_checked;
+class rm_checkbox : public rm_widget, public rm_callback<rm_checkbox_cb> {
+  RmToggleBehaviour m_behaviour;
   std::string    m_label;
-  rm_font        m_icon_font;
+  RmThemeRef     m_theme;
 
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
+  void on_pointer_capture_lost() override { m_behaviour.cancel(); }
   virtual void on_draw(NVGcontext* pctx) override;
+  virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
+  rm_checkbox(rm_widget* p_parent, int x, int y, int width,
+    const std::string& label, rm_checkbox_cb pcallback = nullptr, RmThemeRef theme = {});
+  // Compatibility adapter for the original mutable style API.
   rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style *pstyle, const std::string& label, rm_checkbox_cb pcallback=nullptr);
   virtual ~rm_checkbox();
-  inline bool        is_checked() const { return m_checked; }
+  inline bool        is_checked() const { return m_behaviour.is_checked(); }
   inline const char* get_label() const { return m_label.c_str(); }
   inline void        set_label(const char* plabeltext) { m_label.assign(plabeltext); }
-  inline void        set_checked(bool val) { m_checked = val; }
+  inline void        set_checked(bool val) { m_behaviour.set_checked(val); }
+  const RmToggleBehaviour& behaviour() const { return m_behaviour; }
+  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmTheme::default_theme(); }
 };
 
 /**
@@ -302,30 +325,32 @@ public:
 */
 class rm_slider;
 using rm_slider_callback = void(*)(rm_slider *pslider);
-class rm_slider : public rm_widget, public rm_styled<rm_slider_style> {
-  float   m_min;
-  float   m_max;
-  float   m_value;
-  bool    m_dragging;
-  float   m_last_value;
+class rm_slider : public rm_widget {
+  RmSliderBehaviour m_behaviour;
   rm_slider_callback m_pcallback;
-  rm_rect m_inner_rect;
-  float   m_thumb_size;
-  void    compute_value(rm_vec2& cursor_pos);
-  void    compute_inner_and_thumb();
+  RmThemeRef m_theme;
+  void    update_value_from_pointer(const rm_vec2& local_cursor);
+  void    on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void    on_pointer_capture_lost() override { m_behaviour.cancel(); }
 
   virtual void on_draw(NVGcontext* pctx) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta);
 
 public:
+  rm_slider(rm_widget* p_parent, int x, int y, int width, int height,
+    float min, float max, float initial, rm_slider_callback pcallback = nullptr, RmThemeRef theme = {});
+  // Compatibility adapter for the original mutable style API.
   rm_slider(rm_widget* p_parent, int x, int y, int width, int height, rm_slider_style* style, float min, float max, float initial, rm_slider_callback pcallback=nullptr);
   virtual ~rm_slider();
-  float get_value() const { return m_value; }
+  float get_value() const { return m_behaviour.value(); }
+  void set_value(float value) { m_behaviour.set_value(value); }
+  const RmSliderBehaviour& behaviour() const { return m_behaviour; }
+  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmTheme::default_theme(); }
 };
 
 /**
 * =============================================
-* Progress Base class
+* Default progress control
 *
 *
 * =============================================
@@ -333,17 +358,19 @@ public:
 class rm_progress_base : public rm_widget
 {
 protected:
-  float m_round;
-  float m_percent;
+  RmProgressBehaviour m_behaviour;
+  RmThemeRef m_theme;
 public:
-  rm_progress_base(rm_widget* p_parent, int x, int y, int width, int height, float inital=0.1f, float corner_round=0.5f);
+  rm_progress_base(rm_widget* p_parent, int x, int y, int width, int height,
+    float initial = 0.1f, float corner_round = 0.5f, RmThemeRef theme = {});
   virtual ~rm_progress_base();
-  void         set_percent(float p) { m_percent = rm_clamp(p, 0.f, 100.f); }
-  inline float get_percent() const { return m_percent; }
-  void         set_corner_round(float p) { m_round = p; }
-  inline float get_corner_round() const { return m_round; }
+  void         set_percent(float percent) { m_behaviour.set_percent(percent); }
+  inline float get_percent() const { return m_behaviour.percent(); }
+  void         set_corner_round(float radius);
+  inline float get_corner_round() const { return m_theme->progress.corner_radius; }
+  const RmProgressBehaviour& behaviour() const { return m_behaviour; }
+  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmTheme::default_theme(); }
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta);
 };
 
 /**
@@ -360,7 +387,8 @@ class rm_progress_image : public rm_progress_base
   float    m_alpha;
 public:
   rm_progress_image(rm_widget* p_parent, int x, int y, int width, int height, 
-    rm_image img, float patangle=0.f, float patalpha=1.f, float inital = 0.1f, float corner_round = 0.5f);
+    rm_image img, float pattern_angle = 0.f, float pattern_alpha = 1.f,
+    float initial = 0.1f, float corner_round = 0.5f);
   ~rm_progress_image();
   inline void     set_image(rm_image img) { m_image = img; }
   inline rm_image get_image() const { return m_image; }
@@ -1234,30 +1262,32 @@ using rm_switch_cb = void(*)(rm_switch*);
 /**
  * SWITCH
 */
-class rm_switch : public rm_widget, public rm_styled<rm_switch_style>, public rm_callback<rm_switch_cb>{
-  bool  m_state;
-  float m_progress;
-  float m_target;
+class rm_switch : public rm_widget, public rm_callback<rm_switch_cb>{
+  RmSwitchBehaviour m_behaviour;
+  RmThemeRef m_theme;
+
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
+  void on_pointer_capture_lost() override { m_behaviour.cancel(); }
 
 public:
+  rm_switch(rm_widget* parent, int x, int y, int width,
+    bool initial = false, rm_switch_cb cb = nullptr, RmThemeRef theme = {});
+  // Compatibility adapter for the original mutable style API.
   rm_switch(rm_widget* parent, int x, int y, int width, 
     rm_switch_style* pstyle, bool initial = false, rm_switch_cb cb = nullptr);
 
   virtual void on_draw(NVGcontext* pctx) override;
+  virtual void on_keybd(int sc, RM_KEY key, RM_KEY_STATE state) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY key, RM_KEY_STATE state, rm_vec2& pos, rm_vec2 delta) override;
   
   inline void set_on(bool state, bool animation) {
-    m_state = state;
-    m_target = state ? 1.f : 0.f;
-    if(!animation)
-      m_progress = m_target;
+    m_behaviour.set_on(state, animation);
   }
   
-  inline bool is_on() const { return m_state; }
-
-  static float ease_in_out(float t) {
-    return t * t * (3 - 2 * t);
-  }
+  inline bool is_on() const { return m_behaviour.is_on(); }
+  const RmSwitchBehaviour& behaviour() const { return m_behaviour; }
+  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmTheme::default_theme(); }
 };
 
 /**

@@ -1,6 +1,7 @@
 ﻿#include <algorithm>
 #include <cstdarg>
 #include <utility>
+#include <vector>
 
 #include "rmgui.h"
 
@@ -54,21 +55,62 @@ bool rm_widget::perform_layout()
 	return false;
 }
 
+rm_widget::~rm_widget()
+{
+	if (m_proot)
+		m_proot->forget_widget(this);
+
+	if (m_pparent) {
+		auto& siblings = m_pparent->m_childs;
+		auto it = std::find(siblings.begin(), siblings.end(), this);
+		if (it != siblings.end())
+			siblings.erase(it);
+		m_pparent = nullptr;
+	}
+
+	destroy_children();
+}
+
+void rm_widget::destroy_children()
+{
+	while (!m_childs.empty()) {
+		rm_widget* child = m_childs.back();
+		m_childs.pop_back();
+		child->m_pparent = nullptr;
+		if (child->m_child_ownership == RmChildOwnership::parent_owned) {
+			delete child;
+		}
+		else {
+			// The external owner remains responsible for destruction. It must not
+			// retain pointers to a root/system interface which is going away.
+			child->grab_globals_from(nullptr);
+		}
+	}
+}
+
 bool rm_widget::add_child(rm_widget* p_child)
 {
 	/* prevent add nullptr */
 	if (!p_child)
 		return false;
 
-	/* prevent enter infinity loop in any event and stack overflowing */
-	if (this == p_child)
-		return false;
+	/* A child cannot be this widget or one of its ancestors. */
+	for (rm_widget* ancestor = this; ancestor; ancestor = ancestor->m_pparent) {
+		if (ancestor == p_child)
+			return false;
+	}
 
 	/* if element with no childs */
 	if (!m_elem_flags.has_childs())
 		return false;
 
-	/* have parent? */
+	if (std::find(m_childs.begin(), m_childs.end(), p_child) != m_childs.end())
+		return true;
+
+	if (p_child->m_pparent && p_child->m_pparent != this)
+		p_child->m_pparent->remove_child(p_child);
+
+	p_child->m_pparent = this;
 	p_child->grab_globals_from(this);
 
 	/* need events handling highest priority? */
@@ -80,6 +122,7 @@ bool rm_widget::add_child(rm_widget* p_child)
 		/* add child last */
 		m_childs.push_back(p_child);
 	}
+	p_child->dispatch_event(PARENT_CHANGED_EVENT, this, nullptr);
 	root_update();
 	return true;
 }
@@ -96,12 +139,16 @@ bool rm_widget::remove_child(rm_widget* p_child)
 
 	_childs_vec::iterator it = std::find(m_childs.begin(), m_childs.end(), p_child);
 	if (it != m_childs.end()) {
-		/* child found */
+		if (m_proot)
+			m_proot->forget_widget(p_child);
 		m_childs.erase(it);
 		p_child->dispatch_event(PARENT_CHANGED_EVENT, this, nullptr);
-		p_child->set_parent(nullptr);
+		p_child->m_pparent = nullptr;
+		p_child->grab_globals_from(nullptr);
+		root_update();
+		return true;
 	}
-	return true;
+	return false;
 }
 
 rm_widget* rm_widget::find_child(const char* pclassname) const
@@ -117,8 +164,31 @@ rm_widget* rm_widget::find_child(const char* pclassname) const
 
 void rm_widget::set_parent(rm_widget* p_parent)
 {
-	m_pparent = p_parent;
-	root_update();
+	if (m_pparent == p_parent)
+		return;
+
+	if (p_parent) {
+		p_parent->add_child(this);
+		return;
+	}
+
+	if (m_pparent)
+		m_pparent->remove_child(this);
+}
+
+void rm_widget::set_enabled(bool enabled)
+{
+	m_elem_flags.toggle_bits(RM_FLAG_ACTIVE, enabled);
+	on_enabled_changed(enabled);
+	if (!enabled && m_proot)
+		m_proot->forget_widget(this);
+}
+
+void rm_widget::show(bool visible)
+{
+	m_elem_flags.toggle_bits(RM_FLAG_VISIBLE, visible);
+	if (!visible && m_proot)
+		m_proot->forget_widget(this);
 }
 
 void rm_widget::resize(float width, float height)
@@ -127,35 +197,128 @@ void rm_widget::resize(float width, float height)
 	perform_layout();
 }
 
-void rm_surface::keybd_dispatcher(rm_widget* p_elem, int sc, RM_KEY vk, RM_KEY_STATE state)
+bool rm_surface::contains_widget(const rm_widget* subtree, const rm_widget* widget)
 {
-	p_elem->on_keybd(sc, vk, state);
-	/* element has childs? */
-	if (p_elem->get_elem_flags().has_active() &&
-		p_elem->get_elem_flags().has_childs() &&
-		p_elem->get_elem_flags().has_notify_childs()) {
-		/* recursive enum childs */
-		for (size_t i = 0; i < p_elem->get_num_childs(); i++) {
-			/* enter recursively */
-			keybd_dispatcher(p_elem->get_child(i), sc, vk, state);
-		}
+	if (!subtree || !widget)
+		return false;
+	if (subtree == widget)
+		return true;
+	for (rm_widget* child : subtree->m_childs) {
+		if (contains_widget(child, widget))
+			return true;
+	}
+	return false;
+}
+
+void rm_surface::forget_widget(rm_widget* widget)
+{
+	if (contains_widget(widget, m_pfocus))
+		set_focus(nullptr);
+	if (contains_widget(widget, m_pointer_capture))
+		release_pointer();
+}
+
+void rm_surface::set_focus(rm_widget* widget)
+{
+	if (widget == this)
+		widget = nullptr;
+	if (widget && (widget->get_root() != this ||
+		!widget->m_elem_flags.has_visible() ||
+		!widget->m_elem_flags.has_active() ||
+		!widget->m_elem_flags.has_keybd()))
+		widget = nullptr;
+	if (m_pfocus == widget)
+		return;
+
+	if (m_pfocus) {
+		m_pfocus->m_elem_flags.toggle_bits(RM_FLAG_FOCUSED, false);
+		m_pfocus->on_focus_changed(false);
+	}
+	m_pfocus = widget;
+	if (m_pfocus) {
+		m_pfocus->m_elem_flags.toggle_bits(RM_FLAG_FOCUSED, true);
+		m_pfocus->on_focus_changed(true);
 	}
 }
 
-#if 0
-void rmgui_surface::text_input_dispatcher(rmgui_widget* p_elem, int sym)
+bool rm_surface::capture_pointer(rm_widget* widget)
 {
-	p_elem->on_text_input(sym);
-	/* element has childs? */
-	if (p_elem->get_elem_flags().has_childs() && p_elem->get_elem_flags().has_notify_childs()) {
-		/* recursive enum childs */
-		for (size_t i = 0; i < p_elem->get_num_childs(); i++) {
-			/* enter recursively */
-			text_input_dispatcher(p_elem->get_child(i), sym);
-		}
-	}
+	if (!widget || widget->get_root() != this || !widget->is_enabled())
+		return false;
+	if (m_pointer_capture && m_pointer_capture != widget)
+		release_pointer();
+	m_pointer_capture = widget;
+	widget->m_elem_flags.toggle_bits(RM_FLAG_DRAGGED, true);
+	return true;
 }
-#endif
+
+void rm_surface::release_pointer(rm_widget* widget)
+{
+	if (!m_pointer_capture || (widget && widget != m_pointer_capture))
+		return;
+	rm_widget* captured = m_pointer_capture;
+	captured->m_elem_flags.toggle_bits(RM_FLAG_DRAGGED, false);
+	m_pointer_capture = nullptr;
+	captured->on_pointer_capture_lost();
+}
+
+rm_vec2 rm_surface::cursor_for_widget(const rm_widget* widget, const rm_vec2& surface_cursor) const
+{
+	std::vector<const rm_widget*> ancestors;
+	for (const rm_widget* current = widget ? widget->m_pparent : nullptr;
+		current; current = current->m_pparent)
+		ancestors.push_back(current);
+
+	rm_vec2 result = surface_cursor;
+	for (auto it = ancestors.rbegin(); it != ancestors.rend(); ++it) {
+		const rm_widget* ancestor = *it;
+		result.x -= ancestor->m_pos_of_parent.x + ancestor->m_content_area.x;
+		result.y -= ancestor->m_pos_of_parent.y + ancestor->m_content_area.y;
+	}
+	return result;
+}
+
+void rm_surface::update_hover_states(rm_widget* p_elem, const rm_vec2& cursor_pos)
+{
+	if (!p_elem)
+		return;
+
+	const bool interactive = p_elem->m_elem_flags.has_visible() && p_elem->m_elem_flags.has_active();
+	p_elem->m_elem_flags.toggle_bits(RM_FLAG_HOVERED,
+		interactive && p_elem->m_bbox.inside(cursor_pos));
+
+	if (!interactive || !p_elem->m_elem_flags.has_childs())
+		return;
+
+	rm_vec2 local = p_elem->cursor_to_local(cursor_pos);
+	const rm_rect& content = p_elem->get_content_area();
+	rm_vec2 child_cursor(local.x - content.x, local.y - content.y);
+	for (rm_widget* child : p_elem->m_childs)
+		update_hover_states(child, child_cursor);
+}
+
+rm_widget* rm_surface::hit_test(rm_widget* p_elem, const rm_vec2& cursor_pos)
+{
+	if (!p_elem || !p_elem->m_elem_flags.has_visible() || !p_elem->m_elem_flags.has_active())
+		return nullptr;
+
+	rm_vec2 local = p_elem->cursor_to_local(cursor_pos);
+	const rm_rect& content = p_elem->get_content_area();
+	rm_vec2 child_cursor(local.x - content.x, local.y - content.y);
+
+	std::vector<rm_widget*> ordered(p_elem->m_childs.rbegin(), p_elem->m_childs.rend());
+	std::stable_sort(ordered.begin(), ordered.end(), [](const rm_widget* lhs, const rm_widget* rhs) {
+		return lhs->get_zindex() > rhs->get_zindex();
+	});
+	for (rm_widget* child : ordered) {
+		if (rm_widget* hit = hit_test(child, child_cursor))
+			return hit;
+	}
+
+	if (p_elem->m_elem_flags.has_mouse() && p_elem->m_bbox.inside(cursor_pos))
+		return p_elem;
+	return nullptr;
+}
 
 bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
 	RM_MOUSE_EVENT event,
@@ -163,20 +326,16 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
 	RM_KEY_STATE state,
 	rm_vec2& cursor_pos)
 {
+	if (!p_elem->get_elem_flags().has_visible() || !p_elem->get_elem_flags().has_active())
+		return true;
+
 	bool b_call_next = true;
 	bool b_cursor_inside = p_elem->get_bbox().inside(cursor_pos);
 	bool b_global_receive_events = p_elem->get_elem_flags().is_set(RM_FLAG_GLOBAL);
-	if (b_cursor_inside || b_global_receive_events) {
+	if (p_elem->get_elem_flags().has_mouse() && (b_cursor_inside || b_global_receive_events)) {
 		b_call_next = p_elem->on_mouse(event, vk, state, cursor_pos, m_delta_cursor);
-		if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && p_elem != this) {
-			if (!(b_global_receive_events && !b_cursor_inside)) {
-				m_pfocus = p_elem;
-				printf("updated focus to element %s\n", p_elem->get_classname());
-			}
-		}
 	}
 
-	p_elem->m_elem_flags.toggle_bits(RM_FLAG_HOVERED, b_cursor_inside);
 	if (!b_call_next)
 		return false; //this event was break by p_elem
 
@@ -192,9 +351,11 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
 		bool b_child_consumed = false;
 		/* Iterate children in reverse order (last added = drawn on top = highest priority).
 		   This ensures topmost visual elements receive mouse events first. */
-		size_t num = p_elem->get_num_childs();
-		for (size_t i = num; i > 0; i--) {
-			rm_widget* pchild = p_elem->get_child(i - 1);
+		std::vector<rm_widget*> ordered(p_elem->m_childs.rbegin(), p_elem->m_childs.rend());
+		std::stable_sort(ordered.begin(), ordered.end(), [](const rm_widget* lhs, const rm_widget* rhs) {
+			return lhs->get_zindex() > rhs->get_zindex();
+		});
+		for (rm_widget* pchild : ordered) {
 			if (!mouse_dispatcher(pchild, event, vk, state, child_cursor)) {
 				/* For UP events, keep dispatching to all siblings so that
 				   every widget can clear its pressed/dragging state.
@@ -258,10 +419,10 @@ void rm_surface::draw_recursive(rm_widget* pwidget, float dt)
 
 #ifdef RMGUI_DEBUG_DRAW
 	/* draw absolute position for debug */
-	m_pctx->BeginPath();
-	m_pctx->FillColor(NVGcolor::RGB(0, 0, 255));
-	m_pctx->Circle(abs_pos.x, abs_pos.y, 2.f);
-	m_pctx->Fill();
+	m_pctx->beginPath();
+	m_pctx->fillColor(NVGcolor::RGB(0, 0, 255));
+	m_pctx->circle(abs_pos.x, abs_pos.y, 2.f);
+	m_pctx->fill();
 #endif
 }
 
@@ -300,15 +461,15 @@ void rm_surface::draw(float dt)
 
 void rm_surface::keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 {
-	keybd_dispatcher(this, sc, vk, state);
+	if (m_pfocus && m_pfocus->m_elem_flags.has_visible() &&
+		m_pfocus->m_elem_flags.has_active() && m_pfocus->m_elem_flags.has_keybd())
+		m_pfocus->on_keybd(sc, vk, state);
 }
 
 void rm_surface::textinput(int sym)
 {
-#if 0
-	text_input_dispatcher(this, sym);
-#endif
-	if (m_pfocus)
+	if (m_pfocus && m_pfocus->m_elem_flags.has_visible() &&
+		m_pfocus->m_elem_flags.has_active() && m_pfocus->m_elem_flags.has_symbols_input())
 		m_pfocus->on_text_input(sym);
 }
 
@@ -316,7 +477,20 @@ void rm_surface::mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, int 
 {
 	rm_vec2 mouse_pos(x, y);
 	m_delta_cursor = mouse_pos - m_last_cursor;
-	mouse_dispatcher(this, event, vk, state, mouse_pos);
+	update_hover_states(this, mouse_pos);
+
+	if (m_pointer_capture) {
+		rm_widget* captured = m_pointer_capture;
+		rm_vec2 captured_cursor = cursor_for_widget(captured, mouse_pos);
+		captured->on_mouse(event, vk, state, captured_cursor, m_delta_cursor);
+		if (event == RM_MOUSE_EVENT_CLICK && state == UP)
+			release_pointer(captured);
+	}
+	else {
+		if (event == RM_MOUSE_EVENT_CLICK && state == DOWN)
+			set_focus(hit_test(this, mouse_pos));
+		mouse_dispatcher(this, event, vk, state, mouse_pos);
+	}
 	m_last_cursor = mouse_pos;
 }
 
@@ -415,6 +589,7 @@ rm_surface::rm_surface(std::unique_ptr<NVGcontext> pctx, int width, int height, 
 	set_root(this);
 	m_pctx = std::move(pctx);
 	m_pfocus = nullptr;
+	m_pointer_capture = nullptr;
 	m_delta_time = 0.f;
 	m_device_pixel_ratio = 1.f;
 	rm_font font = load_font_from_memory(fontawesomewebfont, FONT_SIZE, "fontawesome");
@@ -423,6 +598,10 @@ rm_surface::rm_surface(std::unique_ptr<NVGcontext> pctx, int width, int height, 
 
 rm_surface::~rm_surface()
 {
+	m_pfocus = nullptr;
+	m_pointer_capture = nullptr;
+	destroy_children();
+	m_proot = nullptr;
 }
 
 rm_window::WSC rm_window::get_active_size_corner()

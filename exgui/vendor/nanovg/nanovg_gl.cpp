@@ -4,6 +4,7 @@
 #include <string.h>
 #include <math.h>
 #include <algorithm>
+#include <string>
 #include "nanovg.h"
 
 #if defined(NANOVG_GL3) || defined(NANOVG_GLES2) || defined(NANOVG_GLES3)
@@ -582,6 +583,8 @@ struct GLNVGcall {
 	int triangleOffset;
 	int triangleCount;
 	int uniformOffset;
+	int customUniformOffset;
+	int customUniformCount;
 	GLNVGblend blendFunc;
 };
 typedef struct GLNVGcall GLNVGcall;
@@ -700,6 +703,10 @@ class GLNVGrenderer : public NVGrenderer {
 	int m_cuniforms; //NOTE KD: capacity UNUSED!
 	int m_nuniforms; //NOTE KD: size
 
+	GLNVGcustomUniform* m_customUniformSnapshots;
+	int m_customUniformSnapshotCapacity;
+	int m_customUniformSnapshotCount;
+
 	// cached state
 #if NANOVG_GL_USE_STATE_FILTER
 	GLuint m_boundTexture;
@@ -757,6 +764,11 @@ private:
 		prog = glCreateProgram();
 		vert = glCreateShader(GL_VERTEX_SHADER);
 		frag = glCreateShader(GL_FRAGMENT_SHADER);
+		auto cleanup = [&]() {
+			if (prog != 0) glDeleteProgram(prog);
+			if (vert != 0) glDeleteShader(vert);
+			if (frag != 0) glDeleteShader(frag);
+		};
 		str[2] = vshader;
 		glShaderSource(vert, 3, str, 0);
 		str[2] = fshader;
@@ -766,6 +778,7 @@ private:
 		glGetShaderiv(vert, GL_COMPILE_STATUS, &status);
 		if (status != GL_TRUE) {
 			glnvg__dumpShaderError(vert, name, "vert");
+			cleanup();
 			return 0;
 		}
 
@@ -773,6 +786,7 @@ private:
 		glGetShaderiv(frag, GL_COMPILE_STATUS, &status);
 		if (status != GL_TRUE) {
 			glnvg__dumpShaderError(frag, name, "frag");
+			cleanup();
 			return 0;
 		}
 
@@ -786,6 +800,7 @@ private:
 		glGetProgramiv(prog, GL_LINK_STATUS, &status);
 		if (status != GL_TRUE) {
 			glnvg__dumpProgramError(prog, name);
+			cleanup();
 			return 0;
 		}
 
@@ -968,9 +983,9 @@ private:
 	}
 
 	// Bind a custom shader program, setting up standard uniforms
-	void glnvg__bindCustomShader(NVGhandle shaderHandle)
+	void glnvg__bindCustomShader(const GLNVGcall* call)
 	{
-		GLNVGcustomShader* cs = m_customShaders.getData(shaderHandle);
+		GLNVGcustomShader* cs = call ? m_customShaders.getData(call->shader) : nullptr;
 		if (!cs || cs->shader.prog == 0)
 			return;
 
@@ -986,8 +1001,8 @@ private:
 #endif
 
 		// Apply custom uniforms
-		for (int i = 0; i < cs->numUniforms; i++) {
-			GLNVGcustomUniform* u = &cs->uniforms[i];
+		for (int i = 0; i < call->customUniformCount; i++) {
+			const GLNVGcustomUniform* u = &m_customUniformSnapshots[call->customUniformOffset + i];
 			if (u->location < 0 || u->dataSize <= 0)
 				continue;
 
@@ -1050,7 +1065,7 @@ private:
 
 		// Color pass - bind custom shader if available
 		if (call->shader.isValid())
-			glnvg__bindCustomShader(call->shader);
+			glnvg__bindCustomShader(call);
 
 		glnvg__setUniforms(call->uniformOffset + m_fragSize, call->image);
 		glnvg__checkError("fill fill");
@@ -1081,7 +1096,7 @@ private:
 		int i, npaths = call->pathCount;
 
 		if (call->shader.isValid())
-			glnvg__bindCustomShader(call->shader);
+			glnvg__bindCustomShader(call);
 
 		glnvg__setUniforms(call->uniformOffset, call->image);
 		glnvg__checkError("convex fill");
@@ -1113,7 +1128,7 @@ private:
 			glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
 
 			if (call->shader.isValid())
-				glnvg__bindCustomShader(call->shader);
+				glnvg__bindCustomShader(call);
 
 			glnvg__setUniforms(call->uniformOffset + m_fragSize, call->image);
 			glnvg__checkError("stroke fill 0");
@@ -1144,7 +1159,7 @@ private:
 		}
 		else {
 			if (call->shader.isValid())
-				glnvg__bindCustomShader(call->shader);
+				glnvg__bindCustomShader(call);
 
 			glnvg__setUniforms(call->uniformOffset, call->image);
 			glnvg__checkError("stroke fill");
@@ -1160,7 +1175,7 @@ private:
 	void glnvg__triangles(GLNVGcall* call)
 	{
 		if (call->shader.isValid())
-			glnvg__bindCustomShader(call->shader);
+			glnvg__bindCustomShader(call);
 
 		glnvg__setUniforms(call->uniformOffset, call->image);
 		glnvg__checkError("triangles fill");
@@ -1306,6 +1321,48 @@ private:
 		return ret;
 	}
 
+	int glnvg__allocCustomUniformSnapshots(int count)
+	{
+		if (count <= 0)
+			return 0;
+
+		if (m_customUniformSnapshotCount + count > m_customUniformSnapshotCapacity) {
+			const int capacity = glnvg__maxi(
+				m_customUniformSnapshotCount + count, 128) + m_customUniformSnapshotCapacity / 2;
+			GLNVGcustomUniform* snapshots = static_cast<GLNVGcustomUniform*>(realloc(
+				m_customUniformSnapshots, sizeof(GLNVGcustomUniform) * capacity));
+			if (!snapshots)
+				return -1;
+			m_customUniformSnapshots = snapshots;
+			m_customUniformSnapshotCapacity = capacity;
+		}
+
+		const int offset = m_customUniformSnapshotCount;
+		m_customUniformSnapshotCount += count;
+		return offset;
+	}
+
+	bool glnvg__snapshotCustomUniforms(GLNVGcall* call)
+	{
+		if (!call->shader.isValid())
+			return true;
+
+		GLNVGcustomShader* shader = m_customShaders.getData(call->shader);
+		if (!shader)
+			return false;
+
+		call->customUniformCount = shader->numUniforms;
+		call->customUniformOffset = glnvg__allocCustomUniformSnapshots(shader->numUniforms);
+		if (call->customUniformOffset < 0)
+			return false;
+
+		if (shader->numUniforms > 0) {
+			memcpy(&m_customUniformSnapshots[call->customUniformOffset], shader->uniforms,
+				sizeof(GLNVGcustomUniform) * shader->numUniforms);
+		}
+		return true;
+	}
+
 
 	GLNVGfragUniforms* nvg__fragUniformPtr(int i)
 	{
@@ -1386,7 +1443,21 @@ public:
 private:
 
 public:
-	explicit GLNVGrenderer(int flags) : m_flags(flags), m_zIndex(0), m_zDirty(false), m_defaultFBO(-1), m_boundProgram(0) {
+	explicit GLNVGrenderer(int flags)
+		: m_boundProgram(0), m_view{ 0.0f, 0.0f }, m_textureId(0), m_targetId(0), m_vertBuf(0)
+#if defined NANOVG_GL3
+		, m_vertArr(0)
+#endif
+#if NANOVG_GL_USE_UNIFORMBUFFER
+		, m_fragBuf(0)
+#endif
+		, m_fragSize(0), m_flags(flags), m_zIndex(0), m_zDirty(false)
+		, m_calls(nullptr), m_ccalls(0), m_ncalls(0)
+		, m_paths(nullptr), m_cpaths(0), m_npaths(0)
+		, m_verts(nullptr), m_cverts(0), m_nverts(0)
+		, m_uniforms(nullptr), m_cuniforms(0), m_nuniforms(0)
+		, m_customUniformSnapshots(nullptr), m_customUniformSnapshotCapacity(0), m_customUniformSnapshotCount(0)
+		, m_defaultFBO(-1) {
 		int align = 4;
 		glnvg__checkError("init");
 		if (m_flags & NVG_ANTIALIAS) {
@@ -1478,8 +1549,6 @@ public:
 	}
 
 	~GLNVGrenderer() override {
-		int i;
-
 		// Delete custom shaders (including built-in blur/glass)
 		{
 			NVGhandle handle;
@@ -1520,6 +1589,7 @@ public:
 		free(m_paths);
 		free(m_verts);
 		free(m_uniforms);
+		free(m_customUniformSnapshots);
 		free(m_calls);
 	}
 
@@ -1703,6 +1773,7 @@ public:
 		m_npaths = 0;
 		m_ncalls = 0;
 		m_nuniforms = 0;
+		m_customUniformSnapshotCount = 0;
 		m_zIndex = 0;
 		m_zDirty = false;
 	}
@@ -1799,6 +1870,7 @@ public:
 		m_npaths = 0;
 		m_ncalls = 0;
 		m_nuniforms = 0;
+		m_customUniformSnapshotCount = 0;
 		m_zDirty = false;
 	}
 
@@ -1811,8 +1883,16 @@ public:
 		int i, maxverts, offset;
 
 		if (call == NULL) return;
+		const int pathStart = m_npaths;
+		const int vertexStart = m_nverts;
+		const int uniformStart = m_nuniforms;
+		const int customUniformStart = m_customUniformSnapshotCount;
 		auto rollbackCall = [&]() {
 			if (m_ncalls > 0) m_ncalls--;
+			m_npaths = pathStart;
+			m_nverts = vertexStart;
+			m_nuniforms = uniformStart;
+			m_customUniformSnapshotCount = customUniformStart;
 			};
 
 		call->type = GLNVG_FILL;
@@ -1826,6 +1906,10 @@ public:
 		call->image = paint.image;
 		call->shader = paint.shader;
 		call->blendFunc = glnvg__blendCompositeOperation(compositeOperation);
+		if (!glnvg__snapshotCustomUniforms(call)) {
+			rollbackCall();
+			return;
+		}
 
 		if (npaths == 1 && paths[0].convex)
 		{
@@ -1903,9 +1987,17 @@ public:
 		if (call == NULL)
 			return;
 
+		const int pathStart = m_npaths;
+		const int vertexStart = m_nverts;
+		const int uniformStart = m_nuniforms;
+		const int customUniformStart = m_customUniformSnapshotCount;
 		auto rollbackCall = [&]() {
 			if (m_ncalls > 0)
 				m_ncalls--;
+			m_npaths = pathStart;
+			m_nverts = vertexStart;
+			m_nuniforms = uniformStart;
+			m_customUniformSnapshotCount = customUniformStart;
 			};
 
 		call->type = GLNVG_STROKE;
@@ -1918,6 +2010,10 @@ public:
 		call->image = paint.image;
 		call->shader = paint.shader;
 		call->blendFunc = glnvg__blendCompositeOperation(compositeOperation);
+		if (!glnvg__snapshotCustomUniforms(call)) {
+			rollbackCall();
+			return;
+		}
 
 		// Allocate vertices for all the paths.
 		maxverts = glnvg__maxVertCount(paths, npaths);
@@ -1969,15 +2065,25 @@ public:
 		if (call == NULL)
 			return;
 
+		const int vertexStart = m_nverts;
+		const int uniformStart = m_nuniforms;
+		const int customUniformStart = m_customUniformSnapshotCount;
 		auto rollbackCall = [&]() {
 			if (m_ncalls > 0)
 				m_ncalls--;
+			m_nverts = vertexStart;
+			m_nuniforms = uniformStart;
+			m_customUniformSnapshotCount = customUniformStart;
 			};
 
 		call->type = GLNVG_TRIANGLES;
 		call->image = paint.image;
 		call->shader = paint.shader;
 		call->blendFunc = glnvg__blendCompositeOperation(compositeOperation);
+		if (!glnvg__snapshotCustomUniforms(call)) {
+			rollbackCall();
+			return;
+		}
 
 		// Allocate vertices for all the paths.
 		call->triangleOffset = glnvg__allocVerts(nverts);
@@ -2147,7 +2253,8 @@ public:
 		cs->numUniforms = 0;
 		cs->nextUniformId = 0;
 
-		const char* fragSrc = (const char*)desc.data;
+		const std::string fragmentSource(static_cast<const char*>(desc.data), desc.size);
+		const char* fragSrc = fragmentSource.c_str();
 		const char* opts = (m_flags & NVG_ANTIALIAS) ? "#define EDGE_AA 1\n" : NULL;
 
 		if (glnvg__createShader(&cs->shader, "custom", shaderHeader, opts, fillVertShader, fragSrc) == 0) {
@@ -2175,12 +2282,20 @@ public:
 
 	void drawCustomTriangles(const NVGcustomDraw& draw, NVGcompositeOperationState compositeOperation, const NVGscissor& scissor, const NVGvertex* verts, int nverts, float fringe) override
 	{
-		NVG_NOTUSED(draw);
-		NVG_NOTUSED(compositeOperation);
-		NVG_NOTUSED(scissor);
-		NVG_NOTUSED(verts);
-		NVG_NOTUSED(nverts);
-		NVG_NOTUSED(fringe);
+		if (!verts || nverts <= 0 || !draw.shader.isValid())
+			return;
+
+		NVGpaint paint{};
+		paint.xform[0] = 1.0f;
+		paint.xform[3] = 1.0f;
+		paint.extent[0] = 1.0f;
+		paint.extent[1] = 1.0f;
+		paint.feather = 1.0f;
+		paint.innerColor = NVGcolor::RGBAf(1.0f, 1.0f, 1.0f, 1.0f);
+		paint.outerColor = paint.innerColor;
+		paint.image = draw.image;
+		paint.shader = draw.shader;
+		triangles(paint, compositeOperation, scissor, verts, nverts, fringe);
 	}
 
 	NVGhandle getShader() override {

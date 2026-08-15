@@ -110,6 +110,7 @@ RM_KEY translate_glfw_key(int k)
 
   case GLFW_KEY_LEFT_CONTROL:  return RM_KEY_LCTRL;
   case GLFW_KEY_RIGHT_CONTROL: return RM_KEY_RCTRL;
+  case GLFW_KEY_SPACE:         return RM_KEY_SPACE;
 
   default:
     return RM_KEY_NONE;
@@ -225,8 +226,10 @@ void destroy_window(rm_surface* psurface)
   assert(psurface->get_context() && "destroy_window(): nvg context was nullptr!");
   assert(psurface->get_syswindow<GLFWwindow*>() && "destroy_window(): GLFWwindow was nullptr!");
 
-  glfwDestroyWindow(psurface->get_syswindow<GLFWwindow*>());
+  GLFWwindow* window = psurface->get_syswindow<GLFWwindow*>();
+  glfwMakeContextCurrent(window);
   delete psurface;
+  glfwDestroyWindow(window);
   glfwTerminate();
 }
 

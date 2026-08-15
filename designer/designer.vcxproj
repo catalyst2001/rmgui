@@ -138,6 +138,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="SDL_initializer.cpp" />
     <ClCompile Include="..\exgui\exgui\rmgui.cpp" />
+    <ClCompile Include="..\exgui\exgui\rmgui_default_painter.cpp" />
     <ClCompile Include="..\exgui\exgui\rmgui_controls.cpp" />
     <ClCompile Include="..\exgui\exgui\blend_ui.cpp" />
     <ClCompile Include="..\exgui\exgui\rm_effects.cpp" />
