@@ -71,6 +71,19 @@ struct RmWindowStyle {
   float resize_grip_extent = 0.0f;
 };
 
+struct RmTooltipStyle {
+  NVGcolor background;
+  NVGcolor border;
+  NVGcolor text;
+  float horizontal_padding = 0.0f;
+  float vertical_padding = 0.0f;
+  float cursor_offset = 0.0f;
+  float corner_radius = 0.0f;
+  float border_width = 0.0f;
+  float font_size = 0.0f;
+  float show_delay = 0.0f;
+};
+
 struct RmButtonStyle {
   RmStateColors background;
   RmStateColors border;
@@ -304,9 +317,6 @@ struct RmTreeViewStyle {
   NVGcolor guide;
   NVGcolor focus_ring;
   NVGcolor selection_border;
-  NVGcolor tooltip_background;
-  NVGcolor tooltip_border;
-  NVGcolor tooltip_text;
   float row_height = 0.0f;
   float indent = 0.0f;
   float horizontal_padding = 0.0f;
@@ -322,11 +332,6 @@ struct RmTreeViewStyle {
   float focus_ring_width = 0.0f;
   float selection_border_width = 0.0f;
   float font_size = 0.0f;
-  float tooltip_horizontal_padding = 0.0f;
-  float tooltip_vertical_padding = 0.0f;
-  float tooltip_offset = 0.0f;
-  float tooltip_corner_radius = 0.0f;
-  float tooltip_border_width = 0.0f;
   bool draw_background = true;
   bool draw_border = true;
   bool show_guides = true;
@@ -536,6 +541,10 @@ struct RmControlMetricsTokens {
   float window_resize_grip_extent = 5.0f;
   float button_icon_size = 16.0f;
   float button_icon_text_gap = 6.0f;
+  float tooltip_horizontal_padding = 7.0f;
+  float tooltip_vertical_padding = 5.0f;
+  float tooltip_cursor_offset = 12.0f;
+  float tooltip_show_delay = 0.45f;
   float text_input_horizontal_padding = 10.0f;
   float text_input_vertical_padding = 7.0f;
   float text_input_caret_width = 1.5f;
@@ -570,9 +579,6 @@ struct RmControlMetricsTokens {
   float treeview_icon_text_gap = 4.0f;
   float treeview_expander_size = 7.0f;
   float treeview_expander_stroke_width = 1.0f;
-  float treeview_tooltip_horizontal_padding = 7.0f;
-  float treeview_tooltip_vertical_padding = 5.0f;
-  float treeview_tooltip_offset = 6.0f;
   bool treeview_draw_background = true;
   bool treeview_draw_border = true;
   float propertyview_row_height = 27.0f;
@@ -653,6 +659,7 @@ struct RmThemeSnapshot {
   RmThemeMode mode = RmThemeMode::dark;
   RmThemeTokens tokens;
   RmWindowStyle window;
+  RmTooltipStyle tooltip;
   RmButtonStyles buttons;
   RmTabStyles tabs;
   RmMenuStyle menu;
@@ -776,6 +783,10 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.window_resize_grip_extent, 1.0f, 64.0f, "tokens.controls.window_resize_grip_extent", diagnostics);
     sanitize_metric(tokens.controls.button_icon_size, 1.0f, 256.0f, "tokens.controls.button_icon_size", diagnostics);
     sanitize_metric(tokens.controls.button_icon_text_gap, 0.0f, 256.0f, "tokens.controls.button_icon_text_gap", diagnostics);
+    sanitize_metric(tokens.controls.tooltip_horizontal_padding, 0.0f, 256.0f, "tokens.controls.tooltip_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.tooltip_vertical_padding, 0.0f, 256.0f, "tokens.controls.tooltip_vertical_padding", diagnostics);
+    sanitize_metric(tokens.controls.tooltip_cursor_offset, 0.0f, 256.0f, "tokens.controls.tooltip_cursor_offset", diagnostics);
+    sanitize_metric(tokens.controls.tooltip_show_delay, 0.0f, 10.0f, "tokens.controls.tooltip_show_delay", diagnostics);
     sanitize_metric(tokens.controls.text_input_horizontal_padding, 0.0f, 256.0f, "tokens.controls.text_input_horizontal_padding", diagnostics);
     sanitize_metric(tokens.controls.text_input_vertical_padding, 0.0f, 256.0f, "tokens.controls.text_input_vertical_padding", diagnostics);
     sanitize_metric(tokens.controls.text_input_caret_width, 0.0f, 32.0f, "tokens.controls.text_input_caret_width", diagnostics);
@@ -810,9 +821,6 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.treeview_icon_text_gap, 0.0f, 256.0f, "tokens.controls.treeview_icon_text_gap", diagnostics);
     sanitize_metric(tokens.controls.treeview_expander_size, 1.0f, 64.0f, "tokens.controls.treeview_expander_size", diagnostics);
     sanitize_metric(tokens.controls.treeview_expander_stroke_width, 0.0f, 32.0f, "tokens.controls.treeview_expander_stroke_width", diagnostics);
-    sanitize_metric(tokens.controls.treeview_tooltip_horizontal_padding, 0.0f, 256.0f, "tokens.controls.treeview_tooltip_horizontal_padding", diagnostics);
-    sanitize_metric(tokens.controls.treeview_tooltip_vertical_padding, 0.0f, 256.0f, "tokens.controls.treeview_tooltip_vertical_padding", diagnostics);
-    sanitize_metric(tokens.controls.treeview_tooltip_offset, 0.0f, 256.0f, "tokens.controls.treeview_tooltip_offset", diagnostics);
     sanitize_metric(tokens.controls.propertyview_row_height, 16.0f, 256.0f, "tokens.controls.propertyview_row_height", diagnostics);
     sanitize_metric(tokens.controls.propertyview_group_height, 16.0f, 256.0f, "tokens.controls.propertyview_group_height", diagnostics);
     sanitize_metric(tokens.controls.propertyview_name_column_ratio, 0.1f, 0.9f, "tokens.controls.propertyview_name_column_ratio", diagnostics);
@@ -906,6 +914,17 @@ public:
     p_theme->window.focus_ring_width = controls.focus_ring_width;
     p_theme->window.titlebar_height = controls.window_titlebar_height;
     p_theme->window.resize_grip_extent = controls.window_resize_grip_extent;
+
+    p_theme->tooltip.background = colors.control;
+    p_theme->tooltip.border = colors.border_hovered;
+    p_theme->tooltip.text = colors.text;
+    p_theme->tooltip.horizontal_padding = controls.tooltip_horizontal_padding;
+    p_theme->tooltip.vertical_padding = controls.tooltip_vertical_padding;
+    p_theme->tooltip.cursor_offset = controls.tooltip_cursor_offset;
+    p_theme->tooltip.corner_radius = tokens.radius.small;
+    p_theme->tooltip.border_width = controls.border_width;
+    p_theme->tooltip.font_size = tokens.typography.caption;
+    p_theme->tooltip.show_delay = controls.tooltip_show_delay;
 
     const auto configure_button = [&](RmButtonStyle& style,
       const RmStateColors& background, const RmStateColors& border,
@@ -1190,9 +1209,6 @@ public:
     p_theme->treeview.guide = colors.border;
     p_theme->treeview.focus_ring = colors.focus_ring;
     p_theme->treeview.selection_border = colors.focus_ring;
-    p_theme->treeview.tooltip_background = colors.control;
-    p_theme->treeview.tooltip_border = colors.border_hovered;
-    p_theme->treeview.tooltip_text = colors.text;
     p_theme->treeview.row_height = controls.treeview_row_height;
     p_theme->treeview.indent = controls.treeview_indent;
     p_theme->treeview.horizontal_padding = controls.treeview_horizontal_padding;
@@ -1211,13 +1227,6 @@ public:
     p_theme->treeview.focus_ring_width = controls.focus_ring_width;
     p_theme->treeview.selection_border_width = controls.focus_ring_width;
     p_theme->treeview.font_size = tokens.typography.control;
-    p_theme->treeview.tooltip_horizontal_padding =
-      controls.treeview_tooltip_horizontal_padding;
-    p_theme->treeview.tooltip_vertical_padding =
-      controls.treeview_tooltip_vertical_padding;
-    p_theme->treeview.tooltip_offset = controls.treeview_tooltip_offset;
-    p_theme->treeview.tooltip_corner_radius = tokens.radius.small;
-    p_theme->treeview.tooltip_border_width = controls.border_width;
     p_theme->treeview.draw_background = controls.treeview_draw_background;
     p_theme->treeview.draw_border = controls.treeview_draw_border;
 

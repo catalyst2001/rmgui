@@ -1055,8 +1055,8 @@ void RmDefaultControlPainter::draw_treeview_row(NVGcontext& context,
   context.text(text_x, center_y, text, nullptr);
 }
 
-void RmDefaultControlPainter::draw_treeview_tooltip(NVGcontext& context,
-  const RmTreeViewTooltipVisual& visual, const RmTreeViewStyle& style)
+void RmDefaultControlPainter::draw_tooltip(NVGcontext& context,
+  const RmTooltipVisual& visual, const RmTooltipStyle& style)
 {
   const char* text = visual.text ? visual.text : "";
   if (*text == '\0' || visual.available_width <= 0.0f ||
@@ -1068,26 +1068,27 @@ void RmDefaultControlPainter::draw_treeview_tooltip(NVGcontext& context,
   context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
   const float text_width = context.textBounds(0.0f, 0.0f, text, nullptr, nullptr);
   const float width = std::min(visual.available_width,
-    text_width + style.tooltip_horizontal_padding * 2.0f);
+    text_width + style.horizontal_padding * 2.0f);
   const float height = std::min(visual.available_height,
-    style.font_size + style.tooltip_vertical_padding * 2.0f);
-  const float x = std::clamp(visual.anchor_x, 0.0f,
+    style.font_size + style.vertical_padding * 2.0f);
+  const float preferred_x = visual.anchor_x + style.cursor_offset;
+  const float x = std::clamp(preferred_x, 0.0f,
     std::max(0.0f, visual.available_width - width));
-  const float preferred_y = visual.anchor_y + style.tooltip_offset;
+  const float preferred_y = visual.anchor_y + style.cursor_offset;
   const float y = std::clamp(preferred_y, 0.0f,
     std::max(0.0f, visual.available_height - height));
 
   context.beginPath();
-  context.roundedRect(x, y, width, height, style.tooltip_corner_radius);
-  context.fillColor(style.tooltip_background);
+  context.roundedRect(x, y, width, height, style.corner_radius);
+  context.fillColor(style.background);
   context.fill();
-  if (style.tooltip_border_width > 0.0f) {
-    context.StrokeWidth(style.tooltip_border_width);
-    context.strokeColor(style.tooltip_border);
+  if (style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.border);
     context.stroke();
   }
-  context.fillColor(style.tooltip_text);
-  context.text(x + style.tooltip_horizontal_padding, y + height * 0.5f,
+  context.fillColor(style.text);
+  context.text(x + style.horizontal_padding, y + height * 0.5f,
     text, nullptr);
 }
 

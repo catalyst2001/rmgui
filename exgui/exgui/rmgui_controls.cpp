@@ -22,6 +22,8 @@ void rm_window::apply_geometry(const RmWindowGeometry& geometry)
 	m_content_area.width = m_size.x;
 	m_content_area.height = m_size.y;
 	perform_layout();
+	if (m_pcallback)
+		m_pcallback(this, geometry);
 }
 
 void rm_window::on_draw(NVGcontext* pctx)
@@ -88,12 +90,13 @@ bool rm_window::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
 }
 
 rm_window::rm_window(rm_widget* p_parent, int x, int y, int width, int height,
-	uint32_t flags, RmThemeRef theme) :
+	uint32_t flags, RmThemeRef theme, rm_window_cb callback) :
 	rm_widget(x, y, width, height, p_parent, "ui_window",
 		RM_FLAG_DEFAULT | RM_FLAG_GLOBAL),
 	m_flags(flags & WCF_RESIZABLE),
 	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
 {
+	m_pcallback = callback;
 	set_min_size(rm_vec2(0.0f, 0.0f));
 	set_max_size(rm_vec2(0.0f, 0.0f));
 }
@@ -197,13 +200,16 @@ void rm_label::on_draw(NVGcontext* pctx) {
 }
 
 rm_text_input::rm_text_input(rm_widget* p_parent, int x, int y, int width, int height,
-	uint32_t flags, RmThemeRef theme, float blink_cursor_interval)
+	uint32_t flags, RmThemeRef theme, float blink_cursor_interval,
+	rm_text_input_cb callback, rm_text_input_submit_cb submit_callback)
 	: rm_widget(x, y, width, height, p_parent, "ui_text_input",
 		RM_FLAG_DEFAULT | RM_FLAG_GLOBAL | RM_FLAG_OPAQUE),
 	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()),
 	m_ctrl_pressed(false), m_blink_state(false), m_flags(flags),
-	m_scroll_offset(0.0f), m_last_click_time(0.0), m_last_click_pos({ 0.0f, 0.0f })
+	m_scroll_offset(0.0f), m_last_click_time(0.0), m_last_click_pos({ 0.0f, 0.0f }),
+	m_submit_callback(submit_callback)
 {
+	m_pcallback = callback;
 	m_timer.set_interval(blink_cursor_interval);
 }
 
@@ -213,6 +219,12 @@ void rm_text_input::reset_caret(bool visible)
 {
 	m_blink_state = visible;
 	m_timer.reset(m_psysdf);
+}
+
+void rm_text_input::notify_text_changed(const std::string& previous)
+{
+	if (m_pcallback && previous != m_behaviour.text())
+		m_pcallback(this, m_behaviour.text());
 }
 
 void rm_text_input::on_draw(NVGcontext* pctx)
@@ -268,7 +280,9 @@ void rm_text_input::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 	if (state != RM_KEY_STATE::DOWN && state != RM_KEY_STATE::REPEAT)
 		return;
 
+	const std::string previous = m_behaviour.text();
 	RmBehaviourUpdate update;
+	bool submit_requested = false;
 	if (m_ctrl_pressed) {
 		if (state == RM_KEY_STATE::DOWN) {
 			switch (vk) {
@@ -342,6 +356,8 @@ void rm_text_input::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 		case RM_KEY_ENTER:
 			if ((m_flags & RMGUI_TEXT_INPUT_MULTILINE) != 0)
 				update = m_behaviour.insert_codepoint('\n');
+			else if (state == RM_KEY_STATE::DOWN)
+				submit_requested = true;
 			break;
 		default:
 			break;
@@ -350,6 +366,9 @@ void rm_text_input::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 
 	if (update.handled || update.state_changed)
 		reset_caret();
+	notify_text_changed(previous);
+	if (submit_requested && m_submit_callback)
+		m_submit_callback(this, m_behaviour.text());
 }
 
 bool rm_text_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
@@ -426,10 +445,12 @@ void rm_text_input::ensure_visible(size_t idx)
 void rm_text_input::on_text_input(int sym)
 {
 	if (sym >= 32) {
+		const std::string previous = m_behaviour.text();
 		const RmBehaviourUpdate update =
 			m_behaviour.insert_codepoint(static_cast<uint32_t>(sym));
 		if (update.state_changed)
 			reset_caret();
+		notify_text_changed(previous);
 	}
 }
 
@@ -1157,6 +1178,20 @@ rm_tool_item* rm_toolstrip::item_from_flat_index(size_t index)
 		return nullptr;
 	const ItemLayout& layout = m_item_layout[index];
 	return &m_groups[layout.group].items[layout.item];
+}
+
+std::string_view rm_toolstrip::resolve_tooltip(
+	const rm_vec2& cursor_pos) const
+{
+	const size_t index = hit_test_item(cursor_pos);
+	if (index < m_item_layout.size()) {
+		const ItemLayout& layout = m_item_layout[index];
+		const std::string& tooltip =
+			m_groups[layout.group].items[layout.item].tooltip;
+		if (!tooltip.empty())
+			return tooltip;
+	}
+	return rm_widget::resolve_tooltip(cursor_pos);
 }
 
 void rm_toolstrip::on_draw(NVGcontext* pctx)
@@ -2110,19 +2145,17 @@ void rm_treeview::on_draw(NVGcontext* pctx)
 		};
 		RmDefaultControlPainter::draw_treeview_row(*pctx, visual, style);
 	}
-	if (hovered < m_visible_rows.size()) {
-		const VisibleRow& row = m_visible_rows[hovered];
-		if (!row.node->tooltip.empty()) {
-			const float anchor_x = style.horizontal_padding +
-				(static_cast<float>(row.depth) + 1.0f) * style.indent;
-			const float anchor_y = (static_cast<float>(hovered) + 1.0f) *
-				style.row_height;
-			RmDefaultControlPainter::draw_treeview_tooltip(*pctx,
-				{ anchor_x, anchor_y, m_size.x, m_size.y, get_font(),
-					row.node->tooltip.c_str() }, style);
-		}
-	}
 	rm_widget::on_draw(pctx);
+}
+
+std::string_view rm_treeview::resolve_tooltip(
+	const rm_vec2& cursor_pos) const
+{
+	const size_t index = hit_test_row(cursor_pos);
+	if (index < m_visible_rows.size() &&
+		!m_visible_rows[index].node->tooltip.empty())
+		return m_visible_rows[index].node->tooltip;
+	return rm_widget::resolve_tooltip(cursor_pos);
 }
 
 void rm_treeview::on_draw_overlay(NVGcontext* pctx)
@@ -2774,6 +2807,7 @@ void rm_number_input::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 	RM_UNUSED(sc);
 	if (state != RM_KEY_STATE::DOWN && state != RM_KEY_STATE::REPEAT)
 		return;
+	const float previous = m_behaviour.value();
 	switch (vk) {
 	case RM_KEY_UP:
 		m_behaviour.step_by(1);
@@ -2790,6 +2824,7 @@ void rm_number_input::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 	default:
 		break;
 	}
+	notify_value_changed(previous);
 }
 
 bool rm_number_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
@@ -2808,7 +2843,9 @@ bool rm_number_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE sta
 		return !update.handled;
 	}
 	if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::UP) {
+		const float previous = m_behaviour.value();
 		const RmBehaviourUpdate update = m_behaviour.pointer_up(part);
+		notify_value_changed(previous);
 		return !update.handled;
 	}
 	return true;
@@ -2816,13 +2853,21 @@ bool rm_number_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE sta
 
 rm_number_input::rm_number_input(rm_widget* p_parent, int x, int y, int width, int height,
 	RmNumberInputType type, float value, float step, float minval, float maxval,
-	RmThemeRef theme, RmNumberInputButtonPlacement button_placement) :
+	RmThemeRef theme, RmNumberInputButtonPlacement button_placement,
+	rm_number_input_cb callback) :
 	rm_widget(x, y, width, height, p_parent, "ui_number_input",
 		RM_FLAG_DEFAULT | RM_FLAG_OPAQUE),
 	m_behaviour(type, value, step, minval, maxval),
 	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()),
 	m_button_placement(button_placement)
 {
+	m_pcallback = callback;
+}
+
+void rm_number_input::notify_value_changed(float previous)
+{
+	if (m_pcallback && previous != m_behaviour.value())
+		m_pcallback(this, m_behaviour.value());
 }
 
 

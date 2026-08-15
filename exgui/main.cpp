@@ -201,6 +201,7 @@ static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme,
         pbutton->set_imagelist(p_icons);
         pbutton->set_icon(static_cast<rm_image_index>(column));
       }
+      pbutton->set_tooltip("Select this widget in the designer canvas");
     }
   }
   new rm_label(poverflow, 550, 650,
@@ -517,12 +518,17 @@ void example_widgets(rm_surface* gui)
   RmThemeDocument shell_theme_document = RmThemeDocument::dark_theme();
   shell_theme_document.name = "ExGUI shell";
   const RmThemeRef shell_theme = RmThemeCompiler::compile(shell_theme_document).theme;
+  gui->set_tooltip_theme(shell_theme);
   rm_tabcontrol* ptabctl = new rm_tabcontrol(gui, 0, 105, 1000, 600,
     nullptr, shell_theme, RmTabVariant::underline, RmTabPlacement::top);
   rm_widget* ptab01 = ptabctl->add_tab("Window", 0);
 
   rm_window *pwindow = new rm_window(
-    ptab01, 0, 0, 300, 300, WCF_RESIZABLE, shell_theme);
+    ptab01, 0, 0, 300, 300, WCF_RESIZABLE, shell_theme,
+    [](rm_window*, const RmWindowGeometry& geometry) {
+      printf("Window geometry: %.0f, %.0f, %.0f x %.0f\n",
+        geometry.x, geometry.y, geometry.width, geometry.height);
+    });
 
   rm_widget* ptab11 = ptabctl->add_tab("Controls", 1);
   rm_widget* ptab12 = ptabctl->add_tab("Effects", 2);
@@ -638,9 +644,22 @@ void example_widgets(rm_surface* gui)
   rm_text_input* psingle_input = new rm_text_input(pinput_panel,
     20, 50, 210, 38, RMGUI_TEXT_INPUT_SINGLELINE, controls_theme);
   psingle_input->set_text("Editable project name");
-  new rm_number_input(pinput_panel, 246, 50, 94, 38,
+  psingle_input->set_callback(
+    [](rm_text_input*, const std::string& text) {
+      printf("Text changed: %s\n", text.c_str());
+    });
+  psingle_input->set_submit_callback(
+    [](rm_text_input*, const std::string& text) {
+      printf("Text submitted: %s\n", text.c_str());
+    });
+  rm_number_input* pnumber_right = new rm_number_input(
+    pinput_panel, 246, 50, 94, 38,
     RmNumberInputType::integer, 24.0f, 1.0f, 0.0f, 100.0f,
     controls_theme, RmNumberInputButtonPlacement::vertical_right);
+  pnumber_right->set_callback(
+    [](rm_number_input*, float value) {
+      printf("Number changed: %.3f\n", value);
+    });
   rm_text_input* pmultiline_input = new rm_text_input(pinput_panel,
     20, 104, 210, 96, RMGUI_TEXT_INPUT_MULTILINE, controls_theme);
   pmultiline_input->set_text("Multiline notes\nwith selection and undo");

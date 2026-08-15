@@ -12,7 +12,10 @@
 #include <string_view>
 #include <utility>
 
-class rm_window : public rm_widget {
+class rm_window;
+using rm_window_cb = Delegate<void, rm_window*, const RmWindowGeometry&>;
+
+class rm_window : public rm_widget, public rm_callback<rm_window_cb> {
   uint32_t m_flags;
   RmWindowBehaviour m_behaviour;
   RmThemeRef m_theme;
@@ -34,7 +37,8 @@ protected:
 
 public:
   rm_window(rm_widget* p_parent, int x, int y, int width, int height,
-    uint32_t flags = WCF_RESIZABLE, RmThemeRef theme = {});
+    uint32_t flags = WCF_RESIZABLE, RmThemeRef theme = {},
+    rm_window_cb callback = nullptr);
 
   uint32_t get_window_flags() const noexcept { return m_flags; }
   void set_window_flags(uint32_t flags) noexcept {
@@ -98,7 +102,11 @@ enum RMGUI_TEXT_INPUT_FLAGS {
   RMGUI_TEXT_INPUT_MULTILINE = 1 << 0
 };
 
-class rm_text_input : public rm_widget {
+class rm_text_input;
+using rm_text_input_cb = Delegate<void, rm_text_input*, const std::string&>;
+using rm_text_input_submit_cb = Delegate<void, rm_text_input*, const std::string&>;
+
+class rm_text_input : public rm_widget, public rm_callback<rm_text_input_cb> {
   RmTextInputBehaviour m_behaviour;
   RmThemeRef           m_theme;
   RmTextInputLayout    m_layout;
@@ -109,11 +117,13 @@ class rm_text_input : public rm_widget {
   float                m_scroll_offset;
   double               m_last_click_time;
   rm_vec2              m_last_click_pos;
+  rm_text_input_submit_cb m_submit_callback;
 
   static constexpr double DOUBLE_CLICK_THRESHOLD = 0.35;
   static constexpr float  CLICK_MOVE_THRESHOLD = 4.f;
 
   void reset_caret(bool visible = true);
+  void notify_text_changed(const std::string& previous);
   void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
   void on_focus_changed(bool focused) override {
     m_behaviour.set_active(focused);
@@ -124,7 +134,9 @@ class rm_text_input : public rm_widget {
 public:
   rm_text_input(rm_widget* p_parent, int x, int y, int width, int height,
     uint32_t flags = RMGUI_TEXT_INPUT_SINGLELINE, RmThemeRef theme = {},
-    float blink_cursor_interval = 0.5f);
+    float blink_cursor_interval = 0.5f,
+    rm_text_input_cb callback = nullptr,
+    rm_text_input_submit_cb submit_callback = nullptr);
   virtual ~rm_text_input();
   virtual void on_draw(NVGcontext* pctx) override;
   void on_draw_overlay(NVGcontext* pctx) override;
@@ -138,7 +150,14 @@ public:
   void ensure_visible(size_t idx);
   const RmTextInputBehaviour& behaviour() const noexcept { return m_behaviour; }
   const std::string& get_text() const noexcept { return m_behaviour.text(); }
-  void set_text(std::string text) { m_behaviour.set_text(std::move(text)); }
+  void set_text(std::string text, bool notify = false) {
+    const std::string previous = m_behaviour.text();
+    m_behaviour.set_text(std::move(text));
+    if (notify) notify_text_changed(previous);
+  }
+  void set_submit_callback(rm_text_input_submit_cb callback) {
+    m_submit_callback = callback;
+  }
   void set_theme(RmThemeRef theme) {
     m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
   }
@@ -401,6 +420,8 @@ class rm_toolstrip : public rm_widget, public rm_callback<rm_toolstrip_cb>,
   void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
   void on_pointer_capture_lost() override { m_behaviour.cancel(); }
 protected:
+  std::string_view resolve_tooltip(
+    const rm_vec2& cursor_pos) const override;
   void on_draw(NVGcontext* pctx) override;
   void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
@@ -701,6 +722,8 @@ class rm_treeview : public rm_widget, public rm_callback<rm_treeview_cb>,
     m_expander_pressed = RmTreeViewBehaviour::invalid_index;
   }
 protected:
+  std::string_view resolve_tooltip(
+    const rm_vec2& cursor_pos) const override;
   virtual void on_draw(NVGcontext* pctx) override;
   void on_draw_overlay(NVGcontext* pctx) override;
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
@@ -918,7 +941,10 @@ public:
 /**
 * @brief Numbers input widget
 */
-class rm_number_input : public rm_widget
+class rm_number_input;
+using rm_number_input_cb = Delegate<void, rm_number_input*, float>;
+
+class rm_number_input : public rm_widget, public rm_callback<rm_number_input_cb>
 {
 protected:
   RmNumberInputBehaviour m_behaviour;
@@ -926,6 +952,7 @@ protected:
   RmNumberInputButtonPlacement m_button_placement;
 
   RmNumberInputPart hit_test_part(const rm_vec2& cursor_pos) const;
+  void notify_value_changed(float previous);
   void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
   void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
   void on_pointer_capture_lost() override { m_behaviour.cancel(); }
@@ -939,14 +966,19 @@ public:
     float value = 0.f, float step = 0.1f, float minval = 0.f,
     float maxval = 100.f, RmThemeRef theme = {},
     RmNumberInputButtonPlacement button_placement =
-      RmNumberInputButtonPlacement::vertical_right);
+      RmNumberInputButtonPlacement::vertical_right,
+    rm_number_input_cb callback = nullptr);
 
   RmNumberInputType get_type() const noexcept { return m_behaviour.type(); }
   template<class _type> _type get_value() const { return static_cast<_type>(m_behaviour.value()); }
   template<class _type> _type get_min() const { return static_cast<_type>(m_behaviour.minimum()); }
   template<class _type> _type get_max() const { return static_cast<_type>(m_behaviour.maximum()); }
   template<class _type> _type get_step() const { return static_cast<_type>(m_behaviour.step()); }
-  void set_value(float value) { m_behaviour.set_value(value); }
+  void set_value(float value, bool notify = false) {
+    const float previous = m_behaviour.value();
+    m_behaviour.set_value(value);
+    if (notify) notify_value_changed(previous);
+  }
   void set_range(float minimum, float maximum) { m_behaviour.set_range(minimum, maximum); }
   void set_step(float step) { m_behaviour.set_step(step); }
   RmNumberInputButtonPlacement get_button_placement() const noexcept {

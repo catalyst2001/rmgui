@@ -4,6 +4,8 @@
 #include <vector>
 
 #include "rmgui.h"
+#include "rmgui_default_painter.h"
+#include "rmgui_theme.h"
 
 void rm_widget::move_childs_relative(rm_widget* pwidget, rm_vec2 deltapos)
 {
@@ -272,6 +274,34 @@ void rm_surface::forget_widget(rm_widget* widget)
 		set_focus(nullptr);
 	if (contains_widget(widget, m_pointer_capture))
 		release_pointer();
+	if (contains_widget(widget, m_tooltip_target)) {
+		m_tooltip_target = nullptr;
+		m_tooltip_text.clear();
+		m_tooltip_elapsed = 0.0f;
+	}
+}
+
+void rm_surface::update_tooltip_target(const rm_vec2& surface_cursor)
+{
+	rm_widget* target = hit_test(this, surface_cursor);
+	std::string text;
+	while (target && target != this) {
+		const rm_vec2 cursor = cursor_for_widget(target, surface_cursor);
+		const std::string_view resolved = target->resolve_tooltip(cursor);
+		if (!resolved.empty()) {
+			text.assign(resolved.data(), resolved.size());
+			break;
+		}
+		target = target->m_pparent;
+	}
+	if (target == this)
+		target = nullptr;
+
+	if (target != m_tooltip_target || text != m_tooltip_text) {
+		m_tooltip_target = target;
+		m_tooltip_text = std::move(text);
+		m_tooltip_elapsed = 0.0f;
+	}
 }
 
 void rm_surface::set_focus(rm_widget* widget)
@@ -566,6 +596,16 @@ void rm_surface::draw(float dt)
 	m_delta_time = dt;
 	m_pctx->beginFrame(m_size.x, m_size.y, m_device_pixel_ratio);
 	draw_recursive(this, dt);
+	if (m_tooltip_target && !m_tooltip_text.empty() && m_tooltip_theme) {
+		m_tooltip_elapsed += std::max(0.0f, dt);
+		const RmTooltipStyle& style = m_tooltip_theme->tooltip;
+		if (m_tooltip_elapsed >= style.show_delay) {
+			m_pctx->setZIndex(1000000);
+			RmDefaultControlPainter::draw_tooltip(*m_pctx,
+				{ m_last_cursor.x, m_last_cursor.y,
+				  m_size.x, m_size.y, m_font, m_tooltip_text.c_str() }, style);
+		}
+	}
 	m_pctx->endFrame();
 }
 
@@ -588,6 +628,9 @@ void rm_surface::mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, int 
 	rm_vec2 mouse_pos(x, y);
 	m_delta_cursor = mouse_pos - m_last_cursor;
 	update_hover_states(this, mouse_pos);
+	update_tooltip_target(mouse_pos);
+	if (event == RM_MOUSE_EVENT_CLICK)
+		m_tooltip_elapsed = 0.0f;
 
 	if (m_pointer_capture) {
 		rm_widget* captured = m_pointer_capture;
@@ -742,8 +785,13 @@ rm_surface::rm_surface(std::unique_ptr<NVGcontext> pctx, int width, int height, 
 	m_pctx = std::move(pctx);
 	m_pfocus = nullptr;
 	m_pointer_capture = nullptr;
+	m_tooltip_target = nullptr;
+	m_tooltip_theme = RmThemeSnapshot::default_theme();
+	m_tooltip_elapsed = 0.0f;
 	m_delta_time = 0.f;
 	m_device_pixel_ratio = 1.f;
+	m_last_cursor.init(0.0f, 0.0f);
+	m_delta_cursor.init(0.0f, 0.0f);
 	rm_font font = load_font_from_memory(fontawesomewebfont, FONT_SIZE, "fontawesome");
 	assert(font.isValid() && "font is invalid");
 }
@@ -752,9 +800,17 @@ rm_surface::~rm_surface()
 {
 	m_pfocus = nullptr;
 	m_pointer_capture = nullptr;
+	m_tooltip_target = nullptr;
 	destroy_children();
 	m_imagelists.clear();
 	m_proot = nullptr;
+}
+
+void rm_surface::set_tooltip_theme(
+	std::shared_ptr<const RmThemeSnapshot> theme)
+{
+	m_tooltip_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+	m_tooltip_elapsed = 0.0f;
 }
 
 bool rmgui_timer::has_elapsed(irm_sysdf* p_sysdf)

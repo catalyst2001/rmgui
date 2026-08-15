@@ -31,7 +31,10 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <string_view>
 #include "rmgui_resources.h"
+
+struct RmThemeSnapshot;
 
 /* utils */
 #define RM_COUNTOF(x) (sizeof(x) / sizeof(x[0]))
@@ -971,7 +974,14 @@ protected:
   rm_rect          m_content_area;
   rm_vec2          m_content_extent;
   rm_vec2          m_content_offset;
+  std::string      m_tooltip;
   int              m_zindex;
+
+  virtual std::string_view resolve_tooltip(
+    const rm_vec2& cursor_pos) const {
+    RM_UNUSED(cursor_pos);
+    return m_tooltip;
+  }
 
   ///* rmgui_root::rebuild_draw_cache accessor class */
   //class rmgui_root_update_acessor : public rmgui_root {
@@ -1073,6 +1083,9 @@ public:
 
   template<class _dst_type>
   inline _dst_type  *get_userptr() { return reinterpret_cast<_dst_type*>(m_puserptr); }
+
+  void set_tooltip(std::string tooltip) { m_tooltip = std::move(tooltip); }
+  const std::string& get_tooltip() const noexcept { return m_tooltip; }
   inline void        set_userptr(void* p) { m_puserptr = p; }
 
   /* rect && bbox */
@@ -1158,6 +1171,10 @@ class rm_surface : public rm_widget
   std::vector<std::unique_ptr<rm_imagelist>> m_imagelists;
   rm_widget  *m_pfocus;
   rm_widget  *m_pointer_capture;
+  rm_widget  *m_tooltip_target;
+  std::shared_ptr<const RmThemeSnapshot> m_tooltip_theme;
+  std::string m_tooltip_text;
+  float       m_tooltip_elapsed;
   float       m_delta_time;
   float       m_device_pixel_ratio;
   rm_vec2     m_last_cursor;
@@ -1174,6 +1191,7 @@ class rm_surface : public rm_widget
     RM_MOUSE_EVENT event, RM_KEY vk, 
     RM_KEY_STATE state, rm_vec2 &cursor_pos);
   void draw_recursive(rm_widget* p_elem, float dt);
+  void update_tooltip_target(const rm_vec2& surface_cursor);
 
 public:
   rm_surface(std::unique_ptr<NVGcontext> pctx, int width, int height, irm_sysdf *p_sysdf, void *psyswindow);
@@ -1192,6 +1210,8 @@ public:
   bool capture_pointer(rm_widget* widget);
   void release_pointer(rm_widget* widget = nullptr);
   rm_widget* get_pointer_capture() const { return m_pointer_capture; }
+
+  void set_tooltip_theme(std::shared_ptr<const RmThemeSnapshot> theme);
 
   NVGcontext* get_context() { return m_pctx.get(); }
 

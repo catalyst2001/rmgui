@@ -231,6 +231,8 @@ void test_theme_document_compilation()
   document.tokens.controls.switch_track_height = 30.0f;
   document.tokens.controls.text_input_horizontal_padding = 13.0f;
   document.tokens.controls.number_input_button_width = 31.0f;
+  document.tokens.controls.button_icon_size = 18.0f;
+  document.tokens.controls.tooltip_show_delay = 0.25f;
   document.tokens.controls.treeview_indent = 23.0f;
   document.tokens.controls.treeview_selection_horizontal_padding = 7.0f;
   document.tokens.controls.treeview_draw_background = false;
@@ -259,6 +261,12 @@ void test_theme_document_compilation()
     "text input selection must derive from the accent token");
   require(result.theme->number_input.button_width == 31.0f,
     "number input recipes must use editable spinner metrics");
+  require(result.theme->buttons.primary.icon_size == 18.0f,
+    "button recipes must expose editable icon metrics");
+  require(result.theme->tooltip.show_delay == 0.25f &&
+    same_color(result.theme->tooltip.background,
+      document.tokens.colors.control),
+    "surface tooltips must compile from shared theme tokens");
   require(result.theme->treeview.indent == 23.0f,
     "tree view recipes must use editable hierarchy metrics");
   require(result.theme->treeview.selection_horizontal_padding == 7.0f,

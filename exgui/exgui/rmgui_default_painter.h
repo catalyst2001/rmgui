@@ -215,7 +215,7 @@ struct RmTreeViewRowVisual {
   bool expanded = false;
 };
 
-struct RmTreeViewTooltipVisual {
+struct RmTooltipVisual {
   float anchor_x = 0.0f;
   float anchor_y = 0.0f;
   float available_width = 0.0f;
@@ -415,8 +415,8 @@ public:
     const RmTreeViewSurfaceVisual& visual, const RmTreeViewStyle& style);
   static void draw_treeview_row(NVGcontext& context,
     const RmTreeViewRowVisual& visual, const RmTreeViewStyle& style);
-  static void draw_treeview_tooltip(NVGcontext& context,
-    const RmTreeViewTooltipVisual& visual, const RmTreeViewStyle& style);
+  static void draw_tooltip(NVGcontext& context,
+    const RmTooltipVisual& visual, const RmTooltipStyle& style);
   static void draw_propertyview_surface(NVGcontext& context,
     const RmPropertyViewSurfaceVisual& visual, const RmPropertyViewStyle& style);
   static void draw_propertyview_group(NVGcontext& context,
