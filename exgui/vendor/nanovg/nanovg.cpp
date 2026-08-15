@@ -1523,10 +1523,19 @@ void NVGcontext::roundedRectVarying(float x, float y, float w, float h, float ra
 	else {
 		float halfw = nvg__absf(w) * 0.5f;
 		float halfh = nvg__absf(h) * 0.5f;
-		float rxBL = nvg__minf(radBottomLeft, halfw) * nvg__signf(w), ryBL = nvg__minf(radBottomLeft, halfh) * nvg__signf(h);
-		float rxBR = nvg__minf(radBottomRight, halfw) * nvg__signf(w), ryBR = nvg__minf(radBottomRight, halfh) * nvg__signf(h);
-		float rxTR = nvg__minf(radTopRight, halfw) * nvg__signf(w), ryTR = nvg__minf(radTopRight, halfh) * nvg__signf(h);
-		float rxTL = nvg__minf(radTopLeft, halfw) * nvg__signf(w), ryTL = nvg__minf(radTopLeft, halfh) * nvg__signf(h);
+		// A roundedRect radius describes a circular corner. Clamping X and Y
+		// independently turns oversized corners on narrow rectangles into ellipses
+		// and can consume the entire straight edge. Keep a single clamped radius
+		// for both axes so the resulting geometry remains a rounded rectangle.
+		float maxRadius = nvg__minf(halfw, halfh);
+		float rBL = nvg__minf(nvg__maxf(radBottomLeft, 0.0f), maxRadius);
+		float rBR = nvg__minf(nvg__maxf(radBottomRight, 0.0f), maxRadius);
+		float rTR = nvg__minf(nvg__maxf(radTopRight, 0.0f), maxRadius);
+		float rTL = nvg__minf(nvg__maxf(radTopLeft, 0.0f), maxRadius);
+		float rxBL = rBL * nvg__signf(w), ryBL = rBL * nvg__signf(h);
+		float rxBR = rBR * nvg__signf(w), ryBR = rBR * nvg__signf(h);
+		float rxTR = rTR * nvg__signf(w), ryTR = rTR * nvg__signf(h);
+		float rxTL = rTL * nvg__signf(w), ryTL = rTL * nvg__signf(h);
 		float vals[] = {
 			NVG_MOVETO, x, y + ryTL,
 			NVG_LINETO, x, y + h - ryBL,

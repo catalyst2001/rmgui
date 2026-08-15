@@ -21,10 +21,12 @@ class RecordingRenderer final : public NVGrenderer {
 public:
   int viewport_calls = 0;
   int flush_calls = 0;
+  int fill_calls = 0;
   int custom_draw_calls = 0;
   int last_z_index = 0;
   NVGcustomDraw last_draw{};
   std::vector<NVGvertex> last_vertices;
+  std::vector<NVGvertex> last_fill_vertices;
 
   NVGhandle createTexture(int, int, int, int, const unsigned char*) override
   {
@@ -42,7 +44,16 @@ public:
   void cancel() override {}
   void flush() override { ++flush_calls; }
   void fill(const NVGpaint&, NVGcompositeOperationState, const NVGscissor&, float,
-    const float*, const NVGpath*, int) override {}
+    const float*, const NVGpath* paths, int path_count) override
+  {
+    ++fill_calls;
+    last_fill_vertices.clear();
+    for (int i = 0; i < path_count; ++i) {
+      if (paths[i].fill && paths[i].nfill > 0)
+        last_fill_vertices.insert(last_fill_vertices.end(), paths[i].fill,
+          paths[i].fill + paths[i].nfill);
+    }
+  }
   void stroke(const NVGpaint&, NVGcompositeOperationState, const NVGscissor&, float,
     float, const NVGpath*, int) override {}
   void triangles(const NVGpaint&, NVGcompositeOperationState, const NVGscissor&,
@@ -104,6 +115,37 @@ void test_custom_triangle_forwarding()
     "custom vertex data must be preserved");
   require(recording->last_z_index == 17, "custom draw must use the current z-index");
   require(recording->flush_calls == 1, "endFrame must flush deferred rendering");
+}
+
+void test_narrow_rounded_rectangle_geometry()
+{
+  auto renderer = std::make_unique<RecordingRenderer>();
+  RecordingRenderer* recording = renderer.get();
+  NVGcontext context(std::move(renderer), NVGcontextConfig{});
+
+  context.beginFrame(200.0f, 200.0f, 1.0f);
+  context.beginPath();
+  context.roundedRect(10.0f, 10.0f, 12.0f, 100.0f, 40.0f);
+  context.fillColor(NVGcolor::RGB(255, 255, 255));
+  context.fill();
+  context.endFrame();
+
+  require(recording->fill_calls == 1 && !recording->last_fill_vertices.empty(),
+    "narrow rounded rectangle must produce fill geometry");
+  float min_x = 1000.0f;
+  for (const NVGvertex& vertex : recording->last_fill_vertices)
+    min_x = std::min(min_x, vertex.x);
+
+  float min_side_y = 1000.0f;
+  float max_side_y = -1000.0f;
+  for (const NVGvertex& vertex : recording->last_fill_vertices) {
+    if (std::fabs(vertex.x - min_x) < 1.0e-3f) {
+      min_side_y = std::min(min_side_y, vertex.y);
+      max_side_y = std::max(max_side_y, vertex.y);
+    }
+  }
+  require(max_side_y - min_side_y > 80.0f,
+    "oversized radius must preserve the long straight side of a narrow rectangle");
 }
 
 bool same_color(const NVGcolor& lhs, const NVGcolor& rhs)
@@ -204,6 +246,7 @@ void test_theme_document_compilation()
 int main()
 {
   test_custom_triangle_forwarding();
+  test_narrow_rounded_rectangle_geometry();
   test_theme_document_compilation();
   std::cout << "All NanoVG and theme tests passed\n";
   return 0;

@@ -865,7 +865,7 @@ public:
     p_theme->scrollbar.thickness = controls.scrollbar_thickness;
     p_theme->scrollbar.minimum_thumb_length = controls.scrollbar_minimum_thumb_length;
     p_theme->scrollbar.padding = controls.scrollbar_padding;
-    p_theme->scrollbar.corner_radius = tokens.radius.pill;
+    p_theme->scrollbar.corner_radius = tokens.radius.small;
     p_theme->scrollbar.border_width = controls.border_width;
     p_theme->scrollbar.thumb_border_width = controls.scrollbar_thumb_border_width;
     p_theme->scrollbar.focus_ring_width = controls.focus_ring_width;
