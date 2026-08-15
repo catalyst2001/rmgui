@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "rmgui.h"
+#include "rmgui_data_visual.h"
 #include "rmgui_default_painter.h"
 #include "rmgui_theme.h"
 
@@ -726,6 +727,10 @@ RmVisualResourceSnapshot rm_surface::snapshot_visual_resources() const
 	for (const std::unique_ptr<rm_imagelist>& images : m_imagelists)
 		if (images)
 			result.imagelists.push_back(images->snapshot());
+	result.draw_programs.reserve(m_draw_programs.size());
+	for (const std::unique_ptr<rm_draw_program>& program : m_draw_programs)
+		if (program)
+			result.draw_programs.push_back(program->snapshot());
 	return result;
 }
 

@@ -29,6 +29,9 @@
     <ClCompile Include="exgui\rmgui.cpp">
       <Filter>exgui</Filter>
     </ClCompile>
+    <ClCompile Include="exgui\rmgui_data_visual.cpp">
+      <Filter>exgui</Filter>
+    </ClCompile>
     <ClCompile Include="exgui\rmgui_default_painter.cpp">
       <Filter>exgui</Filter>
     </ClCompile>
@@ -74,6 +77,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="exgui\rmgui.h">
+      <Filter>exgui</Filter>
+    </ClInclude>
+    <ClInclude Include="exgui\rmgui_data_visual.h">
       <Filter>exgui</Filter>
     </ClInclude>
     <ClInclude Include="exgui\rmgui_behaviour.h">
@@ -132,5 +138,9 @@
       <Filter>exgui\backend</Filter>
     </ClInclude>
     <ClInclude Include="exgui\blend_ui.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="visuals\strict_button.nvgcmd" />
+    <None Include="visuals\sloped_tab.nvgcmd" />
   </ItemGroup>
 </Project>

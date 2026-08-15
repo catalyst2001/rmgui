@@ -127,7 +127,17 @@ void rm_button::on_draw(NVGcontext* pctx) {
 		m_elem_flags.is_hovered(),
 		m_behaviour.is_pressed()
 	};
-	RmDefaultControlPainter::draw_button(*pctx, visual, m_theme->buttons.resolve(m_variant));
+	const RmButtonStyle& style = m_theme->buttons.resolve(m_variant);
+	const rm_draw_program* program = get_root()
+		? get_root()->resolve_draw_program(get_draw_program_id()) : nullptr;
+	const RmDrawSurfaceData surface = RmDrawSurfaceData::from_bounds(
+		0.0f, 0.0f, m_size.x, m_size.y,
+		RmDataDrivenPainter::button_state(visual.enabled, visual.hovered,
+			visual.pressed));
+	if (!program || !RmDataDrivenPainter::draw_surface(*pctx, *program,
+		RmDrawProgramTarget::button_surface, surface))
+		RmDefaultControlPainter::draw_button_surface(*pctx, visual, style);
+	RmDefaultControlPainter::draw_button_content(*pctx, visual, style);
 	rm_widget::on_draw(pctx);
 }
 
@@ -2054,6 +2064,8 @@ void rm_tabcontrol::on_draw(NVGcontext* pctx)
 	RmDefaultControlPainter::draw_tab_bar(*pctx, bar.x, bar.y,
 		bar.width, bar.height, style);
 	rebuild_tab_layout(pctx);
+	const rm_draw_program* program = get_root()
+		? get_root()->resolve_draw_program(get_draw_program_id()) : nullptr;
 
 	for (size_t i = 0; i < m_tabs.size(); ++i) {
 		const rm_rect& bounds = m_tab_bounds[i];
@@ -2066,7 +2078,14 @@ void rm_tabcontrol::on_draw(NVGcontext* pctx)
 			m_tabs[i].is_closable() && !m_tabs[i].is_pinned(),
 			m_close_hovered == i
 		};
-		RmDefaultControlPainter::draw_tab(*pctx, visual, style);
+		const RmDrawSurfaceData surface = RmDrawSurfaceData::from_bounds(
+			bounds.x, bounds.y, bounds.width, bounds.height,
+			RmDataDrivenPainter::tab_state(visual.enabled, visual.hovered,
+				visual.pressed, visual.selected));
+		if (!program || !RmDataDrivenPainter::draw_surface(*pctx, *program,
+			RmDrawProgramTarget::tab_surface, surface))
+			RmDefaultControlPainter::draw_tab_surface(*pctx, visual, style);
+		RmDefaultControlPainter::draw_tab_content(*pctx, visual, style);
 	}
 	rm_widget::on_draw(pctx);
 }

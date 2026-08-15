@@ -36,6 +36,8 @@
 #include "rmgui_resources.h"
 
 struct RmThemeSnapshot;
+struct NVGcmdBuf;
+class rm_draw_program;
 
 /* utils */
 #define RM_COUNTOF(x) (sizeof(x) / sizeof(x[0]))
@@ -796,10 +798,24 @@ struct RmImageListResourceSnapshot {
   uint32_t image_count = 0;
 };
 
+enum class RmDrawProgramTarget : uint32_t {
+  button_surface = 0,
+  tab_surface
+};
+
+struct RmDrawProgramResourceSnapshot {
+  rm_resource_id id = RM_INVALID_RESOURCE_ID;
+  std::string name;
+  RmDrawProgramTarget target = RmDrawProgramTarget::button_surface;
+  std::string element_name;
+  uint32_t format_version = 0;
+};
+
 struct RmVisualResourceSnapshot {
-  uint32_t schema_version = 1;
+  uint32_t schema_version = 2;
   uint64_t revision = 0;
   std::vector<RmImageListResourceSnapshot> imagelists;
+  std::vector<RmDrawProgramResourceSnapshot> draw_programs;
 };
 
 /**
@@ -856,6 +872,25 @@ protected:
 public:
   void set_imagelist(rm_resource_id imagelist_id) noexcept {
     m_imagelist_id = imagelist_id;
+  }
+};
+
+/** Lightweight binding used by controls with replaceable data-driven chrome. */
+class rm_draw_program_host
+{
+  rm_resource_id m_draw_program_id = RM_INVALID_RESOURCE_ID;
+
+protected:
+  rm_resource_id get_draw_program_id() const noexcept {
+    return m_draw_program_id;
+  }
+
+public:
+  void set_draw_program(rm_resource_id draw_program_id) noexcept {
+    m_draw_program_id = draw_program_id;
+  }
+  void clear_draw_program() noexcept {
+    m_draw_program_id = RM_INVALID_RESOURCE_ID;
   }
 };
 
@@ -1194,6 +1229,8 @@ class rm_surface : public rm_widget
   std::unique_ptr<NVGcontext> m_pctx;
   std::vector<std::unique_ptr<rm_imagelist>> m_imagelists;
   std::unordered_map<std::string, rm_resource_id> m_imagelist_names;
+  std::vector<std::unique_ptr<rm_draw_program>> m_draw_programs;
+  std::unordered_map<std::string, rm_resource_id> m_draw_program_names;
   uint64_t m_resource_revision;
   rm_widget  *m_pfocus;
   rm_widget  *m_pointer_capture;
@@ -1252,6 +1289,16 @@ public:
   const rm_imagelist* resolve_imagelist(
     rm_resource_id resource_id) const noexcept;
   rm_resource_id find_imagelist(std::string_view resource_name) const noexcept;
+  rm_resource_id register_draw_program(const char* p_resource_name,
+    RmDrawProgramTarget target, NVGcmdBuf program,
+    std::string* p_error = nullptr);
+  rm_resource_id register_draw_program_text(const char* p_resource_name,
+    RmDrawProgramTarget target, const char* pfilename,
+    std::string* p_error = nullptr);
+  const rm_draw_program* resolve_draw_program(
+    rm_resource_id resource_id) const noexcept;
+  rm_resource_id find_draw_program(
+    std::string_view resource_name) const noexcept;
   RmVisualResourceSnapshot snapshot_visual_resources() const;
   rm_image load_image_from_memory(const void *psrc, size_t srclen, int flags);
   rm_image load_image(const char *pfilename, int flags);

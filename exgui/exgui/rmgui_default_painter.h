@@ -380,11 +380,19 @@ public:
     const RmWindowStyle& style);
   static void draw_button(NVGcontext& context, const RmButtonVisual& visual,
     const RmButtonStyle& style);
+  static void draw_button_surface(NVGcontext& context,
+    const RmButtonVisual& visual, const RmButtonStyle& style);
+  static void draw_button_content(NVGcontext& context,
+    const RmButtonVisual& visual, const RmButtonStyle& style);
   static void draw_tab_bar(NVGcontext& context, float x, float y, float width,
     float height, const RmTabStyle& style);
   static void draw_tab_page(NVGcontext& context, float x, float y, float width,
     float height, const RmTabStyle& style);
   static void draw_tab(NVGcontext& context, const RmTabVisual& visual,
+    const RmTabStyle& style);
+  static void draw_tab_surface(NVGcontext& context, const RmTabVisual& visual,
+    const RmTabStyle& style);
+  static void draw_tab_content(NVGcontext& context, const RmTabVisual& visual,
     const RmTabStyle& style);
   static void draw_menu_surface(NVGcontext& context,
     const RmMenuSurfaceVisual& visual, const RmMenuStyle& style);

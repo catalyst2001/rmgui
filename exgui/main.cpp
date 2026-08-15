@@ -22,6 +22,23 @@
 
 static rm_surface* g_gui = nullptr;
 
+static rm_resource_id register_demo_draw_program(rm_surface* gui,
+  const char* resource_name, RmDrawProgramTarget target,
+  const char* relative_path)
+{
+  const char* prefixes[] = { "", "exgui/", "../../exgui/" };
+  std::string error;
+  for (const char* prefix : prefixes) {
+    const std::string filename = std::string(prefix) + relative_path;
+    const rm_resource_id resource = gui->register_draw_program_text(
+      resource_name, target, filename.c_str(), &error);
+    if (resource != RM_INVALID_RESOURCE_ID)
+      return resource;
+  }
+  printf("Could not load %s: %s\n", relative_path, error.c_str());
+  return RM_INVALID_RESOURCE_ID;
+}
+
 class rm_theme_preview_panel : public rm_widget {
   RmThemeRef m_theme;
 
@@ -96,10 +113,12 @@ static void create_theme_preview(rm_widget* p_parent, int x, int y,
 
 static rm_tabcontrol* create_tabs_preview(rm_widget* p_parent, int x, int y,
   int width, int height, const char* p_title, RmThemeRef theme,
-  RmTabVariant variant, RmTabPlacement placement)
+  RmTabVariant variant, RmTabPlacement placement,
+  rm_resource_id draw_program = RM_INVALID_RESOURCE_ID)
 {
   rm_tabcontrol* ptabs = new rm_tabcontrol(p_parent, x, y, width, height,
     nullptr, theme, variant, placement);
+  ptabs->set_draw_program(draw_program);
   rm_widget* pfirst = ptabs->add_tab("Overview", 10, false, true);
   rm_widget* psecond = ptabs->add_tab("Source.cpp", 11, true);
   rm_widget* pthird = ptabs->add_tab("Properties", 12, true);
@@ -487,11 +506,18 @@ void example_widgets(rm_surface* gui)
   }
   const rm_resource_id duplicate_icons = gui->register_imagelist(
     "designer.icons.16", "icons1.png", 16, NVG_IMAGE_NEAREST);
+  const rm_resource_id button_draw_program = register_demo_draw_program(gui,
+    "designer.visual.strict_button", RmDrawProgramTarget::button_surface,
+    "visuals/strict_button.nvgcmd");
+  const rm_resource_id tab_draw_program = register_demo_draw_program(gui,
+    "designer.visual.sloped_tab", RmDrawProgramTarget::tab_surface,
+    "visuals/sloped_tab.nvgcmd");
   const RmVisualResourceSnapshot resource_snapshot =
     gui->snapshot_visual_resources();
   if (duplicate_icons != RM_INVALID_RESOURCE_ID ||
     resource_snapshot.imagelists.size() != 1 ||
-    resource_snapshot.imagelists.front().name != "designer.icons.16") {
+    resource_snapshot.imagelists.front().name != "designer.icons.16" ||
+    resource_snapshot.draw_programs.size() != 2) {
     printf("visual resource registry invariant failed\n");
   }
 
@@ -579,7 +605,8 @@ void example_widgets(rm_surface* gui)
   create_theme_preview(ptheme_page, 410, 30, light_theme_document);
 
   create_tabs_preview(ptab_tabs, 20, 20, 360, 230, "Document tabs",
-    shell_theme, RmTabVariant::document, RmTabPlacement::top);
+    shell_theme, RmTabVariant::document, RmTabPlacement::top,
+    tab_draw_program);
   create_tabs_preview(ptab_tabs, 400, 20, 360, 230, "Underline / bottom",
     shell_theme, RmTabVariant::underline, RmTabPlacement::bottom);
   create_tabs_preview(ptab_tabs, 20, 280, 360, 230, "Segmented tabs",
@@ -623,6 +650,11 @@ void example_widgets(rm_surface* gui)
   controls_theme_document.tokens.animation.normal = 0.25f;
   const RmThemeRef controls_theme = RmThemeCompiler::compile(controls_theme_document).theme;
   pdiv->set_theme(controls_theme);
+  rm_button* pdata_button = new rm_button(pdiv, 10, 10, 170, 34,
+    "Data-driven button", controls_theme, RmButtonVariant::secondary);
+  pdata_button->set_draw_program(button_draw_program);
+  pdata_button->set_tooltip(
+    "Surface loaded from visuals/strict_button.nvgcmd");
 
   rm_theme_preview_panel* pcombo_panel = new rm_theme_preview_panel(
     ptab11, 240, 10, 360, 260, controls_theme);

@@ -133,8 +133,8 @@ void RmDefaultControlPainter::draw_window(NVGcontext& context,
   }
 }
 
-void RmDefaultControlPainter::draw_button(NVGcontext& context, const RmButtonVisual& visual,
-  const RmButtonStyle& style)
+void RmDefaultControlPainter::draw_button_surface(NVGcontext& context,
+  const RmButtonVisual& visual, const RmButtonStyle& style)
 {
   const RmVisualState state = resolve_state(visual);
   const float half_border = style.border_width * 0.5f;
@@ -150,7 +150,12 @@ void RmDefaultControlPainter::draw_button(NVGcontext& context, const RmButtonVis
     context.strokeColor(style.border.resolve(state));
     context.stroke();
   }
+}
 
+void RmDefaultControlPainter::draw_button_content(NVGcontext& context,
+  const RmButtonVisual& visual, const RmButtonStyle& style)
+{
+  const RmVisualState state = resolve_state(visual);
   context.setFontFaceId(static_cast<int>(visual.font.getValue()));
   context.setFontSize(style.font_size);
   context.fillColor(style.text.resolve(state));
@@ -186,6 +191,13 @@ void RmDefaultControlPainter::draw_button(NVGcontext& context, const RmButtonVis
   }
 }
 
+void RmDefaultControlPainter::draw_button(NVGcontext& context,
+  const RmButtonVisual& visual, const RmButtonStyle& style)
+{
+  draw_button_surface(context, visual, style);
+  draw_button_content(context, visual, style);
+}
+
 void RmDefaultControlPainter::draw_tab_bar(NVGcontext& context, float x, float y,
   float width, float height, const RmTabStyle& style)
 {
@@ -209,7 +221,7 @@ void RmDefaultControlPainter::draw_tab_page(NVGcontext& context, float x, float 
   }
 }
 
-void RmDefaultControlPainter::draw_tab(NVGcontext& context,
+void RmDefaultControlPainter::draw_tab_surface(NVGcontext& context,
   const RmTabVisual& visual, const RmTabStyle& style)
 {
   const RmVisualState state = resolve_state(
@@ -218,8 +230,6 @@ void RmDefaultControlPainter::draw_tab(NVGcontext& context,
     ? style.selected_background : style.background;
   const RmStateColors& borders = visual.selected
     ? style.selected_border : style.border;
-  const RmStateColors& text = visual.selected
-    ? style.selected_text : style.text;
   const float half_border = style.border_width * 0.5f;
 
   context.beginPath();
@@ -256,7 +266,15 @@ void RmDefaultControlPainter::draw_tab(NVGcontext& context,
     context.fillColor(style.indicator);
     context.fill();
   }
+}
 
+void RmDefaultControlPainter::draw_tab_content(NVGcontext& context,
+  const RmTabVisual& visual, const RmTabStyle& style)
+{
+  const RmVisualState state = resolve_state(
+    visual.enabled, visual.hovered, visual.pressed);
+  const RmStateColors& text = visual.selected
+    ? style.selected_text : style.text;
   const float close_region = visual.closable
     ? style.close_size + style.horizontal_padding * 0.5f : 0.0f;
   context.setFontFaceId(static_cast<int>(visual.font.getValue()));
@@ -281,6 +299,13 @@ void RmDefaultControlPainter::draw_tab(NVGcontext& context,
       visual.close_hovered ? RmVisualState::hovered : state));
     context.stroke();
   }
+}
+
+void RmDefaultControlPainter::draw_tab(NVGcontext& context,
+  const RmTabVisual& visual, const RmTabStyle& style)
+{
+  draw_tab_surface(context, visual, style);
+  draw_tab_content(context, visual, style);
 }
 
 void RmDefaultControlPainter::draw_menu_surface(NVGcontext& context,

@@ -147,6 +147,7 @@
     <ClCompile Include="exgui\backend\rmgui_glfw_opnegl33.cpp" />
     <ClCompile Include="exgui\backend\rmgui_win32_opnegl33.cpp" />
     <ClCompile Include="exgui\rmgui.cpp" />
+    <ClCompile Include="exgui\rmgui_data_visual.cpp" />
     <ClCompile Include="exgui\rmgui_default_painter.cpp" />
     <ClCompile Include="exgui\rmgui_controls.cpp" />
     <ClCompile Include="exgui\blend_ui.cpp">
@@ -171,6 +172,7 @@
     <ClInclude Include="exgui\backend\rmgui_glfw_opnegl33.h" />
     <ClInclude Include="exgui\backend\rmgui_win32_opnegl33.h" />
     <ClInclude Include="exgui\rmgui.h" />
+    <ClInclude Include="exgui\rmgui_data_visual.h" />
     <ClInclude Include="exgui\rmgui_behaviour.h" />
     <ClInclude Include="exgui\rmgui_default_painter.h" />
     <ClInclude Include="exgui\rmgui_controls.h" />
@@ -188,6 +190,10 @@
     <ClInclude Include="vendor\nanovg\nanovg_gl.h" />
     <ClInclude Include="vendor\nanovg\nanovg_gl_utils.h" />
     <ClInclude Include="vendor\stb\stb_image.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="visuals\strict_button.nvgcmd" />
+    <None Include="visuals\sloped_tab.nvgcmd" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

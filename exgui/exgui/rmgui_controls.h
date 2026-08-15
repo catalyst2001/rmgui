@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "rmgui.h"
 #include "rmgui_behaviour.h"
+#include "rmgui_data_visual.h"
 #include "rmgui_default_painter.h"
 #include "rmgui_theme.h"
 #include "smalldelegate.h"
@@ -54,7 +55,7 @@ class rm_button;
 using rm_button_cb = Delegate<void, rm_button*>;
 
 class rm_button : public rm_widget, public rm_callback<rm_button_cb>,
-  public rm_imagelist_host {
+  public rm_imagelist_host, public rm_draw_program_host {
   std::string m_text;
   rm_image_index m_icon;
   RmButtonBehaviour m_behaviour;
@@ -596,7 +597,8 @@ public:
 class rm_tabcontrol;
 using rm_tabcontrol_cb = Delegate<void, rm_tabcontrol*, rm_tab_item*, size_t>;
 using rm_tabcontrol_close_cb = Delegate<bool, rm_tabcontrol*, rm_tab_item*, size_t>;
-class rm_tabcontrol : public rm_widget, public rm_callback<rm_tabcontrol_cb> {
+class rm_tabcontrol : public rm_widget, public rm_callback<rm_tabcontrol_cb>,
+  public rm_draw_program_host {
   std::vector<rm_tab_item> m_tabs;
   std::vector<rm_rect> m_tab_bounds;
   RmTabBehaviour m_behaviour;

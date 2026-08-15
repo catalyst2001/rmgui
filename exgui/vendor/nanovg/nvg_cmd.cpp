@@ -546,6 +546,13 @@ NVGcmdEvalResult nvgEvalChecked(NVGcontext& ctx,
 	result.validation = nvgCmdValidate(buf, layout);
 	if (!result.validation)
 		return result;
+	result.commands_executed = nvgEvalValidated(ctx, buf, data, layout);
+	return result;
+}
+
+uint32_t nvgEvalValidated(NVGcontext& ctx,
+	const NVGcmdBuf& buf, const void* data, const NVGcmdLayout* layout)
+{
 	const NVGcmdCell* cells = buf.cells.data();
 	const uint32_t total    = (uint32_t)buf.cells.size();
 	const uint8_t* argTbl   = nvgCmdArgCount();
@@ -556,6 +563,7 @@ NVGcmdEvalResult nvgEvalChecked(NVGcontext& ctx,
 	e.data   = data;
 	e.layout = layout;
 	e.buf    = &buf;
+	uint32_t commands_executed = 0;
 
 	while (pc < total) {
 		const uint32_t opVal = cells[pc].u;
@@ -575,9 +583,9 @@ NVGcmdEvalResult nvgEvalChecked(NVGcontext& ctx,
 		e.args = cells + pc;
 		g_cmdDispatch[opVal](e);   // ← one indirect call, no branches
 		pc += nargs;
-		++result.commands_executed;
+		++commands_executed;
 	}
-	return result;
+	return commands_executed;
 }
 
 void nvgEval(NVGcontext& ctx,

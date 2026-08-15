@@ -741,4 +741,11 @@ NVGcmdEvalResult nvgEvalChecked(NVGcontext& ctx,
 	const NVGcmdBuf& buf, const void* data = nullptr,
 	const NVGcmdLayout* layout = nullptr);
 
+// Executes a command buffer which has already been validated against layout.
+// Intended for immutable runtime resources; authoring code should use
+// nvgEvalChecked instead.
+uint32_t nvgEvalValidated(NVGcontext& ctx,
+	const NVGcmdBuf& buf, const void* data = nullptr,
+	const NVGcmdLayout* layout = nullptr);
+
 #endif // NVG_CMD_H
