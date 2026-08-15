@@ -705,8 +705,8 @@ class rm_menu : public rm_widget, public rm_callback<rm_menu_fn>
   bool contains_visible_popup(const rm_vec2& local_cursor) const;
   void activate_item(size_t index);
   void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
-  void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
-  void on_pointer_capture_lost() override { m_behaviour.cancel(); }
+  void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel_press(); }
+  void on_pointer_capture_lost() override { m_behaviour.cancel_press(); }
 private:
   void     on_draw(NVGcontext* pctx) override;
   void     on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;

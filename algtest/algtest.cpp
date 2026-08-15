@@ -133,6 +133,10 @@ void test_menu_behaviour()
   expect(menu.pointer_up(1).activated, "menu activates on matching press and release");
   menu.open(1);
   expect(menu.opened_index() == 1, "menu tracks the opened submenu");
+  menu.pointer_down(1);
+  menu.cancel_press();
+  expect(menu.opened_index() == 1,
+    "losing pointer capture does not close an opened submenu");
 
   menu.select_relative(1);
   expect(menu.highlighted_index() == 2, "menu supports forward keyboard navigation");

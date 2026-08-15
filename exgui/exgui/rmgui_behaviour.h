@@ -520,6 +520,12 @@ public:
     return { changed, changed, false };
   }
 
+  RmBehaviourUpdate cancel_press() noexcept {
+    const bool changed = m_pressed != invalid_index;
+    m_pressed = invalid_index;
+    return { changed, changed, false };
+  }
+
   RmBehaviourUpdate select_relative(int delta, bool wrap = true) noexcept {
     if (!m_enabled || m_count == 0 || delta == 0)
       return {};

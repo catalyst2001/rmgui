@@ -1645,6 +1645,9 @@ rm_menu::rm_menu(rm_widget* p_parent, rm_menu_fn p_callback, RmThemeRef theme) :
 {
 	assert(p_parent && "p_parent was nullptr!");
 	set_callback(p_callback);
+	set_zindex(1000);
+	set_min_size({ 0.f, 0.f });
+	set_max_size({ 0.f, 0.f });
 	m_elem_flags.set_bit(RM_FLAG_DISABLE_SCISSOR);
 	resize(p_parent->get_size().x, menu_style().bar_height);
 	m_behaviour.set_count(0);
@@ -1659,6 +1662,9 @@ rm_menu::rm_menu(rm_menu* p_parent, const char* p_name, uint32_t menuid,
 	m_text_width(0.f), m_proot_menu(p_parent->m_proot_menu),
 	m_separator(separator)
 {
+	set_zindex(1000 + static_cast<int>(m_level));
+	set_min_size({ 0.f, 0.f });
+	set_max_size({ 0.f, 0.f });
 	m_elem_flags.set_bit(RM_FLAG_DISABLE_SCISSOR);
 	if (m_proot)
 		m_text_width = m_proot->get_text_width(m_text.c_str(), get_font());
@@ -1928,6 +1934,9 @@ bool rm_menu::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
 		return false;
 	if (state == DOWN) {
 		const RmBehaviourUpdate update = m_behaviour.pointer_down(index);
+		if (update.handled && index < get_num_submenus() &&
+			get_submenu(index)->has_submenus())
+			open_submenu(index);
 		if (update.handled && get_root())
 			get_root()->capture_pointer(this);
 		return !update.handled;
