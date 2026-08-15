@@ -1558,58 +1558,45 @@ bool rm_treeview::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
 
 void rm_output_text::on_draw(NVGcontext* pctx)
 {
-	rm_vec2 textpos(5.f, 0.f);
-	//pctx->BeginPath();
-	//pctx->RoundedRect( 1.f, 1.f, m_size.x - 1.f, m_size.y - 1.f, 4.f);
-	//pctx->FillColor( NVGcolor::RGB(255, 255, 255));
-	////pctx->StrokeColor( NVGcolor::RGB(0, 0, 0));
-	//pctx->Fill();
-	////pctx->Stroke();
-
-	rm_vec2 pos(1.f, 1.f);
-	rm_vec2 size(m_size.x - 1.f, m_size.y - 1.f);
-	NVGcolor background = NVGcolor::RGB(255, 255, 255);
-	NVGcolor stroke = NVGcolor::RGB(0, 0, 0);
-	NVGcolor colors[rm_utl::RM_BFRM_MAX_COLORS] = { NVGcolor::RGB(128, 128, 128), NVGcolor::RGB(60, 60, 60) };
-	rm_corners_style cstyle;
-	cstyle.set_all_corners_radius(8.f);
-	rm_utl::draw_frame(pctx, pos, size, rm_utl::RM_BFRM_MODE_SUNKEN, background, stroke,
-		1.f, colors, &cstyle);
-
-	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
-	pctx->fillColor(NVGcolor::RGBA(0, 0, 0, 255));
-	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-	for (size_t i = 0; i < m_linesbuf.get_num_output_lines(); i++) {
-		const rm_line_ring_buffer::rm_rb_line* pline = m_linesbuf.get_output_line(i);
-		pctx->text(textpos.x, textpos.y, pline->get_cstr(), nullptr);
-		textpos.y += m_line_height;
+	const RmOutputTextStyle& style = m_theme->output_text;
+	RmDefaultControlPainter::draw_output_text_surface(*pctx,
+		{ m_size.x, m_size.y, m_elem_flags.is_focused(), is_enabled() }, style);
+	float y = style.vertical_padding;
+	for (const std::string& line : m_behaviour.lines()) {
+		if (y + style.line_height > m_size.y)
+			break;
+		RmDefaultControlPainter::draw_output_text_line(*pctx,
+			{ y, get_font(), line.c_str(), is_enabled() }, style);
+		y += style.line_height;
 	}
+	rm_widget::on_draw(pctx);
 }
 
-bool rm_output_text::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+rm_output_text::rm_output_text(rm_widget* p_parent, float x, float y,
+	float width, float height, size_t num_lines, RmThemeRef theme)
+	: rm_widget(x, y, width, height, p_parent, "ui_outputtext",
+		RM_FLAG_DEFAULT | RM_FLAG_OPAQUE),
+	m_behaviour(num_lines),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
 {
-	return true;
-}
-
-rm_output_text::rm_output_text(rm_widget* p_parent, int x, int y, int width, int height, float line_height, size_t num_lines) :
-	rm_widget(x, y, width, height, p_parent, "ui_outputtext", RM_FLAG_DEFAULT), m_linesbuf(num_lines, 512, num_lines), m_line_height(line_height)
-{
-	m_textbuf.resize(8096);
-}
-
-rm_output_text::rm_output_text(rm_widget* p_parent, float x, float y, float width, float height, float line_height, size_t num_lines) :
-	rm_widget(x, y, width, height, p_parent, "ui_outputtext", RM_FLAG_DEFAULT), m_linesbuf(num_lines, 512, num_lines), m_line_height(line_height)
-{
-	m_textbuf.resize(8096);
 }
 
 void rm_output_text::printf(const char* pformat, ...)
 {
-	va_list argptr;
-	va_start(argptr, pformat);
-	vsnprintf(&m_textbuf[0], m_textbuf.size(), pformat, argptr);
-	va_end(argptr);
-	m_linesbuf.append_text(m_textbuf);
+	if (!pformat)
+		return;
+	va_list args;
+	va_start(args, pformat);
+	va_list measure_args;
+	va_copy(measure_args, args);
+	const int length = std::vsnprintf(nullptr, 0, pformat, measure_args);
+	va_end(measure_args);
+	if (length > 0) {
+		std::vector<char> buffer(static_cast<size_t>(length) + 1);
+		std::vsnprintf(buffer.data(), buffer.size(), pformat, args);
+		m_behaviour.append_text(std::string(buffer.data(), static_cast<size_t>(length)));
+	}
+	va_end(args);
 }
 
 void rm_number_input::on_draw(NVGcontext* pctx)

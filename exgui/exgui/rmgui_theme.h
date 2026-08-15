@@ -302,6 +302,20 @@ struct RmTreeViewStyle {
   bool show_guides = true;
 };
 
+struct RmOutputTextStyle {
+  NVGcolor background;
+  NVGcolor border;
+  NVGcolor text;
+  NVGcolor focus_ring;
+  float line_height = 0.0f;
+  float horizontal_padding = 0.0f;
+  float vertical_padding = 0.0f;
+  float corner_radius = 0.0f;
+  float border_width = 0.0f;
+  float focus_ring_width = 0.0f;
+  float font_size = 0.0f;
+};
+
 struct RmSliderStyle {
   RmStateColors track;
   RmStateColors fill;
@@ -442,6 +456,9 @@ struct RmControlMetricsTokens {
   float treeview_horizontal_padding = 8.0f;
   float treeview_expander_size = 7.0f;
   float treeview_expander_stroke_width = 1.5f;
+  float output_text_line_height = 20.0f;
+  float output_text_horizontal_padding = 10.0f;
+  float output_text_vertical_padding = 8.0f;
   float slider_track_height = 4.0f;
   float slider_padding = 8.0f;
   float slider_thumb_radius = 10.0f;
@@ -508,6 +525,7 @@ struct RmThemeSnapshot {
   RmComboBoxStyle combobox;
   RmListViewStyle listview;
   RmTreeViewStyle treeview;
+  RmOutputTextStyle output_text;
   RmSliderStyle slider;
   RmScrollbarStyle scrollbar;
   RmProgressStyle progress;
@@ -640,6 +658,9 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.treeview_horizontal_padding, 0.0f, 256.0f, "tokens.controls.treeview_horizontal_padding", diagnostics);
     sanitize_metric(tokens.controls.treeview_expander_size, 1.0f, 64.0f, "tokens.controls.treeview_expander_size", diagnostics);
     sanitize_metric(tokens.controls.treeview_expander_stroke_width, 0.0f, 32.0f, "tokens.controls.treeview_expander_stroke_width", diagnostics);
+    sanitize_metric(tokens.controls.output_text_line_height, 1.0f, 256.0f, "tokens.controls.output_text_line_height", diagnostics);
+    sanitize_metric(tokens.controls.output_text_horizontal_padding, 0.0f, 256.0f, "tokens.controls.output_text_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.output_text_vertical_padding, 0.0f, 256.0f, "tokens.controls.output_text_vertical_padding", diagnostics);
     sanitize_metric(tokens.controls.slider_track_height, 1.0f, 256.0f, "tokens.controls.slider_track_height", diagnostics);
     sanitize_metric(tokens.controls.slider_padding, 0.0f, 256.0f, "tokens.controls.slider_padding", diagnostics);
     sanitize_metric(tokens.controls.slider_thumb_radius, 1.0f, 256.0f, "tokens.controls.slider_thumb_radius", diagnostics);
@@ -989,6 +1010,19 @@ public:
     p_theme->treeview.border_width = controls.border_width;
     p_theme->treeview.focus_ring_width = controls.focus_ring_width;
     p_theme->treeview.font_size = tokens.typography.control;
+
+    p_theme->output_text.background = colors.surface_elevated;
+    p_theme->output_text.border = colors.border;
+    p_theme->output_text.text = colors.text_muted;
+    p_theme->output_text.focus_ring = colors.focus_ring;
+    p_theme->output_text.line_height = controls.output_text_line_height;
+    p_theme->output_text.horizontal_padding =
+      controls.output_text_horizontal_padding;
+    p_theme->output_text.vertical_padding = controls.output_text_vertical_padding;
+    p_theme->output_text.corner_radius = tokens.radius.medium;
+    p_theme->output_text.border_width = controls.border_width;
+    p_theme->output_text.focus_ring_width = controls.focus_ring_width;
+    p_theme->output_text.font_size = tokens.typography.caption;
 
     p_theme->slider.track = { colors.control, colors.control_hovered,
       colors.control_pressed, colors.control_disabled };

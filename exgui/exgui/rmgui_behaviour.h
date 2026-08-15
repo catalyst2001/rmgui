@@ -639,6 +639,54 @@ public:
   }
 };
 
+class RmOutputTextBehaviour {
+  std::vector<std::string> m_lines;
+  size_t m_capacity = 16;
+
+  void trim() {
+    if (m_lines.size() > m_capacity)
+      m_lines.erase(m_lines.begin(),
+        m_lines.begin() + static_cast<std::ptrdiff_t>(m_lines.size() - m_capacity));
+  }
+
+public:
+  explicit RmOutputTextBehaviour(size_t capacity = 16) noexcept
+    : m_capacity(std::max<size_t>(1, capacity)) {}
+
+  const std::vector<std::string>& lines() const noexcept { return m_lines; }
+  size_t capacity() const noexcept { return m_capacity; }
+
+  RmBehaviourUpdate set_capacity(size_t capacity) {
+    capacity = std::max<size_t>(1, capacity);
+    const bool changed = m_capacity != capacity || m_lines.size() > capacity;
+    m_capacity = capacity;
+    trim();
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate append_text(const std::string& text) {
+    if (text.empty())
+      return {};
+    size_t start = 0;
+    do {
+      const size_t newline = text.find('\n', start);
+      const size_t end = newline == std::string::npos ? text.size() : newline;
+      m_lines.push_back(text.substr(start, end - start));
+      if (newline == std::string::npos)
+        break;
+      start = newline + 1;
+    } while (start <= text.size());
+    trim();
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate clear() noexcept {
+    const bool changed = !m_lines.empty();
+    m_lines.clear();
+    return { false, changed, false };
+  }
+};
+
 class RmButtonBehaviour {
   bool enabled_ = true;
   bool hovered_ = false;

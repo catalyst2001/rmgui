@@ -206,6 +206,20 @@ struct RmTreeViewRowVisual {
   bool expanded = false;
 };
 
+struct RmOutputTextSurfaceVisual {
+  float width = 0.0f;
+  float height = 0.0f;
+  bool focused = false;
+  bool enabled = true;
+};
+
+struct RmOutputTextLineVisual {
+  float y = 0.0f;
+  NVGhandle font;
+  const char* text = nullptr;
+  bool enabled = true;
+};
+
 struct RmSliderVisual {
   float width = 0.0f;
   float height = 0.0f;
@@ -288,6 +302,10 @@ public:
     const RmTreeViewSurfaceVisual& visual, const RmTreeViewStyle& style);
   static void draw_treeview_row(NVGcontext& context,
     const RmTreeViewRowVisual& visual, const RmTreeViewStyle& style);
+  static void draw_output_text_surface(NVGcontext& context,
+    const RmOutputTextSurfaceVisual& visual, const RmOutputTextStyle& style);
+  static void draw_output_text_line(NVGcontext& context,
+    const RmOutputTextLineVisual& visual, const RmOutputTextStyle& style);
   static void draw_slider(NVGcontext& context, const RmSliderVisual& visual,
     const RmSliderStyle& style);
   static void draw_scrollbar(NVGcontext& context, const RmScrollbarVisual& visual,

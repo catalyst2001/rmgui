@@ -242,29 +242,6 @@ void drawParagraph(NVGcontext* vg, float x, float y, float width, float height, 
 }
 #pragma endregion
 
-void testtrb()
-{
-  auto gen_rand_string = []() -> const char* {
-    size_t i;
-    const size_t arrlen = 32+1;
-    static char buf[arrlen];
-    for (i = 0; i < arrlen-1; i++)
-      buf[i] = 64 + (rand() % 90);
-    buf[i] = 0;
-    return buf;
-  };
-
-  rm_line_ring_buffer ringbuf(32, 512, 32);
-  while (1) {
-    ringbuf.append_text(gen_rand_string());
-    for (size_t i = 0; i < ringbuf.get_num_lines(); i++) {
-      printf("[%zd] %s\n", i+1, ringbuf.get_output_line(i)->get_cstr());
-    }
-    sleep(1);
-    system("cls");
-  }
-}
-
 void example_core_widgets(rm_surface* gui)
 {
   static rm_window_style default_style;
@@ -424,7 +401,7 @@ void example_widgets(rm_surface* gui)
   RmThemeDocument shell_theme_document = RmThemeDocument::dark_theme();
   shell_theme_document.name = "ExGUI shell";
   const RmThemeRef shell_theme = RmThemeCompiler::compile(shell_theme_document).theme;
-  rm_tabcontrol* ptabctl = new rm_tabcontrol(gui, 0, 105, 800, 600,
+  rm_tabcontrol* ptabctl = new rm_tabcontrol(gui, 0, 105, 1000, 600,
     nullptr, shell_theme, RmTabVariant::underline, RmTabPlacement::top);
   rm_widget* ptab01 = ptabctl->add_tab("Window", 0);
 
@@ -574,6 +551,16 @@ void example_widgets(rm_surface* gui)
   pthemes->add_child("Dark");
   pthemes->add_child("Light");
   ptree->add_root("Resources");
+
+  rm_theme_preview_panel* poutput_panel = new rm_theme_preview_panel(
+    ptab11, 810, 10, 180, 510, controls_theme);
+  new rm_label(poutput_panel, 12, 18, "Activity log", controls_theme);
+  rm_output_text* poutput = new rm_output_text(
+    poutput_panel, 12, 50, 156, 444, 18, controls_theme);
+  poutput->print("Theme compiled");
+  poutput->print("Controls loaded");
+  poutput->print("Tree model ready");
+  poutput->print("NanoVG renderer online");
 
   rm_checkbox *pcb = new rm_checkbox(pdiv, 10, 100, 200, "This is checkbox",
     [](rm_checkbox* pcheckbox) {
@@ -894,7 +881,6 @@ void example_widgets(rm_surface* gui)
 }
 
 int main() {
-  //testtrb();
   //return 0;
 
   g_gui = create_window(-1, -1, 1200, 700, "test window");

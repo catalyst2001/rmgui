@@ -563,20 +563,23 @@ public:
 
 class rm_output_text : public rm_widget
 {
-  rm_line_ring_buffer m_linesbuf;
-  std::string         m_textbuf;
-  float               m_line_height;
+  RmOutputTextBehaviour m_behaviour;
+  RmThemeRef            m_theme;
 protected:
   virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
-  rm_output_text(rm_widget* p_parent, int x, int y, int width, int height, float line_height=16.f, size_t num_lines=16);
-  rm_output_text(rm_widget* p_parent, float x, float y, float width, float height, float line_height=16.f, size_t num_lines=16);
+  rm_output_text(rm_widget* p_parent, float x, float y, float width, float height,
+    size_t num_lines = 16, RmThemeRef theme = {});
   virtual ~rm_output_text() {}
 
-  inline void print(const std::string& text) { m_linesbuf.append_text(text); }
-  inline void print(const char* ptext) { m_linesbuf.append_text(ptext); }
+  inline void print(const std::string& text) { m_behaviour.append_text(text); }
+  inline void print(const char* ptext) { if (ptext) m_behaviour.append_text(ptext); }
   void printf(const char* pformat, ...);
+  void clear() { m_behaviour.clear(); }
+  const RmOutputTextBehaviour& behaviour() const noexcept { return m_behaviour; }
+  void set_theme(RmThemeRef theme) {
+    m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+  }
 };
 
 /**

@@ -950,6 +950,45 @@ void RmDefaultControlPainter::draw_treeview_row(NVGcontext& context,
     visual.text ? visual.text : "", nullptr);
 }
 
+void RmDefaultControlPainter::draw_output_text_surface(NVGcontext& context,
+  const RmOutputTextSurfaceVisual& visual, const RmOutputTextStyle& style)
+{
+  context.beginPath();
+  context.roundedRect(0.5f, 0.5f, std::max(0.0f, visual.width - 1.0f),
+    std::max(0.0f, visual.height - 1.0f), style.corner_radius);
+  context.fillColor(style.background);
+  context.fill();
+  if (style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.border);
+    context.stroke();
+  }
+  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
+    const float inset = style.focus_ring_width * 0.5f;
+    context.beginPath();
+    context.roundedRect(inset, inset,
+      std::max(0.0f, visual.width - inset * 2.0f),
+      std::max(0.0f, visual.height - inset * 2.0f), style.corner_radius);
+    context.StrokeWidth(style.focus_ring_width);
+    context.strokeColor(style.focus_ring);
+    context.stroke();
+  }
+}
+
+void RmDefaultControlPainter::draw_output_text_line(NVGcontext& context,
+  const RmOutputTextLineVisual& visual, const RmOutputTextStyle& style)
+{
+  NVGcolor text = style.text;
+  if (!visual.enabled)
+    text.a *= 0.5f;
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+  context.fillColor(text);
+  context.text(style.horizontal_padding, visual.y,
+    visual.text ? visual.text : "", nullptr);
+}
+
 void RmDefaultControlPainter::draw_slider(NVGcontext& context,
   const RmSliderVisual& visual, const RmSliderStyle& style)
 {

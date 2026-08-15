@@ -120,6 +120,22 @@ void test_treeview_behaviour()
     "disabled tree view ignores pointer selection");
 }
 
+void test_output_text_behaviour()
+{
+  RmOutputTextBehaviour output(3);
+  output.append_text("first\nsecond");
+  output.append_text("third");
+  output.append_text("fourth");
+  expect(output.lines().size() == 3 && output.lines()[0] == "second" &&
+    output.lines()[2] == "fourth",
+    "output text retains only the newest lines within its capacity");
+  output.append_text("tail\n");
+  expect(output.lines().back().empty(),
+    "output text preserves an explicit trailing empty line");
+  output.clear();
+  expect(output.lines().empty(), "output text can clear its renderer-free model");
+}
+
 void test_toggle_behaviour()
 {
   RmToggleBehaviour toggle;
@@ -318,6 +334,7 @@ int main()
   test_text_input_behaviour();
   test_number_input_behaviour();
   test_treeview_behaviour();
+  test_output_text_behaviour();
   test_toggle_behaviour();
   test_combobox_behaviour();
   test_radiobutton_behaviour();
