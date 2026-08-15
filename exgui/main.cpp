@@ -385,7 +385,7 @@ void example_core_widgets(rm_surface* gui)
 
 void example_widgets(rm_surface* gui)
 {
-  static class debug_widget : public rm_widget, rm_tab_drawer {
+  static class debug_widget : public rm_widget {
   public:
     debug_widget(rm_widget *pparent) : rm_widget(0, 0, 800, 800, pparent, "debug_widget",
       RM_FLAG_DEFAULT, 0, nullptr, RmChildOwnership::borrowed) {}
