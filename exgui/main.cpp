@@ -22,6 +22,69 @@
 
 static rm_surface* g_gui = nullptr;
 
+class rm_theme_preview_panel : public rm_widget {
+  RmThemeRef m_theme;
+
+public:
+  rm_theme_preview_panel(rm_widget* p_parent, int x, int y, int width, int height,
+    RmThemeRef p_theme) :
+    rm_widget(x, y, width, height, p_parent, "rm_theme_preview_panel"),
+    m_theme(p_theme ? std::move(p_theme) : RmThemeSnapshot::default_theme()) {
+  }
+
+  void on_draw(NVGcontext* pctx) override {
+    const RmThemeTokens& tokens = m_theme->tokens;
+    pctx->beginPath();
+    pctx->roundedRect(0.f, 0.f, m_size.x, m_size.y, tokens.radius.large);
+    pctx->fillColor(tokens.colors.surface);
+    pctx->fill();
+
+    pctx->beginPath();
+    pctx->roundedRect(0.5f, 0.5f, m_size.x - 1.f, m_size.y - 1.f,
+      tokens.radius.large);
+    pctx->strokeColor(tokens.colors.border);
+    pctx->StrokeWidth(tokens.controls.border_width);
+    pctx->stroke();
+
+    rm_widget::on_draw(pctx);
+  }
+};
+
+static void create_theme_preview(rm_widget* p_parent, int x, int y,
+  const RmThemeDocument& p_document) {
+  const RmThemeCompileResult compile_result = RmThemeCompiler::compile(p_document);
+  const RmThemeRef theme = compile_result.theme;
+  rm_theme_preview_panel* ppanel = new rm_theme_preview_panel(
+    p_parent, x, y, 350, 465, theme);
+
+  new rm_label(ppanel, 20, 18, p_document.name, theme);
+  new rm_label(ppanel, 20, 52, "Buttons", theme);
+  new rm_button(ppanel, 20, 78, 145, 38, "Default", theme);
+  rm_button* pdisabled_button = new rm_button(
+    ppanel, 185, 78, 145, 38, "Disabled", theme);
+  pdisabled_button->set_enabled(false);
+
+  new rm_label(ppanel, 20, 138, "Selection", theme);
+  rm_checkbox* pcheckbox = new rm_checkbox(
+    ppanel, 20, 164, 160, "Remember choice", nullptr, theme);
+  pcheckbox->set_checked(true);
+  rm_checkbox* pdisabled_checkbox = new rm_checkbox(
+    ppanel, 185, 164, 145, "Unavailable", nullptr, theme);
+  pdisabled_checkbox->set_enabled(false);
+
+  new rm_label(ppanel, 20, 210, "Toggle", theme);
+  rm_switch* pswitch = new rm_switch(ppanel, 20, 238, 58, true, nullptr, theme);
+  pswitch->set_on(true, false);
+  rm_switch* pdisabled_switch = new rm_switch(
+    ppanel, 98, 238, 58, false, nullptr, theme);
+  pdisabled_switch->set_enabled(false);
+
+  new rm_label(ppanel, 20, 292, "Value", theme);
+  new rm_slider(ppanel, 20, 318, 310, 34, 0.f, 100.f, 64.f, nullptr, theme);
+  new rm_progress(ppanel, 20, 378, 310, 12, 0.68f, theme);
+  new rm_label(ppanel, 20, 414, "Theme tokens compile into immutable styles", theme);
+}
+
 #pragma region TEMPLATE1
 void drawParagraph(NVGcontext* vg, float x, float y, float width, float height, float mx, float my)
 {
@@ -201,12 +264,14 @@ void example_core_widgets(rm_surface* gui)
   //RMGUI_TEXT_INPUT_MULTILINE RMGUI_TEXT_INPUT_SINGLELINE
   rm_text_input* textInput = new rm_text_input(pwindow, 300, 100, 200, 20, &style_inp, RMGUI_TEXT_INPUT_SINGLELINE);
 
-  auto checkbox_theme = std::make_shared<RmTheme>(*RmTheme::default_theme());
-  checkbox_theme->checkbox.font_size = 14.f;
-  checkbox_theme->checkbox.background.normal = NVGcolor::RGB(20, 20, 20);
-  checkbox_theme->checkbox.border.normal = NVGcolor::RGB(80, 80, 80);
-  checkbox_theme->checkbox.mark.normal = NVGcolor::RGB(111, 111, 255);
-  checkbox_theme->checkbox.border_width = 1.f;
+  RmThemeDocument checkbox_theme_document = RmThemeDocument::dark_theme();
+  checkbox_theme_document.name = "Compact checkbox demo";
+  checkbox_theme_document.tokens.typography.control = 14.f;
+  checkbox_theme_document.tokens.colors.control = NVGcolor::RGB(20, 20, 20);
+  checkbox_theme_document.tokens.colors.border = NVGcolor::RGB(80, 80, 80);
+  checkbox_theme_document.tokens.colors.accent = NVGcolor::RGB(111, 111, 255);
+  checkbox_theme_document.tokens.controls.border_width = 1.f;
+  const RmThemeRef checkbox_theme = RmThemeCompiler::compile(checkbox_theme_document).theme;
 
   rm_checkbox* checkbox = new rm_checkbox(pwindow, 20, 40 + 30 + 20, 100, "Enable",
     [](rm_checkbox* pcheckbox) -> bool {
@@ -290,8 +355,10 @@ void example_core_widgets(rm_surface* gui)
   );
   slider->set_userptr(potext);
 
-  auto progress_theme = std::make_shared<RmTheme>(*RmTheme::default_theme());
-  progress_theme->progress.corner_radius = 5.f;
+  RmThemeDocument progress_theme_document = RmThemeDocument::dark_theme();
+  progress_theme_document.name = "Progress demo";
+  progress_theme_document.tokens.controls.progress_corner_radius = 5.f;
+  const RmThemeRef progress_theme = RmThemeCompiler::compile(progress_theme_document).theme;
   rm_progress* progress = new rm_progress(pwindow, 50, 350, 300, 10, 0.f, progress_theme);
   //rm_progress_image* progress2 = new rm_progress_image(
   //  pwindow, 50, 365, 300, 10, image_pat, 0.f, 1.f, 0.f, progress_theme);
@@ -346,8 +413,9 @@ void example_widgets(rm_surface* gui)
 
   tc::tab* ptab11 = ptabctl->add_tab("Main page asdasda", 0, 10);
   tc::tab* ptab12 = ptabctl->add_tab("Page 2 asdasdasd", 1, 10);
+  tc::tab* ptab_theme = ptabctl->add_tab("Theme Gallery", 2, 10);
 #if defined(RMGUI_ENABLE_BLENDISH_DEMO)
-  tc::tab* ptab_bui = ptabctl->add_tab("Blendish Controls", 2, 10);
+  tc::tab* ptab_bui = ptabctl->add_tab("Blendish Controls", 3, 10);
 #endif
 
   rm_widget* effects_page = ptab12->get_page_widget();
@@ -356,6 +424,22 @@ void example_widgets(rm_surface* gui)
   const float effects_w = rm_max(0.0f, effects_size.x - effects_pad * 2.0f);
   const float effects_h = rm_max(0.0f, effects_size.y - effects_pad * 2.0f);
   new rm_effects(effects_page, effects_pad, effects_pad, effects_w, effects_h);
+
+  RmThemeDocument dark_theme_document = RmThemeDocument::dark_theme();
+  dark_theme_document.name = "Midnight";
+  dark_theme_document.tokens.colors.accent = NVGcolor::RGB(91, 124, 250);
+  dark_theme_document.tokens.colors.accent_hovered = NVGcolor::RGB(116, 145, 255);
+  dark_theme_document.tokens.colors.accent_pressed = NVGcolor::RGB(70, 98, 220);
+
+  RmThemeDocument light_theme_document = RmThemeDocument::light_theme();
+  light_theme_document.name = "Cloud";
+  light_theme_document.tokens.colors.accent = NVGcolor::RGB(39, 103, 216);
+  light_theme_document.tokens.colors.accent_hovered = NVGcolor::RGB(56, 122, 234);
+  light_theme_document.tokens.colors.accent_pressed = NVGcolor::RGB(29, 80, 173);
+
+  rm_widget* ptheme_page = ptab_theme->get_page_widget();
+  create_theme_preview(ptheme_page, 20, 30, dark_theme_document);
+  create_theme_preview(ptheme_page, 410, 30, light_theme_document);
 
   rm_flexbox_layout* pflexlayout = new rm_flexbox_layout();
   pflexlayout->set_dir(rm_flex_direction::Column);
@@ -374,7 +458,23 @@ void example_widgets(rm_surface* gui)
   pdiv->set_style(&wstyle);
   pdiv->set_layout(pflexlayout);
 
-  auto controls_theme = std::make_shared<RmTheme>(*RmTheme::default_theme());
+  RmThemeDocument controls_theme_document = RmThemeDocument::dark_theme();
+  controls_theme_document.name = "ExGUI control gallery";
+  controls_theme_document.tokens.colors.accent = NVGcolor::RGB(53, 77, 230);
+  controls_theme_document.tokens.colors.accent_hovered = NVGcolor::RGB(73, 99, 245);
+  controls_theme_document.tokens.colors.accent_pressed = NVGcolor::RGB(42, 61, 190);
+  controls_theme_document.tokens.colors.control = NVGcolor::RGB(38, 46, 83);
+  controls_theme_document.tokens.colors.control_hovered = NVGcolor::RGB(49, 59, 102);
+  controls_theme_document.tokens.colors.control_pressed = NVGcolor::RGB(28, 35, 68);
+  controls_theme_document.tokens.controls.switch_track_height = 30.f;
+  controls_theme_document.tokens.controls.switch_padding = 4.f;
+  controls_theme_document.tokens.controls.slider_track_height = 7.f;
+  controls_theme_document.tokens.controls.slider_padding = 9.8f;
+  controls_theme_document.tokens.controls.slider_thumb_radius = 7.f;
+  controls_theme_document.tokens.controls.slider_thumb_border_width = 3.5f;
+  controls_theme_document.tokens.animation.normal = 0.25f;
+  const RmThemeRef controls_theme = RmThemeCompiler::compile(controls_theme_document).theme;
+
   rm_checkbox *pcb = new rm_checkbox(pdiv, 10, 100, 200, "This is checkbox",
     [](rm_checkbox* pcheckbox) {
       printf("checkbox is %s\n", pcheckbox->is_checked() ? "checked" : "unchecked");
@@ -411,20 +511,6 @@ void example_widgets(rm_surface* gui)
   //first->set_allow_uncheck(true);
   rm_radiobutton::select_default(pdiv, 0);
 
-
-  controls_theme->switch_control.track_height = 30.f;
-  controls_theme->switch_control.padding = 4.f;
-  controls_theme->switch_control.track_on = {
-    NVGcolor::RGB(53, 77, 230), NVGcolor::RGB(73, 99, 245),
-    NVGcolor::RGB(42, 61, 190), NVGcolor::RGB(75, 81, 119)
-  };
-  controls_theme->switch_control.track_off = {
-    NVGcolor::RGB(28, 41, 103), NVGcolor::RGB(38, 54, 128),
-    NVGcolor::RGB(22, 32, 82), NVGcolor::RGB(67, 69, 79)
-  };
-  controls_theme->switch_control.animation_duration = 0.25f;
-  controls_theme->switch_control.corner_radius = controls_theme->switch_control.track_height * 0.5f;
-
   rm_switch* sw = new rm_switch(pdiv, 10, 120, 60, false,
     [](rm_switch* sw) {
       //if (sw->is_on())
@@ -434,13 +520,6 @@ void example_widgets(rm_surface* gui)
 
   //sw->set_on(true, 1);
 
-  controls_theme->slider.track_height = 7.f;
-  controls_theme->slider.padding = 9.8f;
-  controls_theme->slider.track.normal = NVGcolor::RGB(109, 119, 213);
-  controls_theme->slider.fill.normal = NVGcolor::RGB(53, 79, 206);
-  controls_theme->slider.thumb_radius = 7.f;
-  controls_theme->slider.thumb_border.normal = NVGcolor::RGB(57, 76, 195);
-  controls_theme->slider.thumb_border_width = 3.5f;
   rm_slider* slider = new rm_slider(pdiv, 10, 160, 200, 40, 0.0f, 100.0f, 50.0f,
     [](rm_slider* psilder) {
       //psilder->get_userptr<rm_output_text>()->printf("slider value changed: %f", psilder->get_value());

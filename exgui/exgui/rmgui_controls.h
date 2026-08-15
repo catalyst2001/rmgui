@@ -46,7 +46,7 @@ public:
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
   const RmButtonBehaviour& behaviour() const { return m_behaviour; }
-  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmTheme::default_theme(); }
+  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme(); }
 };
 
 class rm_label : public rm_widget {
@@ -56,7 +56,7 @@ public:
   rm_label(rm_widget* p_parent, int x, int y, const std::string& text, RmThemeRef theme = {});
   virtual ~rm_label();
   virtual void on_draw(NVGcontext* pctx) override;
-  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmTheme::default_theme(); }
+  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme(); }
 };
 
 /**
@@ -184,7 +184,7 @@ public:
   inline void        set_label(const char* plabeltext) { m_label.assign(plabeltext); }
   inline void        set_checked(bool val) { m_behaviour.set_checked(val); }
   const RmToggleBehaviour& behaviour() const { return m_behaviour; }
-  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmTheme::default_theme(); }
+  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme(); }
 };
 
 /**
@@ -256,7 +256,7 @@ public:
   float get_value() const { return m_behaviour.value(); }
   void set_value(float value) { m_behaviour.set_value(value); }
   const RmSliderBehaviour& behaviour() const { return m_behaviour; }
-  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmTheme::default_theme(); }
+  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme(); }
 };
 
 /**
@@ -278,7 +278,7 @@ public:
   void         set_percent(float percent) { m_behaviour.set_percent(percent); }
   inline float get_percent() const { return m_behaviour.percent(); }
   const RmProgressBehaviour& behaviour() const { return m_behaviour; }
-  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmTheme::default_theme(); }
+  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme(); }
   virtual void on_draw(NVGcontext* pctx) override;
 };
 
@@ -1144,7 +1144,7 @@ public:
   
   inline bool is_on() const { return m_behaviour.is_on(); }
   const RmSwitchBehaviour& behaviour() const { return m_behaviour; }
-  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmTheme::default_theme(); }
+  void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme(); }
 };
 
 /**

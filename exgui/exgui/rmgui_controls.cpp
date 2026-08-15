@@ -113,7 +113,7 @@ bool rm_image_button::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE sta
 rm_button::rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text,
 	RmThemeRef theme)
 	: rm_widget(x, y, width, height, p_parent, "ui_button"), m_text(text),
-	m_theme(theme ? std::move(theme) : RmTheme::default_theme())
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
 {
 }
 
@@ -176,7 +176,7 @@ void rm_button::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 
 rm_label::rm_label(rm_widget* p_parent, int x, int y, const std::string& text, RmThemeRef theme)
 	: rm_widget(x, y, 200, 30, p_parent, "ui_label"), m_text(text),
-	m_theme(theme ? std::move(theme) : RmTheme::default_theme())
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
 {
 }
 
@@ -593,10 +593,10 @@ void rm_text_input::on_text_input(int sym) {
 rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width,
 	const std::string& label, rm_checkbox_cb pcallback, RmThemeRef theme)
 	: rm_widget(x, y, width,
-		static_cast<int>((theme ? theme : RmTheme::default_theme())->checkbox.box_size),
+		static_cast<int>((theme ? theme : RmThemeSnapshot::default_theme())->checkbox.box_size),
 		p_parent, "ui_checkbox"),
 	m_behaviour(false), m_label(label),
-	m_theme(theme ? std::move(theme) : RmTheme::default_theme())
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
 {
 	set_callback(pcallback);
 }
@@ -795,7 +795,7 @@ rm_slider::rm_slider(rm_widget* p_parent, int x, int y, int width, int height,
 	float min, float max, float initial, rm_slider_callback pcallback, RmThemeRef theme)
 	: rm_widget(x, y, width, height, p_parent, "ui_slider", RM_FLAG_DEFAULT),
 	m_behaviour(min, max, initial), m_pcallback(pcallback),
-	m_theme(theme ? std::move(theme) : RmTheme::default_theme()) {
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()) {
 }
 
 rm_slider::~rm_slider() {}
@@ -838,7 +838,7 @@ bool rm_slider::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm
 rm_progress::rm_progress(rm_widget* p_parent, int x, int y, int width, int height,
 	float initial, RmThemeRef theme) :
 	rm_widget(x, y, width, height, p_parent, "ui_progress"),
-	m_behaviour(initial), m_theme(theme ? std::move(theme) : RmTheme::default_theme())
+	m_behaviour(initial), m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
 {}
 
 rm_progress::~rm_progress()
@@ -2326,9 +2326,9 @@ bool rm_radiobutton::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE stat
 
 rm_switch::rm_switch(rm_widget* parent, int x, int y, int width,
 	bool initial, rm_switch_cb cb, RmThemeRef theme) :
-	rm_widget(x, y, width, static_cast<int>((theme ? theme : RmTheme::default_theme())->switch_control.track_height),
+	rm_widget(x, y, width, static_cast<int>((theme ? theme : RmThemeSnapshot::default_theme())->switch_control.track_height),
 		parent, "ui_switch"),
-	m_behaviour(initial), m_theme(theme ? std::move(theme) : RmTheme::default_theme())
+	m_behaviour(initial), m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
 {
 	set_callback(cb);
 }
