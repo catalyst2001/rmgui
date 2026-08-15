@@ -153,10 +153,37 @@ void RmDefaultControlPainter::draw_button(NVGcontext& context, const RmButtonVis
 
   context.setFontFaceId(static_cast<int>(visual.font.getValue()));
   context.setFontSize(style.font_size);
-  context.setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
   context.fillColor(style.text.resolve(state));
-  context.text(visual.width * 0.5f, visual.height * 0.5f,
-    visual.text ? visual.text : "", nullptr);
+  const char* text = visual.text ? visual.text : "";
+  const bool has_text = *text != '\0';
+  const bool has_icon = visual.imagelist &&
+    visual.imagelist->has_image(visual.icon);
+  const float icon_size = has_icon
+    ? std::min(style.icon_size, std::max(0.0f, visual.height - 4.0f))
+    : 0.0f;
+
+  if (has_icon && has_text) {
+    const float text_width = context.textBounds(0.0f, 0.0f, text, nullptr,
+      nullptr);
+    const float content_width = icon_size + style.icon_text_gap + text_width;
+    const float icon_x = (visual.width - content_width) * 0.5f;
+    const float icon_y = (visual.height - icon_size) * 0.5f;
+    rm_utl::draw_image(&context, visual.imagelist, visual.icon,
+      icon_x, icon_y, icon_size, icon_size, visual.enabled ? 1.0f : 0.45f);
+    context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+    context.text(icon_x + icon_size + style.icon_text_gap,
+      visual.height * 0.5f, text, nullptr);
+  }
+  else if (has_icon) {
+    rm_utl::draw_image(&context, visual.imagelist, visual.icon,
+      (visual.width - icon_size) * 0.5f,
+      (visual.height - icon_size) * 0.5f,
+      icon_size, icon_size, visual.enabled ? 1.0f : 0.45f);
+  }
+  else if (has_text) {
+    context.setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+    context.text(visual.width * 0.5f, visual.height * 0.5f, text, nullptr);
+  }
 }
 
 void RmDefaultControlPainter::draw_tab_bar(NVGcontext& context, float x, float y,

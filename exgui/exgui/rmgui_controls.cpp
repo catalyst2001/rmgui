@@ -1,6 +1,5 @@
 ﻿#include "rmgui_controls.h"
 #include "rmgui_default_painter.h"
-#include <iostream>
 #include <algorithm>
 #include <cstdlib>
 #include <cstdio>
@@ -9,8 +8,6 @@
 #include <cerrno>
 #include <cctype>
 #include <cmath>
-
-#include "stb_image.h"
 
 RmWindowGeometry rm_window::current_geometry() const noexcept
 {
@@ -101,112 +98,14 @@ rm_window::rm_window(rm_widget* p_parent, int x, int y, int width, int height,
 	set_max_size(rm_vec2(0.0f, 0.0f));
 }
 
-/**
-* drawImage
-*
-* sx, sy, sw, sh - sprite location on texture
-* x, y, w, h - position and size of the sprite rectangle on screen
-*
-* source 'https://github.com/memononen/nanovg/issues/348'
-*/
-void drawSprite(NVGcontext* vg, NVGhandle image, float alpha,
-	float sx, float sy, float sw, float sh, // sprite location on texture
-	float x, float y, float w, float h, // position and size of the sprite rectangle on screen
-	float lt, float rt, float lb, float rb)
-{
-	float ax, ay;
-	int iw, ih;
-	NVGpaint img;
-
-	vg->getImageSize(image, &iw, &ih);
-
-	// Aspect ration of pixel in x an y dimensions. This allows us to scale
-	// the sprite to fill the whole rectangle.
-	ax = w / sw;
-	ay = h / sh;
-
-	img = NVGpaint::imagePattern(x - sx * ax, y - sy * ay, (float)iw * ax, (float)ih * ay, 0, image, alpha);
-	vg->beginPath();
-	vg->roundedRectVarying(x, y, w, h, lt, rt, rb, lb);
-	vg->fillPaint(img);
-	vg->fill();
-}
-
-rmgui_image::rmgui_image() : imageId(), width(0), height(0), channels(0) {}
-rmgui_image::~rmgui_image() {}
-
-bool rmgui_image::load(const std::string& filename, NVGcontext* ctx) {
-	unsigned char* data = stbi_load(filename.c_str(), &width, &height, &channels, 0);
-	if (!data) {
-		std::cerr << "Failed to load image: " << filename << std::endl;
-		return false;
-	}
-	int flags = NVG_IMAGE_NEAREST;
-	imageId = ctx->createImageRGBA(width, height, flags, data);
-	stbi_image_free(data);
-	if (!imageId.isValid()) {
-		std::cerr << "Failed to create NVG image from: " << filename << std::endl;
-		return false;
-	}
-	return true;
-}
-
-rm_image_button::rm_image_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& imageFile)
-	: rm_widget(x, y, width, height, p_parent, "ui_image_button")
-{
-	m_image = new rmgui_image();
-	rm_surface* surface = dynamic_cast<rm_surface*>(get_root());
-	if (surface) {
-		NVGcontext* context = surface->get_context();
-		if (!m_image->load(imageFile, context)) {
-			std::cerr << "Image button: Failed to load image " << imageFile << std::endl;
-		}
-	}
-}
-
-rm_image_button::~rm_image_button() {
-	if (m_image) {
-		rm_surface* surface = dynamic_cast<rm_surface*>(get_root());
-		if (surface && m_image->imageId.isValid()) {
-			surface->get_context()->deleteImage(m_image->imageId);
-		}
-		delete m_image;
-	}
-}
-
-void rm_image_button::on_draw(NVGcontext* pctx) {
-	//m_bbox.from_rect(m_absolute); //NOTE: K.D. commented this
-	//pctx->BeginPath();
-	//pctx->Rect( 0.f, 0.f, m_relative.width, m_relative.height);
-	//pctx->FillColor( NVGcolor::RGBA(200, 200, 200, 255));
-	//pctx->Fill();
-
-	if (m_image && m_image->imageId.isValid()) {
-		NVGpaint imgPaint = NVGpaint::imagePattern(
-			0.f, 0.f,
-			m_size.x, m_size.y,
-			0.0f, m_image->imageId, 1.0f);
-		pctx->beginPath();
-		pctx->roundedRect(0.f, 0.f, m_size.x, m_size.y, 4.0f);
-		pctx->fillPaint(imgPaint);
-		pctx->fill();
-	}
-	rm_widget::on_draw(pctx);
-}
-
-bool rm_image_button::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
-	if (event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
-		std::cout << "Image Button clicked!" << std::endl;
-		return false;
-	}
-	return true;
-}
-
 rm_button::rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text,
-	RmThemeRef theme, RmButtonVariant variant)
+	RmThemeRef theme, RmButtonVariant variant, rm_button_cb callback)
 	: rm_widget(x, y, width, height, p_parent, "ui_button"), m_text(text),
-	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()), m_variant(variant)
+	m_icon(RM_INVALID_IMAGE_INDEX),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()),
+	m_variant(variant)
 {
+	m_pcallback = callback;
 }
 
 rm_button::~rm_button() {}
@@ -217,6 +116,8 @@ void rm_button::on_draw(NVGcontext* pctx) {
 		m_size.y,
 		get_font(),
 		m_text.c_str(),
+		get_imagelist(),
+		m_icon,
 		is_enabled(),
 		m_elem_flags.is_hovered(),
 		m_behaviour.is_pressed()
@@ -256,8 +157,8 @@ bool rm_button::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm
 
 	if (state == UP) {
 		const auto update = m_behaviour.pointer_up(inside);
-		if (update.activated)
-			std::cout << "Button \"" << m_text << "\" clicked!" << std::endl;
+		if (update.activated && m_pcallback)
+			m_pcallback(this);
 		return !update.handled;
 	}
 
@@ -271,8 +172,8 @@ void rm_button::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 	const auto update = state == UP
 		? m_behaviour.key_up(activation_key)
 		: m_behaviour.key_down(activation_key);
-	if (update.activated)
-		std::cout << "Button \"" << m_text << "\" clicked!" << std::endl;
+	if (update.activated && m_pcallback)
+		m_pcallback(this);
 }
 
 rm_label::rm_label(rm_widget* p_parent, int x, int y, const std::string& text, RmThemeRef theme)
@@ -937,76 +838,6 @@ void rm_progress::on_draw(NVGcontext* pctx)
 		{ m_size.x, m_size.y, m_behaviour.fraction(), is_enabled() },
 		m_theme->progress);
 	rm_widget::on_draw(pctx);
-}
-
-rm_progress_image::rm_progress_image(rm_widget* p_parent, int x, int y, int width, int height,
-	rm_image img, float pattern_angle, float pattern_alpha, float initial, RmThemeRef theme) :
-	rm_progress(p_parent, x, y, width, height, initial, std::move(theme))
-{
-	m_angle = pattern_angle;
-	m_alpha = pattern_alpha;
-	m_image = img;
-}
-
-rm_progress_image::~rm_progress_image()
-{
-}
-
-void rm_progress_image::on_draw(NVGcontext* pctx)
-{
-	// paint background
-	pctx->beginPath();
-	pctx->fillColor(m_theme->progress.background.resolve(
-		is_enabled() ? RmVisualState::normal : RmVisualState::disabled));
-	pctx->roundedRect(0.f, 0.f, m_size.x, m_size.y, m_theme->progress.corner_radius);
-	pctx->fill();
-
-	// paint progres bar
-	rm_rect percent_rect(0.f, 0.f, m_size);
-	percent_rect.width *= m_behaviour.fraction();
-
-	if (percent_rect.width > 0.0f) {
-		NVGpaint paint = NVGpaint::imagePattern(0, 0, percent_rect.width,
-			percent_rect.height, m_angle, m_image, m_alpha);
-		pctx->beginPath();
-		pctx->roundedRect(
-			percent_rect.x, percent_rect.y,
-			percent_rect.width, percent_rect.height, m_theme->progress.corner_radius);
-		pctx->fillPaint(paint);
-		pctx->fill();
-
-		drawSprite(pctx, m_image, m_alpha, 0.f, 0.f, 13.f, 15.f,
-			percent_rect.x, percent_rect.y, percent_rect.width, percent_rect.height,
-			m_theme->progress.corner_radius, m_theme->progress.corner_radius,
-			m_theme->progress.corner_radius, m_theme->progress.corner_radius);
-	}
-	rm_widget::on_draw(pctx);
-}
-
-void rm_animation::on_draw(NVGcontext* pctx)
-{
-	rm_vec2 pos(m_size.x / 2.f, m_size.y / 2.f);
-	rm_widget::on_draw(pctx);
-	pctx->translate(pos.x, pos.y);
-	pctx->rotate(m_angle);
-	pctx->scale(m_scale, m_scale);
-	pctx->translate(-pos.x, -pos.y);
-	pctx->beginPath();
-	NVGpaint imgPaint = NVGpaint::imagePattern(0.f, 0.f, m_size.x, m_size.y, 0.0f, m_image, 1.0f);
-	pctx->beginPath();
-	pctx->roundedRect(0.f, 0.f, m_size.x, m_size.y, 4.0f);
-	pctx->fillPaint(imgPaint);
-	pctx->fill();
-	m_angle += m_speed * m_proot->get_delta_time();
-}
-
-rm_animation::rm_animation(rm_widget* p_parent, int x, int y, int width, int height, rm_image img, float start_angle, float scale, float speed) :
-	rm_widget(x, y, width, height, p_parent, "ui_animation"), m_image(img), m_speed(speed), m_angle(start_angle), m_scale(scale)
-{
-}
-
-rm_animation::~rm_animation()
-{
 }
 
 void rm_scrollbar::adjust_geometry()

@@ -190,9 +190,17 @@ static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme,
   for (int row = 0; row < 8; ++row) {
     for (int column = 0; column < 4; ++column) {
       const int index = row * 4 + column + 1;
-      new rm_button(poverflow, 20 + column * 175, 54 + row * 74,
+      rm_button* pbutton = new rm_button(
+        poverflow, 20 + column * 175, 54 + row * 74,
         150, 42, "Widget " + std::to_string(index), theme,
-        index % 3 == 0 ? RmButtonVariant::outline : RmButtonVariant::secondary);
+        index % 3 == 0 ? RmButtonVariant::outline : RmButtonVariant::secondary,
+        [](rm_button* p_button) {
+          printf("Button command: %s\n", p_button->get_text().c_str());
+        });
+      if (row == 0) {
+        pbutton->set_imagelist(p_icons);
+        pbutton->set_icon(static_cast<rm_image_index>(column));
+      }
     }
   }
   new rm_label(poverflow, 550, 650,
@@ -362,8 +370,7 @@ void example_core_widgets(rm_surface* gui)
 {
   rm_window* pwindow = new rm_window(gui, 20, 20, 1024, 768);
 
-  rm_image_button* imgButton = new rm_image_button(pwindow, 20, 20, 200, 40, "idle-button-login.png");
-  rm_button* textButton = new rm_button(pwindow, 200 + 20 + 10, 20, 200, 40, "Test Button");
+  rm_button* textButton = new rm_button(pwindow, 20, 20, 200, 40, "Test Button");
   rm_label* label = new rm_label(pwindow, 20, 40 + 30, "this is rm_label");
 
   //RMGUI_TEXT_INPUT_MULTILINE RMGUI_TEXT_INPUT_SINGLELINE
@@ -431,14 +438,6 @@ void example_core_widgets(rm_surface* gui)
 #endif
   checkbox->set_userptr(potext);
 
-  //rm_animation* anim = new rm_animation(pwindow, 20, 100, 100, 100, image_pat);
-  //anim->set_speed(8.f);
-  //anim->set_scale(0.5f);
-
-  //rm_animation* anim2 = new rm_animation(pwindow, 20 + 100, 100, 100, 100, image_pat);
-  //anim2->set_speed(-8.f);
-  //anim2->set_scale(0.5f);
-
   rm_combobox* combobox = new rm_combobox(pwindow, 300, 100 + 50, 200, 20);
   combobox->add_item("Item 1");
   combobox->add_item("Item 2");
@@ -456,8 +455,6 @@ void example_core_widgets(rm_surface* gui)
   progress_theme_document.tokens.controls.progress_corner_radius = 5.f;
   const RmThemeRef progress_theme = RmThemeCompiler::compile(progress_theme_document).theme;
   rm_progress* progress = new rm_progress(pwindow, 50, 350, 300, 10, 0.f, progress_theme);
-  //rm_progress_image* progress2 = new rm_progress_image(
-  //  pwindow, 50, 365, 300, 10, image_pat, 0.f, 1.f, 0.f, progress_theme);
 }
 
 void example_widgets(rm_surface* gui)

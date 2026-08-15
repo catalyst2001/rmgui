@@ -46,30 +46,13 @@ public:
   }
 };
 
-class rmgui_image {
-public:
-  NVGhandle imageId;
-  int width;
-  int height;
-  int channels;
+class rm_button;
+using rm_button_cb = Delegate<void, rm_button*>;
 
-  rmgui_image();
-  ~rmgui_image();
-
-  bool load(const std::string& filename, NVGcontext* ctx);
-};
-
-class rm_image_button : public rm_widget {
-  rmgui_image* m_image;
-public:
-  rm_image_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& imageFile);
-  virtual ~rm_image_button();
-  virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
-};
-
-class rm_button : public rm_widget {
+class rm_button : public rm_widget, public rm_callback<rm_button_cb>,
+  public rm_imagelist_host {
   std::string m_text;
+  rm_image_index m_icon;
   RmButtonBehaviour m_behaviour;
   RmThemeRef m_theme;
   RmButtonVariant m_variant;
@@ -78,7 +61,8 @@ class rm_button : public rm_widget {
   void on_pointer_capture_lost() override { m_behaviour.cancel(); }
 public:
   rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text,
-    RmThemeRef theme = {}, RmButtonVariant variant = RmButtonVariant::primary);
+    RmThemeRef theme = {}, RmButtonVariant variant = RmButtonVariant::primary,
+    rm_button_cb callback = nullptr);
   virtual ~rm_button();
   virtual void on_draw(NVGcontext* pctx) override;
   void on_draw_overlay(NVGcontext* pctx) override;
@@ -88,6 +72,11 @@ public:
   void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme(); }
   RmButtonVariant get_variant() const noexcept { return m_variant; }
   void set_variant(RmButtonVariant variant) noexcept { m_variant = variant; }
+  void set_text(std::string text) { m_text = std::move(text); }
+  const std::string& get_text() const noexcept { return m_text; }
+  void set_icon(rm_image_index icon) noexcept { m_icon = icon; }
+  void clear_icon() noexcept { m_icon = RM_INVALID_IMAGE_INDEX; }
+  rm_image_index get_icon() const noexcept { return m_icon; }
 };
 
 class rm_label : public rm_widget {
@@ -317,29 +306,6 @@ public:
   virtual void on_draw(NVGcontext* pctx) override;
 };
 
-/**
-* =============================================
-* Progress Image
-*
-*
-* =============================================
-*/
-class rm_progress_image : public rm_progress
-{
-  rm_image m_image;
-  float    m_angle;
-  float    m_alpha;
-public:
-  rm_progress_image(rm_widget* p_parent, int x, int y, int width, int height, 
-    rm_image img, float pattern_angle = 0.f, float pattern_alpha = 1.f,
-    float initial = 0.1f, RmThemeRef theme = {});
-  ~rm_progress_image();
-  inline void     set_image(rm_image img) { m_image = img; }
-  inline rm_image get_image() const { return m_image; }
-  virtual void    on_draw(NVGcontext* pctx) override;
-};
-
-
 class rm_scrollbar;
 using rm_scrollbar_cb = Delegate<void, rm_scrollbar*, float>;
 class rm_scrollbar : public rm_widget, public rm_callback<rm_scrollbar_cb>
@@ -541,33 +507,6 @@ public:
   RM_ORIENT get_orientation() const noexcept { return m_orientation; }
   const RmSplitterBehaviour& behaviour() const noexcept { return m_behaviour; }
   void set_theme(RmThemeRef theme);
-};
-
-/**
-* =============================================
-* Animation
-*
-*
-* =============================================
-*/
-class rm_animation : public rm_widget
-{
-  rm_image m_image;
-  float    m_speed;
-  float    m_angle;
-  float    m_scale;
-  virtual void on_draw(NVGcontext* pctx) override;
-public:
-  rm_animation(rm_widget* p_parent, int x, int y, int width, int height, rm_image img, float start_angle=0.f, float scale=1.f, float speed=1.f);
-  ~rm_animation();
-  inline void     set_image(rm_image img) { m_image = img; }
-  inline rm_image get_image() const { return m_image; }
-  inline void     set_angle(float angle) { m_angle = angle; }
-  inline float    get_angle() const { return m_angle; }
-  inline void     set_speed(float speed) { m_speed = speed; }
-  inline float    get_speed() const { return m_speed; }
-  inline void     set_scale(float scl) { m_scale = scl; }
-  inline float    get_scale() const { return m_scale; }
 };
 
 /**

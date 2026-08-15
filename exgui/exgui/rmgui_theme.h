@@ -80,6 +80,8 @@ struct RmButtonStyle {
   float border_width = 0.0f;
   float focus_ring_width = 0.0f;
   float font_size = 0.0f;
+  float icon_size = 0.0f;
+  float icon_text_gap = 0.0f;
 };
 
 struct RmButtonStyles {
@@ -532,6 +534,8 @@ struct RmControlMetricsTokens {
   float focus_ring_width = 1.0f;
   float window_titlebar_height = 30.0f;
   float window_resize_grip_extent = 5.0f;
+  float button_icon_size = 16.0f;
+  float button_icon_text_gap = 6.0f;
   float text_input_horizontal_padding = 10.0f;
   float text_input_vertical_padding = 7.0f;
   float text_input_caret_width = 1.5f;
@@ -770,6 +774,8 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.focus_ring_width, 0.0f, 32.0f, "tokens.controls.focus_ring_width", diagnostics);
     sanitize_metric(tokens.controls.window_titlebar_height, 0.0f, 256.0f, "tokens.controls.window_titlebar_height", diagnostics);
     sanitize_metric(tokens.controls.window_resize_grip_extent, 1.0f, 64.0f, "tokens.controls.window_resize_grip_extent", diagnostics);
+    sanitize_metric(tokens.controls.button_icon_size, 1.0f, 256.0f, "tokens.controls.button_icon_size", diagnostics);
+    sanitize_metric(tokens.controls.button_icon_text_gap, 0.0f, 256.0f, "tokens.controls.button_icon_text_gap", diagnostics);
     sanitize_metric(tokens.controls.text_input_horizontal_padding, 0.0f, 256.0f, "tokens.controls.text_input_horizontal_padding", diagnostics);
     sanitize_metric(tokens.controls.text_input_vertical_padding, 0.0f, 256.0f, "tokens.controls.text_input_vertical_padding", diagnostics);
     sanitize_metric(tokens.controls.text_input_caret_width, 0.0f, 32.0f, "tokens.controls.text_input_caret_width", diagnostics);
@@ -912,6 +918,8 @@ public:
       style.border_width = border_width;
       style.focus_ring_width = controls.focus_ring_width;
       style.font_size = tokens.typography.control;
+      style.icon_size = controls.button_icon_size;
+      style.icon_text_gap = controls.button_icon_text_gap;
     };
 
     configure_button(p_theme->buttons.primary,

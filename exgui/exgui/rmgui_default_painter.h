@@ -23,6 +23,8 @@ struct RmButtonVisual {
   float height = 0.0f;
   NVGhandle font;
   const char* text = nullptr;
+  const rm_imagelist* imagelist = nullptr;
+  rm_image_index icon = RM_INVALID_IMAGE_INDEX;
   bool enabled = true;
   bool hovered = false;
   bool pressed = false;
