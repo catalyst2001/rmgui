@@ -27,6 +27,7 @@ public:
   NVGcustomDraw last_draw{};
   std::vector<NVGvertex> last_vertices;
   std::vector<NVGvertex> last_fill_vertices;
+  std::vector<NVGscissor> fill_scissors;
 
   NVGhandle createTexture(int, int, int, int, const unsigned char*) override
   {
@@ -43,10 +44,12 @@ public:
   void viewport(float, float, float) override { ++viewport_calls; }
   void cancel() override {}
   void flush() override { ++flush_calls; }
-  void fill(const NVGpaint&, NVGcompositeOperationState, const NVGscissor&, float,
+  void fill(const NVGpaint&, NVGcompositeOperationState,
+    const NVGscissor& scissor, float,
     const float*, const NVGpath* paths, int path_count) override
   {
     ++fill_calls;
+    fill_scissors.push_back(scissor);
     last_fill_vertices.clear();
     for (int i = 0; i < path_count; ++i) {
       if (paths[i].fill && paths[i].nfill > 0)
@@ -115,6 +118,45 @@ void test_custom_triangle_forwarding()
     "custom vertex data must be preserved");
   require(recording->last_z_index == 17, "custom draw must use the current z-index");
   require(recording->flush_calls == 1, "endFrame must flush deferred rendering");
+}
+
+void test_nested_scissor_intersection()
+{
+  auto renderer = std::make_unique<RecordingRenderer>();
+  RecordingRenderer* recording = renderer.get();
+  NVGcontext context(std::move(renderer), NVGcontextConfig{});
+
+  context.beginFrame(200.0f, 200.0f, 1.0f);
+  context.scissor(10.0f, 10.0f, 100.0f, 100.0f);
+  context.save();
+  context.translate(50.0f, 50.0f);
+  context.intersectScissor(0.0f, 0.0f, 100.0f, 100.0f);
+  context.beginPath();
+  context.rect(0.0f, 0.0f, 100.0f, 100.0f);
+  context.fillColor(NVGcolor::RGB(255, 255, 255));
+  context.fill();
+  context.restore();
+
+  context.beginPath();
+  context.rect(0.0f, 0.0f, 20.0f, 20.0f);
+  context.fillColor(NVGcolor::RGB(255, 255, 255));
+  context.fill();
+  context.endFrame();
+
+  require(recording->fill_scissors.size() == 2,
+    "nested clipping test must submit both fills");
+  const NVGscissor& nested = recording->fill_scissors[0];
+  require(std::fabs(nested.xform[4] - 80.0f) < 1.0e-4f &&
+    std::fabs(nested.xform[5] - 80.0f) < 1.0e-4f &&
+    std::fabs(nested.extent[0] - 30.0f) < 1.0e-4f &&
+    std::fabs(nested.extent[1] - 30.0f) < 1.0e-4f,
+    "a child scissor must remain intersected with its translated parent viewport");
+  const NVGscissor& restored = recording->fill_scissors[1];
+  require(std::fabs(restored.xform[4] - 60.0f) < 1.0e-4f &&
+    std::fabs(restored.xform[5] - 60.0f) < 1.0e-4f &&
+    std::fabs(restored.extent[0] - 50.0f) < 1.0e-4f &&
+    std::fabs(restored.extent[1] - 50.0f) < 1.0e-4f,
+    "restoring a child draw must recover the parent scissor unchanged");
 }
 
 void test_narrow_rounded_rectangle_geometry()
@@ -291,6 +333,7 @@ void test_theme_document_compilation()
 int main()
 {
   test_custom_triangle_forwarding();
+  test_nested_scissor_intersection();
   test_narrow_rounded_rectangle_geometry();
   test_theme_document_compilation();
   std::cout << "All NanoVG and theme tests passed\n";

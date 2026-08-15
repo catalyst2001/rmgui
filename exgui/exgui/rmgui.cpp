@@ -487,9 +487,11 @@ void rm_surface::draw_recursive(rm_widget* pwidget, float dt)
 
 	m_pctx->save();
 
-	/* disabled scissoring? */
+	/* Widget clipping is cumulative. Replacing the scissor here would discard
+	   the viewport established by every ancestor and let scrolled descendants
+	   render outside their container. */
 	if (!pwidget->get_elem_flags().is_set(RM_FLAG_DISABLE_SCISSOR))
-		m_pctx->scissor(abs_pos.x, abs_pos.y, size.x, size.y);
+		m_pctx->intersectScissor(abs_pos.x, abs_pos.y, size.x, size.y);
 
 	m_pctx->setZIndex(pwidget->get_zindex());
 	m_pctx->translate(abs_pos.x, abs_pos.y);
@@ -516,8 +518,9 @@ void rm_surface::draw_recursive(rm_widget* pwidget, float dt)
 				draw_recursive(child, dt);
 		}
 	}
-	//m_pctx->ResetTransform();
-	m_pctx->resetScissor();
+	/* save()/restore() owns both transform and scissor state. Do not reset the
+	   scissor explicitly: that would make it possible for a descendant to
+	   destroy an ancestor's clipping contract. */
 	m_pctx->restore();
 
 #ifdef RMGUI_DEBUG_DRAW
