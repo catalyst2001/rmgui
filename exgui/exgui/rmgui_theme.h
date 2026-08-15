@@ -292,6 +292,8 @@ struct RmTreeViewStyle {
   float row_height = 0.0f;
   float indent = 0.0f;
   float horizontal_padding = 0.0f;
+  float selection_horizontal_padding = 0.0f;
+  float selection_vertical_padding = 0.0f;
   float expander_size = 0.0f;
   float expander_stroke_width = 0.0f;
   float corner_radius = 0.0f;
@@ -454,6 +456,8 @@ struct RmControlMetricsTokens {
   float treeview_row_height = 30.0f;
   float treeview_indent = 20.0f;
   float treeview_horizontal_padding = 8.0f;
+  float treeview_selection_horizontal_padding = 6.0f;
+  float treeview_selection_vertical_padding = 3.0f;
   float treeview_expander_size = 7.0f;
   float treeview_expander_stroke_width = 1.5f;
   float output_text_line_height = 20.0f;
@@ -656,6 +660,8 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.treeview_row_height, 16.0f, 256.0f, "tokens.controls.treeview_row_height", diagnostics);
     sanitize_metric(tokens.controls.treeview_indent, 0.0f, 256.0f, "tokens.controls.treeview_indent", diagnostics);
     sanitize_metric(tokens.controls.treeview_horizontal_padding, 0.0f, 256.0f, "tokens.controls.treeview_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.treeview_selection_horizontal_padding, 0.0f, 256.0f, "tokens.controls.treeview_selection_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.treeview_selection_vertical_padding, 0.0f, 256.0f, "tokens.controls.treeview_selection_vertical_padding", diagnostics);
     sanitize_metric(tokens.controls.treeview_expander_size, 1.0f, 64.0f, "tokens.controls.treeview_expander_size", diagnostics);
     sanitize_metric(tokens.controls.treeview_expander_stroke_width, 0.0f, 32.0f, "tokens.controls.treeview_expander_stroke_width", diagnostics);
     sanitize_metric(tokens.controls.output_text_line_height, 1.0f, 256.0f, "tokens.controls.output_text_line_height", diagnostics);
@@ -1002,6 +1008,10 @@ public:
     p_theme->treeview.row_height = controls.treeview_row_height;
     p_theme->treeview.indent = controls.treeview_indent;
     p_theme->treeview.horizontal_padding = controls.treeview_horizontal_padding;
+    p_theme->treeview.selection_horizontal_padding =
+      controls.treeview_selection_horizontal_padding;
+    p_theme->treeview.selection_vertical_padding =
+      controls.treeview_selection_vertical_padding;
     p_theme->treeview.expander_size = controls.treeview_expander_size;
     p_theme->treeview.expander_stroke_width =
       controls.treeview_expander_stroke_width;

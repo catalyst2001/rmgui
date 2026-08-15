@@ -166,6 +166,7 @@ void test_theme_document_compilation()
   document.tokens.controls.text_input_horizontal_padding = 13.0f;
   document.tokens.controls.number_input_button_width = 31.0f;
   document.tokens.controls.treeview_indent = 23.0f;
+  document.tokens.controls.treeview_selection_horizontal_padding = 7.0f;
   document.tokens.controls.output_text_line_height = 19.0f;
 
   const RmThemeCompileResult result = RmThemeCompiler::compile(document);
@@ -192,6 +193,8 @@ void test_theme_document_compilation()
     "number input recipes must use editable spinner metrics");
   require(result.theme->treeview.indent == 23.0f,
     "tree view recipes must use editable hierarchy metrics");
+  require(result.theme->treeview.selection_horizontal_padding == 7.0f,
+    "tree view recipes must use editable selection metrics");
   require(same_color(result.theme->treeview.selected_background.normal,
     document.tokens.colors.accent),
     "tree view selection must use the accent token");

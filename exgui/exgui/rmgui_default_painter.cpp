@@ -895,20 +895,45 @@ void RmDefaultControlPainter::draw_treeview_row(NVGcontext& context,
     ? style.selected_background : style.row_background;
   const RmStateColors& text_colors = visual.selected
     ? style.selected_text : style.row_text;
-  const float row_x = style.horizontal_padding;
-  const float row_width = std::max(0.0f,
+  const float branch_x = style.horizontal_padding +
+    static_cast<float>(visual.depth) * style.indent;
+  const float text_x = branch_x + style.indent;
+  const float center_y = visual.y + style.row_height * 0.5f;
+  const char* text = visual.text ? visual.text : "";
+
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+
+  float background_x = style.horizontal_padding;
+  float background_y = visual.y;
+  float background_width = std::max(0.0f,
     visual.width - style.horizontal_padding * 2.0f);
+  float background_height = style.row_height;
+  if (visual.selected) {
+    const float text_width = context.textBounds(0.0f, 0.0f, text, nullptr,
+      nullptr);
+    background_x = std::max(style.horizontal_padding,
+      text_x - style.selection_horizontal_padding);
+    background_width = std::min(
+      text_width + style.selection_horizontal_padding * 2.0f,
+      std::max(0.0f,
+        visual.width - style.horizontal_padding - background_x));
+    background_height = std::min(style.row_height,
+      style.font_size + style.selection_vertical_padding * 2.0f);
+    background_y = visual.y + (style.row_height - background_height) * 0.5f;
+  }
+
   const NVGcolor background = backgrounds.resolve(state);
-  if (background.a > 0.0f) {
+  if (background.a > 0.0f && background_width > 0.0f &&
+    background_height > 0.0f) {
     context.beginPath();
-    context.roundedRect(row_x, visual.y, row_width, style.row_height,
-      style.row_corner_radius);
+    context.roundedRect(background_x, background_y, background_width,
+      background_height, style.row_corner_radius);
     context.fillColor(background);
     context.fill();
   }
 
-  const float branch_x = style.horizontal_padding +
-    static_cast<float>(visual.depth) * style.indent;
   if (style.show_guides && visual.depth > 0) {
     context.beginPath();
     for (size_t depth = 0; depth < visual.depth; ++depth) {
@@ -923,7 +948,6 @@ void RmDefaultControlPainter::draw_treeview_row(NVGcontext& context,
   }
 
   const float expander_x = branch_x + style.indent * 0.5f;
-  const float center_y = visual.y + style.row_height * 0.5f;
   if (visual.expandable) {
     const float half = style.expander_size * 0.5f;
     context.beginPath();
@@ -942,12 +966,8 @@ void RmDefaultControlPainter::draw_treeview_row(NVGcontext& context,
     context.stroke();
   }
 
-  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
-  context.setFontSize(style.font_size);
-  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
   context.fillColor(text_colors.resolve(state));
-  context.text(branch_x + style.indent, center_y,
-    visual.text ? visual.text : "", nullptr);
+  context.text(text_x, center_y, text, nullptr);
 }
 
 void RmDefaultControlPainter::draw_output_text_surface(NVGcontext& context,
