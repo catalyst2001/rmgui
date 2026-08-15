@@ -252,6 +252,16 @@ void test_theme_document_compilation()
   require(same_color(result.theme->scrollbar.thumb.pressed,
     document.tokens.colors.accent_pressed),
     "dragged scrollbar thumb must use the pressed accent token");
+  require(result.theme->toolbar.button_extent ==
+    document.tokens.controls.toolstrip_button_extent &&
+    result.theme->toolbox.selected_border_width == 1.0f,
+    "toolbar and toolbox recipes must use editable compact metrics");
+  require(result.theme->rebar.gripper_extent ==
+    document.tokens.controls.rebar_gripper_extent,
+    "rebar recipes must expose band gripper geometry");
+  require(result.theme->splitter.thickness ==
+    document.tokens.controls.splitter_thickness,
+    "splitter recipes must use editable divider thickness");
   require(result.theme->switch_control.track_height == 30.0f,
     "component metric token must drive switch geometry");
   require(result.theme->switch_control.corner_radius == 15.0f,

@@ -308,6 +308,7 @@ class rm_scrollbar : public rm_widget, public rm_callback<rm_scrollbar_cb>
   RM_ORIENT m_orientation;
   RmScrollbarBehaviour m_behaviour;
   RmThemeRef m_theme;
+  rm_widget* m_scroll_target = nullptr;
 
   bool is_vertical() const noexcept { return m_orientation == RM_ORIENT_VERT; }
   float track_length() const noexcept { return is_vertical() ? m_size.y : m_size.x; }
@@ -315,6 +316,8 @@ class rm_scrollbar : public rm_widget, public rm_callback<rm_scrollbar_cb>
     return is_vertical() ? local_cursor.y : local_cursor.x;
   }
   void adjust_geometry();
+  void sync_from_target();
+  void apply_to_target();
   void notify_position();
   void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
   void on_pointer_capture_lost() override { m_behaviour.cancel(); }
@@ -332,9 +335,167 @@ public:
   inline float get_position() const { return m_behaviour.position(); }
   void set_viewport_fraction(float fraction) { m_behaviour.set_viewport_fraction(fraction); }
   void set_content_metrics(float content_extent, float viewport_extent);
+  void bind_to(rm_widget* p_target);
+  rm_widget* get_scroll_target() const noexcept { return m_scroll_target; }
   float get_viewport_fraction() const { return m_behaviour.viewport_fraction(); }
   RM_ORIENT get_orientation() const noexcept { return m_orientation; }
   const RmScrollbarBehaviour& behaviour() const noexcept { return m_behaviour; }
+  void set_theme(RmThemeRef theme);
+};
+
+enum class RmToolGroupLabelPlacement {
+  none,
+  top,
+  bottom
+};
+
+struct rm_tool_item {
+  uint32_t id = 0;
+  std::string text;
+  std::string tooltip;
+  rm_image icon;
+  bool enabled = true;
+  void* userdata = nullptr;
+};
+
+struct rm_tool_group {
+  std::string text;
+  RmToolGroupLabelPlacement label_placement = RmToolGroupLabelPlacement::bottom;
+  size_t cross_count = 1;
+  std::vector<rm_tool_item> items;
+};
+
+class rm_toolstrip;
+using rm_toolstrip_cb = Delegate<void, rm_toolstrip*, uint32_t>;
+
+class rm_toolstrip : public rm_widget, public rm_callback<rm_toolstrip_cb> {
+  struct ItemLayout {
+    size_t group = 0;
+    size_t item = 0;
+    rm_rect bounds;
+  };
+  struct GroupLayout {
+    rm_rect bounds;
+    rm_rect label_bounds;
+  };
+
+  std::vector<rm_tool_group> m_groups;
+  std::vector<ItemLayout> m_item_layout;
+  std::vector<GroupLayout> m_group_layout;
+  RmToolStripBehaviour m_behaviour;
+  RmThemeRef m_theme;
+  RM_ORIENT m_orientation;
+
+  const RmToolStripStyle& toolstrip_style() const;
+  void rebuild_layout();
+  size_t hit_test_item(const rm_vec2& cursor_pos) const;
+  rm_tool_item* item_from_flat_index(size_t index);
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
+  void on_pointer_capture_lost() override { m_behaviour.cancel(); }
+protected:
+  void on_draw(NVGcontext* pctx) override;
+  void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
+  bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
+    rm_vec2& cursor_pos, rm_vec2 delta) override;
+public:
+  rm_toolstrip(rm_widget* p_parent, int x, int y, int width, int height,
+    RM_ORIENT orientation, bool exclusive, rm_toolstrip_cb callback = nullptr,
+    RmThemeRef theme = {});
+
+  size_t add_group(const char* p_text,
+    RmToolGroupLabelPlacement placement = RmToolGroupLabelPlacement::bottom,
+    size_t cross_count = 1);
+  rm_tool_item* add_tool(size_t group, uint32_t id, const char* p_text,
+    const char* p_tooltip = nullptr, rm_image icon = {}, void* p_userdata = nullptr);
+  bool select_tool(uint32_t id, bool notify = false);
+  uint32_t get_selected_tool_id() const;
+  rm_tool_item* find_tool(uint32_t id);
+  const std::vector<rm_tool_group>& get_groups() const noexcept { return m_groups; }
+  RM_ORIENT get_orientation() const noexcept { return m_orientation; }
+  bool is_exclusive() const noexcept { return m_behaviour.is_exclusive(); }
+  const RmToolStripBehaviour& behaviour() const noexcept { return m_behaviour; }
+  void set_theme(RmThemeRef theme);
+  void resize(float width, float height) override;
+};
+
+class rm_toolbar : public rm_toolstrip {
+public:
+  rm_toolbar(rm_widget* p_parent, int x, int y, int width, int height,
+    RM_ORIENT orientation = RM_ORIENT_HORZ,
+    rm_toolstrip_cb callback = nullptr, RmThemeRef theme = {})
+    : rm_toolstrip(p_parent, x, y, width, height, orientation, false,
+      callback, std::move(theme)) { set_classname("rm_toolbar"); }
+};
+
+class rm_toolbox : public rm_toolstrip {
+public:
+  rm_toolbox(rm_widget* p_parent, int x, int y, int width, int height,
+    RM_ORIENT orientation = RM_ORIENT_VERT,
+    rm_toolstrip_cb callback = nullptr, RmThemeRef theme = {})
+    : rm_toolstrip(p_parent, x, y, width, height, orientation, true,
+      callback, std::move(theme)) { set_classname("rm_toolbox"); }
+};
+
+class rm_rebar : public rm_widget {
+  struct Band {
+    rm_widget* widget = nullptr;
+    float preferred_extent = 0.0f;
+    float minimum_extent = 0.0f;
+    bool stretch = false;
+    rm_rect bounds;
+  };
+  std::vector<Band> m_bands;
+  RmThemeRef m_theme;
+  RM_ORIENT m_orientation;
+  bool m_layouting = false;
+
+  void layout_bands();
+protected:
+  void on_draw(NVGcontext* pctx) override;
+public:
+  rm_rebar(rm_widget* p_parent, int x, int y, int width, int height,
+    RM_ORIENT orientation = RM_ORIENT_HORZ, RmThemeRef theme = {});
+  bool add_band(rm_widget* p_widget, float preferred_extent = 0.0f,
+    float minimum_extent = 0.0f, bool stretch = false);
+  bool remove_band(rm_widget* p_widget);
+  size_t get_num_bands() const noexcept { return m_bands.size(); }
+  RM_ORIENT get_orientation() const noexcept { return m_orientation; }
+  void set_theme(RmThemeRef theme);
+  void resize(float width, float height) override;
+};
+
+class rm_splitter;
+using rm_splitter_cb = Delegate<void, rm_splitter*, float>;
+
+class rm_splitter : public rm_widget, public rm_callback<rm_splitter_cb> {
+  rm_widget* m_pfirst = nullptr;
+  rm_widget* m_psecond = nullptr;
+  RmSplitterBehaviour m_behaviour;
+  RmThemeRef m_theme;
+  RM_ORIENT m_orientation;
+  float m_min_first = 0.0f;
+  float m_min_second = 0.0f;
+
+  float available_extent() const;
+  void update_limits();
+  void apply_layout();
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_pointer_capture_lost() override { m_behaviour.cancel(); }
+protected:
+  void on_draw(NVGcontext* pctx) override;
+  bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
+    rm_vec2& cursor_pos, rm_vec2 delta) override;
+public:
+  rm_splitter(rm_widget* p_parent, rm_widget* p_first, rm_widget* p_second,
+    RM_ORIENT orientation = RM_ORIENT_VERT, float fraction = 0.5f,
+    rm_splitter_cb callback = nullptr, RmThemeRef theme = {});
+  void set_targets(rm_widget* p_first, rm_widget* p_second);
+  void set_fraction(float fraction, bool notify = false);
+  float get_fraction() const noexcept { return m_behaviour.fraction(); }
+  void set_minimum_extents(float first, float second);
+  RM_ORIENT get_orientation() const noexcept { return m_orientation; }
+  const RmSplitterBehaviour& behaviour() const noexcept { return m_behaviour; }
   void set_theme(RmThemeRef theme);
 };
 

@@ -1346,6 +1346,170 @@ void RmDefaultControlPainter::draw_scrollbar(NVGcontext& context,
   }
 }
 
+void RmDefaultControlPainter::draw_toolstrip_surface(NVGcontext& context,
+  const RmToolStripSurfaceVisual& visual, const RmToolStripStyle& style)
+{
+  const float half = style.border_width * 0.5f;
+  context.beginPath();
+  context.roundedRect(half, half, std::max(0.0f, visual.width - style.border_width),
+    std::max(0.0f, visual.height - style.border_width), style.corner_radius);
+  context.fillColor(style.background);
+  context.fill();
+  if (style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.border);
+    context.stroke();
+  }
+}
+
+void RmDefaultControlPainter::draw_toolstrip_group(NVGcontext& context,
+  const RmToolStripGroupVisual& visual, const RmToolStripStyle& style)
+{
+  if (visual.label_bounds.width <= 0.0f || visual.label_bounds.height <= 0.0f)
+    return;
+  context.beginPath();
+  context.moveTo(visual.label_bounds.x, visual.label_bounds.y);
+  context.lineTo(visual.label_bounds.x + visual.label_bounds.width,
+    visual.label_bounds.y);
+  context.StrokeWidth(style.border_width);
+  context.strokeColor(style.separator);
+  context.stroke();
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.group_font_size);
+  context.setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+  context.fillColor(style.group_text);
+  context.text(visual.label_bounds.x + visual.label_bounds.width * 0.5f,
+    visual.label_bounds.y + visual.label_bounds.height * 0.5f,
+    visual.text ? visual.text : "", nullptr);
+}
+
+void RmDefaultControlPainter::draw_toolstrip_button(NVGcontext& context,
+  const RmToolStripButtonVisual& visual, const RmToolStripStyle& style)
+{
+  const RmVisualState state = resolve_state(visual.enabled,
+    visual.hovered, visual.pressed);
+  const NVGcolor background = visual.selected
+    ? style.selected_background : style.button_background.resolve(state);
+  const NVGcolor border = visual.selected
+    ? style.selected_border : style.button_border.resolve(state);
+  const float border_width = visual.selected
+    ? style.selected_border_width : style.border_width;
+  const float half = border_width * 0.5f;
+  context.beginPath();
+  context.roundedRect(visual.bounds.x + half, visual.bounds.y + half,
+    std::max(0.0f, visual.bounds.width - border_width),
+    std::max(0.0f, visual.bounds.height - border_width), style.corner_radius);
+  context.fillColor(background);
+  context.fill();
+  if (border_width > 0.0f) {
+    context.StrokeWidth(border_width);
+    context.strokeColor(border);
+    context.stroke();
+  }
+
+  const float inset = std::max(3.0f, visual.bounds.height * 0.18f);
+  if (visual.icon.isValid()) {
+    const float extent = std::max(0.0f,
+      std::min(visual.bounds.width, visual.bounds.height) - inset * 2.0f);
+    const float x = visual.bounds.x + (visual.bounds.width - extent) * 0.5f;
+    const float y = visual.bounds.y + (visual.bounds.height - extent) * 0.5f;
+    context.beginPath();
+    context.rect(x, y, extent, extent);
+    context.fillPaint(NVGpaint::imagePattern(x, y, extent, extent, 0.0f,
+      visual.icon, visual.enabled ? 1.0f : 0.45f));
+    context.fill();
+  } else {
+    context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+    context.setFontSize(style.font_size);
+    context.setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+    context.fillColor(style.button_text.resolve(state));
+    context.text(visual.bounds.x + visual.bounds.width * 0.5f,
+      visual.bounds.y + visual.bounds.height * 0.5f,
+      visual.text ? visual.text : "", nullptr);
+  }
+}
+
+void RmDefaultControlPainter::draw_rebar(NVGcontext& context,
+  const RmRebarVisual& visual, const RmRebarStyle& style)
+{
+  const float half = style.border_width * 0.5f;
+  context.beginPath();
+  context.roundedRect(half, half, std::max(0.0f, visual.width - style.border_width),
+    std::max(0.0f, visual.height - style.border_width), style.corner_radius);
+  context.fillColor(style.background);
+  context.fill();
+  if (style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.border);
+    context.stroke();
+  }
+}
+
+void RmDefaultControlPainter::draw_rebar_band(NVGcontext& context,
+  const RmRebarBandVisual& visual, const RmRebarStyle& style)
+{
+  const float axis = visual.vertical ? visual.bounds.y : visual.bounds.x;
+  const float cross = visual.vertical ? visual.bounds.x : visual.bounds.y;
+  const float cross_extent = visual.vertical
+    ? visual.bounds.width : visual.bounds.height;
+  const float line_axis = axis + style.gripper_extent * 0.35f;
+  for (int i = 0; i < 2; ++i) {
+    context.beginPath();
+    if (visual.vertical) {
+      context.moveTo(cross + 2.0f + i * 3.0f, line_axis);
+      context.lineTo(cross + cross_extent - 2.0f, line_axis);
+    } else {
+      context.moveTo(line_axis, cross + 2.0f + i * 3.0f);
+      context.lineTo(line_axis, cross + cross_extent - 2.0f);
+    }
+    context.StrokeWidth(style.separator_width);
+    context.strokeColor(style.gripper);
+    context.stroke();
+  }
+}
+
+void RmDefaultControlPainter::draw_splitter(NVGcontext& context,
+  const RmSplitterVisual& visual, const RmSplitterStyle& style)
+{
+  const RmVisualState state = resolve_state(visual.enabled,
+    visual.hovered, visual.dragging);
+  context.beginPath();
+  context.roundedRect(0.0f, 0.0f, visual.width, visual.height,
+    style.corner_radius);
+  context.fillColor(style.background.resolve(state));
+  context.fill();
+
+  const float center_x = visual.width * 0.5f;
+  const float center_y = visual.height * 0.5f;
+  const float half = style.grip_extent * 0.5f;
+  for (int i = -1; i <= 1; ++i) {
+    context.beginPath();
+    if (visual.vertical) {
+      const float y = center_y + i * style.grip_width * 2.0f;
+      context.moveTo(center_x - half, y);
+      context.lineTo(center_x + half, y);
+    } else {
+      const float x = center_x + i * style.grip_width * 2.0f;
+      context.moveTo(x, center_y - half);
+      context.lineTo(x, center_y + half);
+    }
+    context.StrokeWidth(style.grip_width);
+    context.strokeColor(style.grip);
+    context.stroke();
+  }
+
+  if (visual.focused && style.focus_ring_width > 0.0f) {
+    context.beginPath();
+    context.rect(style.focus_ring_width * 0.5f,
+      style.focus_ring_width * 0.5f,
+      std::max(0.0f, visual.width - style.focus_ring_width),
+      std::max(0.0f, visual.height - style.focus_ring_width));
+    context.StrokeWidth(style.focus_ring_width);
+    context.strokeColor(style.focus_ring);
+    context.stroke();
+  }
+}
+
 void RmDefaultControlPainter::draw_progress(NVGcontext& context,
   const RmProgressVisual& visual, const RmProgressStyle& style)
 {

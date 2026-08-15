@@ -347,6 +347,53 @@ struct RmPropertyViewStyle {
   float choice_indicator_size = 0.0f;
 };
 
+struct RmToolStripStyle {
+  RmStateColors button_background;
+  RmStateColors button_border;
+  RmStateColors button_text;
+  NVGcolor background;
+  NVGcolor border;
+  NVGcolor selected_background;
+  NVGcolor selected_border;
+  NVGcolor group_text;
+  NVGcolor separator;
+  float button_extent = 0.0f;
+  float button_gap = 0.0f;
+  float group_gap = 0.0f;
+  float group_label_height = 0.0f;
+  float group_padding = 0.0f;
+  float corner_radius = 0.0f;
+  float border_width = 0.0f;
+  float selected_border_width = 0.0f;
+  float font_size = 0.0f;
+  float group_font_size = 0.0f;
+};
+
+struct RmRebarStyle {
+  NVGcolor background;
+  NVGcolor border;
+  NVGcolor separator;
+  NVGcolor gripper;
+  float band_gap = 0.0f;
+  float band_padding = 0.0f;
+  float row_gap = 0.0f;
+  float gripper_extent = 0.0f;
+  float border_width = 0.0f;
+  float separator_width = 0.0f;
+  float corner_radius = 0.0f;
+};
+
+struct RmSplitterStyle {
+  RmStateColors background;
+  NVGcolor grip;
+  NVGcolor focus_ring;
+  float thickness = 0.0f;
+  float grip_extent = 0.0f;
+  float grip_width = 0.0f;
+  float focus_ring_width = 0.0f;
+  float corner_radius = 0.0f;
+};
+
 struct RmOutputTextStyle {
   NVGcolor background;
   NVGcolor border;
@@ -517,6 +564,18 @@ struct RmControlMetricsTokens {
   float propertyview_editor_padding = 5.0f;
   float propertyview_grid_width = 1.0f;
   float propertyview_choice_indicator_size = 4.0f;
+  float toolstrip_button_extent = 30.0f;
+  float toolstrip_button_gap = 2.0f;
+  float toolstrip_group_gap = 6.0f;
+  float toolstrip_group_label_height = 20.0f;
+  float toolstrip_group_padding = 3.0f;
+  float rebar_band_gap = 3.0f;
+  float rebar_band_padding = 2.0f;
+  float rebar_row_gap = 2.0f;
+  float rebar_gripper_extent = 6.0f;
+  float splitter_thickness = 6.0f;
+  float splitter_grip_extent = 18.0f;
+  float splitter_grip_width = 1.0f;
   float output_text_line_height = 20.0f;
   float output_text_horizontal_padding = 10.0f;
   float output_text_vertical_padding = 8.0f;
@@ -587,6 +646,10 @@ struct RmThemeSnapshot {
   RmListViewStyle listview;
   RmTreeViewStyle treeview;
   RmPropertyViewStyle propertyview;
+  RmToolStripStyle toolbar;
+  RmToolStripStyle toolbox;
+  RmRebarStyle rebar;
+  RmSplitterStyle splitter;
   RmOutputTextStyle output_text;
   RmSliderStyle slider;
   RmScrollbarStyle scrollbar;
@@ -734,6 +797,18 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.propertyview_editor_padding, 0.0f, 256.0f, "tokens.controls.propertyview_editor_padding", diagnostics);
     sanitize_metric(tokens.controls.propertyview_grid_width, 0.0f, 32.0f, "tokens.controls.propertyview_grid_width", diagnostics);
     sanitize_metric(tokens.controls.propertyview_choice_indicator_size, 1.0f, 64.0f, "tokens.controls.propertyview_choice_indicator_size", diagnostics);
+    sanitize_metric(tokens.controls.toolstrip_button_extent, 12.0f, 256.0f, "tokens.controls.toolstrip_button_extent", diagnostics);
+    sanitize_metric(tokens.controls.toolstrip_button_gap, 0.0f, 64.0f, "tokens.controls.toolstrip_button_gap", diagnostics);
+    sanitize_metric(tokens.controls.toolstrip_group_gap, 0.0f, 256.0f, "tokens.controls.toolstrip_group_gap", diagnostics);
+    sanitize_metric(tokens.controls.toolstrip_group_label_height, 0.0f, 128.0f, "tokens.controls.toolstrip_group_label_height", diagnostics);
+    sanitize_metric(tokens.controls.toolstrip_group_padding, 0.0f, 64.0f, "tokens.controls.toolstrip_group_padding", diagnostics);
+    sanitize_metric(tokens.controls.rebar_band_gap, 0.0f, 128.0f, "tokens.controls.rebar_band_gap", diagnostics);
+    sanitize_metric(tokens.controls.rebar_band_padding, 0.0f, 128.0f, "tokens.controls.rebar_band_padding", diagnostics);
+    sanitize_metric(tokens.controls.rebar_row_gap, 0.0f, 128.0f, "tokens.controls.rebar_row_gap", diagnostics);
+    sanitize_metric(tokens.controls.rebar_gripper_extent, 0.0f, 64.0f, "tokens.controls.rebar_gripper_extent", diagnostics);
+    sanitize_metric(tokens.controls.splitter_thickness, 2.0f, 64.0f, "tokens.controls.splitter_thickness", diagnostics);
+    sanitize_metric(tokens.controls.splitter_grip_extent, 1.0f, 128.0f, "tokens.controls.splitter_grip_extent", diagnostics);
+    sanitize_metric(tokens.controls.splitter_grip_width, 0.0f, 16.0f, "tokens.controls.splitter_grip_width", diagnostics);
     sanitize_metric(tokens.controls.output_text_line_height, 1.0f, 256.0f, "tokens.controls.output_text_line_height", diagnostics);
     sanitize_metric(tokens.controls.output_text_horizontal_padding, 0.0f, 256.0f, "tokens.controls.output_text_horizontal_padding", diagnostics);
     sanitize_metric(tokens.controls.output_text_vertical_padding, 0.0f, 256.0f, "tokens.controls.output_text_vertical_padding", diagnostics);
@@ -1139,6 +1214,55 @@ public:
     p_theme->propertyview.group_font_size = tokens.typography.caption;
     p_theme->propertyview.choice_indicator_size =
       controls.propertyview_choice_indicator_size;
+
+    auto compile_toolstrip = [&](RmToolStripStyle& style, bool exclusive) {
+      style.button_background = { colors.control, colors.control_hovered,
+        colors.control_pressed, colors.control_disabled };
+      style.button_border = { colors.border, colors.border_hovered,
+        colors.border_pressed, colors.border_disabled };
+      style.button_text = { colors.text, colors.text, colors.text,
+        colors.text_disabled };
+      style.background = colors.surface_elevated;
+      style.border = colors.border;
+      style.selected_background = exclusive ? colors.control_pressed : colors.accent;
+      style.selected_border = colors.focus_ring;
+      style.group_text = colors.text_muted;
+      style.separator = colors.border;
+      style.button_extent = controls.toolstrip_button_extent;
+      style.button_gap = controls.toolstrip_button_gap;
+      style.group_gap = controls.toolstrip_group_gap;
+      style.group_label_height = controls.toolstrip_group_label_height;
+      style.group_padding = controls.toolstrip_group_padding;
+      style.corner_radius = tokens.radius.small;
+      style.border_width = controls.border_width;
+      style.selected_border_width = controls.focus_ring_width;
+      style.font_size = tokens.typography.caption;
+      style.group_font_size = tokens.typography.caption;
+    };
+    compile_toolstrip(p_theme->toolbar, false);
+    compile_toolstrip(p_theme->toolbox, true);
+
+    p_theme->rebar.background = colors.surface_elevated;
+    p_theme->rebar.border = colors.border;
+    p_theme->rebar.separator = colors.border;
+    p_theme->rebar.gripper = colors.text_muted;
+    p_theme->rebar.band_gap = controls.rebar_band_gap;
+    p_theme->rebar.band_padding = controls.rebar_band_padding;
+    p_theme->rebar.row_gap = controls.rebar_row_gap;
+    p_theme->rebar.gripper_extent = controls.rebar_gripper_extent;
+    p_theme->rebar.border_width = controls.border_width;
+    p_theme->rebar.separator_width = controls.border_width;
+    p_theme->rebar.corner_radius = tokens.radius.small;
+
+    p_theme->splitter.background = { colors.border, colors.border_hovered,
+      colors.border_pressed, colors.border_disabled };
+    p_theme->splitter.grip = colors.text_muted;
+    p_theme->splitter.focus_ring = colors.focus_ring;
+    p_theme->splitter.thickness = controls.splitter_thickness;
+    p_theme->splitter.grip_extent = controls.splitter_grip_extent;
+    p_theme->splitter.grip_width = controls.splitter_grip_width;
+    p_theme->splitter.focus_ring_width = controls.focus_ring_width;
+    p_theme->splitter.corner_radius = tokens.radius.small;
 
     p_theme->output_text.background = colors.surface_elevated;
     p_theme->output_text.border = colors.border;

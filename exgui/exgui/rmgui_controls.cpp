@@ -876,24 +876,92 @@ void rm_scrollbar::adjust_geometry()
 		return;
 	const rm_vec2& parent_size = m_pparent->get_size();
 	const float thickness = m_theme->scrollbar.thickness;
+	bool has_crossbar = false;
+	for (size_t index = 0; index < m_pparent->get_num_childs(); ++index) {
+		rm_scrollbar* p_other = dynamic_cast<rm_scrollbar*>(
+			m_pparent->get_child(index));
+		if (p_other && p_other != this &&
+			p_other->get_orientation() != m_orientation &&
+			(!m_scroll_target || p_other->get_scroll_target() == m_scroll_target)) {
+			has_crossbar = true;
+			break;
+		}
+	}
 	if (is_vertical()) {
 		move({ std::max(0.f, parent_size.x - thickness), 0.f });
-		resize(thickness, parent_size.y);
+		resize(thickness, std::max(0.0f,
+			parent_size.y - (has_crossbar ? thickness : 0.0f)));
 	}
 	else {
 		move({ 0.f, std::max(0.f, parent_size.y - thickness) });
-		resize(parent_size.x, thickness);
+		resize(std::max(0.0f,
+			parent_size.x - (has_crossbar ? thickness : 0.0f)), thickness);
 	}
+}
+
+void rm_scrollbar::sync_from_target()
+{
+	if (!m_scroll_target)
+		return;
+	m_scroll_target->update_content_extent_from_children();
+	if (m_scroll_target == m_pparent) {
+		bool has_horizontal = false;
+		bool has_vertical = false;
+		for (size_t index = 0; index < m_pparent->get_num_childs(); ++index) {
+			rm_scrollbar* p_scrollbar = dynamic_cast<rm_scrollbar*>(
+				m_pparent->get_child(index));
+			if (!p_scrollbar || p_scrollbar->get_scroll_target() != m_scroll_target)
+				continue;
+			has_vertical |= p_scrollbar->get_orientation() == RM_ORIENT_VERT;
+			has_horizontal |= p_scrollbar->get_orientation() == RM_ORIENT_HORZ;
+		}
+		const rm_rect current = m_scroll_target->get_content_area();
+		const rm_vec2& target_size = m_scroll_target->get_size();
+		const float thickness = m_theme->scrollbar.thickness;
+		m_scroll_target->set_content_area({ current.x, current.y,
+			std::max(0.0f, target_size.x - current.x -
+				(has_vertical ? thickness : 0.0f)),
+			std::max(0.0f, target_size.y - current.y -
+				(has_horizontal ? thickness : 0.0f)) });
+	}
+	const rm_vec2& extent = m_scroll_target->get_content_extent();
+	const rm_rect& viewport = m_scroll_target->get_content_area();
+	const rm_vec2& offset = m_scroll_target->get_content_offset();
+	const rm_vec2 maximum = m_scroll_target->get_max_content_offset();
+	const float content_extent = is_vertical() ? extent.y : extent.x;
+	const float viewport_extent = is_vertical() ? viewport.height : viewport.width;
+	const float maximum_offset = is_vertical() ? maximum.y : maximum.x;
+	const float current_offset = is_vertical() ? offset.y : offset.x;
+	m_behaviour.set_viewport_fraction(content_extent > FLT_EPSILON
+		? viewport_extent / content_extent : 1.0f);
+	m_behaviour.set_position(maximum_offset > FLT_EPSILON
+		? current_offset / maximum_offset : 0.0f);
+}
+
+void rm_scrollbar::apply_to_target()
+{
+	if (!m_scroll_target)
+		return;
+	rm_vec2 offset = m_scroll_target->get_content_offset();
+	const rm_vec2 maximum = m_scroll_target->get_max_content_offset();
+	if (is_vertical())
+		offset.y = maximum.y * m_behaviour.position();
+	else
+		offset.x = maximum.x * m_behaviour.position();
+	m_scroll_target->set_content_offset(offset);
 }
 
 void rm_scrollbar::notify_position()
 {
+	apply_to_target();
 	if (is_valid_callback())
 		get_callback()(this, m_behaviour.position());
 }
 
 void rm_scrollbar::on_draw(NVGcontext* pctx)
 {
+	sync_from_target();
+	adjust_geometry();
 	const RmScrollbarStyle& style = m_theme->scrollbar;
 	const float length = track_length();
 	RmDefaultControlPainter::draw_scrollbar(*pctx,
@@ -968,6 +1036,7 @@ rm_scrollbar::rm_scrollbar(rm_widget* p_parent, RM_ORIENT orientation,
 	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
 {
 	set_callback(p_callback);
+	set_fixed_to_viewport(true);
 	adjust_geometry();
 }
 
@@ -978,8 +1047,11 @@ rm_scrollbar::~rm_scrollbar()
 void rm_scrollbar::set_position(float position, bool notify)
 {
 	const RmBehaviourUpdate update = m_behaviour.set_position(position);
-	if (notify && update.state_changed)
-		notify_position();
+	if (!update.state_changed)
+		return;
+	apply_to_target();
+	if (notify && is_valid_callback())
+		get_callback()(this, m_behaviour.position());
 }
 
 void rm_scrollbar::set_content_metrics(float content_extent, float viewport_extent)
@@ -989,10 +1061,565 @@ void rm_scrollbar::set_content_metrics(float content_extent, float viewport_exte
 	m_behaviour.set_viewport_fraction(fraction);
 }
 
+void rm_scrollbar::bind_to(rm_widget* p_target)
+{
+	m_scroll_target = p_target;
+	set_fixed_to_viewport(m_pparent == p_target);
+	sync_from_target();
+	adjust_geometry();
+}
+
 void rm_scrollbar::set_theme(RmThemeRef theme)
 {
 	m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
 	adjust_geometry();
+}
+
+const RmToolStripStyle& rm_toolstrip::toolstrip_style() const
+{
+	return m_behaviour.is_exclusive() ? m_theme->toolbox : m_theme->toolbar;
+}
+
+void rm_toolstrip::rebuild_layout()
+{
+	m_item_layout.clear();
+	m_group_layout.clear();
+	const RmToolStripStyle& style = toolstrip_style();
+	const bool horizontal = m_orientation == RM_ORIENT_HORZ;
+	float group_origin = style.group_padding;
+
+	for (size_t group_index = 0; group_index < m_groups.size(); ++group_index) {
+		const rm_tool_group& group = m_groups[group_index];
+		const size_t cross_count = std::max<size_t>(1, group.cross_count);
+		const size_t main_count = group.items.empty()
+			? 0 : (group.items.size() + cross_count - 1) / cross_count;
+		const float content_main = main_count > 0
+			? main_count * style.button_extent + (main_count - 1) * style.button_gap : 0.0f;
+		const float content_cross = cross_count * style.button_extent
+			+ (cross_count - 1) * style.button_gap;
+		const bool has_label = group.label_placement != RmToolGroupLabelPlacement::none
+			&& !group.text.empty();
+		const float label_height = has_label ? style.group_label_height : 0.0f;
+
+		GroupLayout group_layout;
+		if (horizontal) {
+			const float width = content_main + style.group_padding * 2.0f;
+			const float height = content_cross + label_height + style.group_padding * 2.0f;
+			group_layout.bounds = { group_origin, style.group_padding, width, height };
+			if (has_label) {
+				const float label_y = group.label_placement == RmToolGroupLabelPlacement::top
+					? style.group_padding : style.group_padding + content_cross;
+				group_layout.label_bounds = { group_origin + style.group_padding,
+					label_y, content_main, label_height };
+			}
+			const float item_y = style.group_padding +
+				(has_label && group.label_placement == RmToolGroupLabelPlacement::top
+					? label_height : 0.0f);
+			for (size_t item = 0; item < group.items.size(); ++item) {
+				const size_t main_slot = item / cross_count;
+				const size_t cross_slot = item % cross_count;
+				m_item_layout.push_back({ group_index, item, {
+					group_origin + style.group_padding + main_slot *
+						(style.button_extent + style.button_gap),
+					item_y + cross_slot * (style.button_extent + style.button_gap),
+					style.button_extent, style.button_extent } });
+			}
+			group_origin += width + style.group_gap;
+		} else {
+			const float width = content_cross + style.group_padding * 2.0f;
+			const float height = content_main + label_height + style.group_padding * 2.0f;
+			group_layout.bounds = { style.group_padding, group_origin, width, height };
+			if (has_label) {
+				const float label_y = group.label_placement == RmToolGroupLabelPlacement::top
+					? group_origin + style.group_padding
+					: group_origin + style.group_padding + content_main;
+				group_layout.label_bounds = { style.group_padding, label_y,
+					width, label_height };
+			}
+			const float item_y = group_origin + style.group_padding +
+				(has_label && group.label_placement == RmToolGroupLabelPlacement::top
+					? label_height : 0.0f);
+			for (size_t item = 0; item < group.items.size(); ++item) {
+				const size_t main_slot = item / cross_count;
+				const size_t cross_slot = item % cross_count;
+				m_item_layout.push_back({ group_index, item, {
+					style.group_padding + cross_slot *
+						(style.button_extent + style.button_gap),
+					item_y + main_slot * (style.button_extent + style.button_gap),
+					style.button_extent, style.button_extent } });
+			}
+			group_origin += height + style.group_gap;
+		}
+		m_group_layout.push_back(group_layout);
+	}
+	m_behaviour.set_count(m_item_layout.size());
+}
+
+size_t rm_toolstrip::hit_test_item(const rm_vec2& cursor_pos) const
+{
+	const rm_vec2 local = rm_vec2(cursor_pos.x - m_pos_of_parent.x,
+		cursor_pos.y - m_pos_of_parent.y);
+	for (size_t i = 0; i < m_item_layout.size(); ++i) {
+		const ItemLayout& layout = m_item_layout[i];
+		if (local.x >= layout.bounds.x && local.y >= layout.bounds.y &&
+			local.x <= layout.bounds.x + layout.bounds.width &&
+			local.y <= layout.bounds.y + layout.bounds.height) {
+			const rm_tool_item& item = m_groups[layout.group].items[layout.item];
+			return item.enabled ? i : RmToolStripBehaviour::invalid_index;
+		}
+	}
+	return RmToolStripBehaviour::invalid_index;
+}
+
+rm_tool_item* rm_toolstrip::item_from_flat_index(size_t index)
+{
+	if (index >= m_item_layout.size())
+		return nullptr;
+	const ItemLayout& layout = m_item_layout[index];
+	return &m_groups[layout.group].items[layout.item];
+}
+
+void rm_toolstrip::on_draw(NVGcontext* pctx)
+{
+	rebuild_layout();
+	const RmToolStripStyle& style = toolstrip_style();
+	RmDefaultControlPainter::draw_toolstrip_surface(*pctx,
+		{ m_size.x, m_size.y }, style);
+	for (size_t i = 0; i < m_group_layout.size(); ++i) {
+		const rm_rect& bounds = m_group_layout[i].bounds;
+		const rm_rect& label = m_group_layout[i].label_bounds;
+		RmDefaultControlPainter::draw_toolstrip_group(*pctx,
+			{ { bounds.x, bounds.y, bounds.width, bounds.height },
+			  { label.x, label.y, label.width, label.height },
+			  m_font, m_groups[i].text.c_str() }, style);
+	}
+	for (size_t i = 0; i < m_item_layout.size(); ++i) {
+		const ItemLayout& layout = m_item_layout[i];
+		const rm_tool_item& item = m_groups[layout.group].items[layout.item];
+		RmDefaultControlPainter::draw_toolstrip_button(*pctx,
+			{ { layout.bounds.x, layout.bounds.y, layout.bounds.width,
+			    layout.bounds.height }, m_font, item.icon, item.text.c_str(),
+			  is_enabled() && item.enabled,
+			  m_behaviour.hovered_index() == i,
+			  m_behaviour.pressed_index() == i,
+			  m_behaviour.selected_index() == i }, style);
+	}
+	rm_widget::on_draw(pctx);
+}
+
+void rm_toolstrip::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
+{
+	RM_UNUSED(sc);
+	if (!m_behaviour.is_exclusive() || state != RM_KEY_STATE::DOWN ||
+		m_item_layout.empty())
+		return;
+	const bool forward = vk == RM_KEY_RIGHT || vk == RM_KEY_DOWN;
+	const bool backward = vk == RM_KEY_LEFT || vk == RM_KEY_UP;
+	if (!forward && !backward && vk != RM_KEY_ENTER && vk != RM_KEY_SPACE)
+		return;
+	size_t index = m_behaviour.selected_index();
+	if (index >= m_item_layout.size())
+		index = 0;
+	else if (forward)
+		index = (index + 1) % m_item_layout.size();
+	else if (backward)
+		index = (index + m_item_layout.size() - 1) % m_item_layout.size();
+	const RmBehaviourUpdate update = m_behaviour.select(index);
+	if (update.activated) {
+		rm_tool_item* item = item_from_flat_index(index);
+		if (item && is_valid_callback())
+			get_callback()(this, item->id);
+	}
+}
+
+bool rm_toolstrip::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+	RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+{
+	RM_UNUSED(delta);
+	const size_t index = hit_test_item(cursor_pos);
+	if (event == RM_MOUSE_EVENT_MOVE) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_move(index);
+		return !update.handled;
+	}
+	if (event != RM_MOUSE_EVENT_CLICK || vk != RM_KEY_LMOUSE)
+		return true;
+	if (state == RM_KEY_STATE::DOWN) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_down(index);
+		if (update.handled && get_root())
+			get_root()->capture_pointer(this);
+		return !update.handled;
+	}
+	if (state == RM_KEY_STATE::UP) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_up(index);
+		if (update.activated) {
+			rm_tool_item* item = item_from_flat_index(index);
+			if (item && is_valid_callback())
+				get_callback()(this, item->id);
+		}
+		return !update.handled;
+	}
+	return true;
+}
+
+rm_toolstrip::rm_toolstrip(rm_widget* p_parent, int x, int y, int width,
+	int height, RM_ORIENT orientation, bool exclusive,
+	rm_toolstrip_cb callback, RmThemeRef theme) :
+	rm_widget(x, y, width, height, p_parent, "rm_toolstrip", RM_FLAG_DEFAULT),
+	m_behaviour(exclusive),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()),
+	m_orientation(orientation == RM_ORIENT_VERT ? RM_ORIENT_VERT : RM_ORIENT_HORZ)
+{
+	set_callback(callback);
+	set_min_size(rm_vec2(0.0f, 0.0f));
+	set_max_size(rm_vec2(0.0f, 0.0f));
+}
+
+size_t rm_toolstrip::add_group(const char* p_text,
+	RmToolGroupLabelPlacement placement, size_t cross_count)
+{
+	rm_tool_group group;
+	group.text = p_text ? p_text : "";
+	group.label_placement = placement;
+	group.cross_count = std::max<size_t>(1, cross_count);
+	m_groups.push_back(std::move(group));
+	rebuild_layout();
+	return m_groups.size() - 1;
+}
+
+rm_tool_item* rm_toolstrip::add_tool(size_t group, uint32_t id,
+	const char* p_text, const char* p_tooltip, rm_image icon, void* p_userdata)
+{
+	if (group >= m_groups.size())
+		return nullptr;
+	rm_tool_item item;
+	item.id = id;
+	item.text = p_text ? p_text : "";
+	item.tooltip = p_tooltip ? p_tooltip : "";
+	item.icon = icon;
+	item.userdata = p_userdata;
+	m_groups[group].items.push_back(std::move(item));
+	rebuild_layout();
+	return &m_groups[group].items.back();
+}
+
+bool rm_toolstrip::select_tool(uint32_t id, bool notify)
+{
+	if (!m_behaviour.is_exclusive())
+		return false;
+	for (size_t i = 0; i < m_item_layout.size(); ++i) {
+		rm_tool_item* item = item_from_flat_index(i);
+		if (item && item->id == id) {
+			const RmBehaviourUpdate update = m_behaviour.select(i);
+			if (notify && update.activated && is_valid_callback())
+				get_callback()(this, id);
+			return update.handled;
+		}
+	}
+	return false;
+}
+
+uint32_t rm_toolstrip::get_selected_tool_id() const
+{
+	const size_t index = m_behaviour.selected_index();
+	if (index >= m_item_layout.size())
+		return std::numeric_limits<uint32_t>::max();
+	const ItemLayout& layout = m_item_layout[index];
+	return m_groups[layout.group].items[layout.item].id;
+}
+
+rm_tool_item* rm_toolstrip::find_tool(uint32_t id)
+{
+	for (rm_tool_group& group : m_groups)
+		for (rm_tool_item& item : group.items)
+			if (item.id == id)
+				return &item;
+	return nullptr;
+}
+
+void rm_toolstrip::set_theme(RmThemeRef theme)
+{
+	m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+	rebuild_layout();
+}
+
+void rm_toolstrip::resize(float width, float height)
+{
+	rm_widget::resize(width, height);
+	rebuild_layout();
+}
+
+rm_rebar::rm_rebar(rm_widget* p_parent, int x, int y, int width, int height,
+	RM_ORIENT orientation, RmThemeRef theme) :
+	rm_widget(x, y, width, height, p_parent, "rm_rebar", RM_FLAG_DEFAULT),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()),
+	m_orientation(orientation == RM_ORIENT_VERT ? RM_ORIENT_VERT : RM_ORIENT_HORZ)
+{
+}
+
+void rm_rebar::layout_bands()
+{
+	if (m_layouting)
+		return;
+	m_layouting = true;
+	const RmRebarStyle& style = m_theme->rebar;
+	const bool horizontal = m_orientation == RM_ORIENT_HORZ;
+	const float available_main = std::max(0.0f,
+		(horizontal ? m_size.x : m_size.y) - style.band_padding * 2.0f);
+	const float available_cross = std::max(0.0f,
+		(horizontal ? m_size.y : m_size.x) - style.band_padding * 2.0f);
+	float main = 0.0f;
+	float cross = 0.0f;
+	float row_cross = 0.0f;
+
+	for (size_t band_index = 0; band_index < m_bands.size(); ++band_index) {
+		Band& band = m_bands[band_index];
+		if (!band.widget)
+			continue;
+		const rm_vec2 child_size = band.widget->get_size();
+		float child_main = band.preferred_extent > 0.0f ? band.preferred_extent
+			: (horizontal ? child_size.x : child_size.y);
+		child_main = std::max(child_main, band.minimum_extent);
+		float child_cross = horizontal ? child_size.y : child_size.x;
+		child_cross = std::min(std::max(child_cross, 1.0f), available_cross);
+		const float gripped_main = child_main + style.gripper_extent;
+		if (main > 0.0f && main + style.band_gap + gripped_main > available_main) {
+			main = 0.0f;
+			cross += row_cross + style.row_gap;
+			row_cross = 0.0f;
+		}
+		if (main > 0.0f)
+			main += style.band_gap;
+		if (band.stretch) {
+			float remaining = 0.0f;
+			for (size_t next_index = band_index + 1;
+				next_index < m_bands.size(); ++next_index) {
+				const Band& next = m_bands[next_index];
+				if (!next.widget)
+					continue;
+				const rm_vec2 next_size = next.widget->get_size();
+				const float next_preferred = next.preferred_extent > 0.0f
+					? next.preferred_extent
+					: (horizontal ? next_size.x : next_size.y);
+				remaining += std::max(next_preferred, next.minimum_extent)
+					+ style.gripper_extent + style.band_gap;
+			}
+			child_main = std::max(child_main,
+				available_main - main - style.gripper_extent - remaining);
+		}
+		child_main = std::min(child_main,
+			std::max(0.0f, available_main - main - style.gripper_extent));
+		if (horizontal)
+			band.bounds = { style.band_padding + main, style.band_padding + cross,
+				child_main + style.gripper_extent, child_cross };
+		else
+			band.bounds = { style.band_padding + cross, style.band_padding + main,
+				child_cross, child_main + style.gripper_extent };
+		const rm_vec2 child_pos = horizontal
+			? rm_vec2(band.bounds.x + style.gripper_extent, band.bounds.y)
+			: rm_vec2(band.bounds.x, band.bounds.y + style.gripper_extent);
+		band.widget->move(child_pos);
+		band.widget->resize(horizontal ? child_main : child_cross,
+			horizontal ? child_cross : child_main);
+		main += child_main + style.gripper_extent;
+		row_cross = std::max(row_cross, child_cross);
+	}
+	m_layouting = false;
+}
+
+void rm_rebar::on_draw(NVGcontext* pctx)
+{
+	layout_bands();
+	RmDefaultControlPainter::draw_rebar(*pctx, { m_size.x, m_size.y },
+		m_theme->rebar);
+	for (const Band& band : m_bands)
+		RmDefaultControlPainter::draw_rebar_band(*pctx,
+			{ { band.bounds.x, band.bounds.y, band.bounds.width,
+			    band.bounds.height }, m_orientation == RM_ORIENT_VERT },
+			m_theme->rebar);
+	rm_widget::on_draw(pctx);
+}
+
+bool rm_rebar::add_band(rm_widget* p_widget, float preferred_extent,
+	float minimum_extent, bool stretch)
+{
+	if (!p_widget)
+		return false;
+	if (p_widget->get_parent() != this)
+		p_widget->set_parent(this);
+	p_widget->set_min_size(m_orientation == RM_ORIENT_HORZ
+		? rm_vec2(std::max(0.0f, minimum_extent), 0.0f)
+		: rm_vec2(0.0f, std::max(0.0f, minimum_extent)));
+	p_widget->set_max_size(rm_vec2(0.0f, 0.0f));
+	m_bands.push_back({ p_widget, preferred_extent, minimum_extent, stretch, {} });
+	layout_bands();
+	return true;
+}
+
+bool rm_rebar::remove_band(rm_widget* p_widget)
+{
+	const auto found = std::find_if(m_bands.begin(), m_bands.end(),
+		[p_widget](const Band& band) { return band.widget == p_widget; });
+	if (found == m_bands.end())
+		return false;
+	m_bands.erase(found);
+	layout_bands();
+	return true;
+}
+
+void rm_rebar::set_theme(RmThemeRef theme)
+{
+	m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+	layout_bands();
+}
+
+void rm_rebar::resize(float width, float height)
+{
+	rm_widget::resize(width, height);
+	layout_bands();
+}
+
+float rm_splitter::available_extent() const
+{
+	if (!m_pparent)
+		return 0.0f;
+	const rm_rect& area = m_pparent->get_content_area();
+	const float total = m_orientation == RM_ORIENT_VERT ? area.width : area.height;
+	return std::max(0.0f, total - m_theme->splitter.thickness);
+}
+
+void rm_splitter::update_limits()
+{
+	const float available = available_extent();
+	if (available <= FLT_EPSILON) {
+		m_behaviour.set_limits(0.0f, 1.0f);
+		return;
+	}
+	const float minimum = std::clamp(m_min_first / available, 0.0f, 1.0f);
+	const float maximum = std::clamp(1.0f - m_min_second / available,
+		minimum, 1.0f);
+	m_behaviour.set_limits(minimum, maximum);
+}
+
+void rm_splitter::apply_layout()
+{
+	if (!m_pparent || !m_pfirst || !m_psecond ||
+		m_pfirst->get_parent() != m_pparent || m_psecond->get_parent() != m_pparent)
+		return;
+	update_limits();
+	const rm_rect& area = m_pparent->get_content_area();
+	const float available = available_extent();
+	const float first_extent = std::round(available * m_behaviour.fraction());
+	const float second_extent = std::max(0.0f, available - first_extent);
+	const float thickness = m_theme->splitter.thickness;
+	if (m_orientation == RM_ORIENT_VERT) {
+		m_pfirst->move(rm_vec2(0.0f, 0.0f));
+		m_pfirst->resize(first_extent, area.height);
+		move(rm_vec2(area.x + first_extent, area.y));
+		resize(thickness, area.height);
+		m_psecond->move(rm_vec2(first_extent + thickness, 0.0f));
+		m_psecond->resize(second_extent, area.height);
+	} else {
+		m_pfirst->move(rm_vec2(0.0f, 0.0f));
+		m_pfirst->resize(area.width, first_extent);
+		move(rm_vec2(area.x, area.y + first_extent));
+		resize(area.width, thickness);
+		m_psecond->move(rm_vec2(0.0f, first_extent + thickness));
+		m_psecond->resize(area.width, second_extent);
+	}
+}
+
+void rm_splitter::on_draw(NVGcontext* pctx)
+{
+	apply_layout();
+	RmDefaultControlPainter::draw_splitter(*pctx,
+		{ m_size.x, m_size.y, m_orientation == RM_ORIENT_VERT,
+		  is_enabled(), m_elem_flags.is_hovered(), m_behaviour.is_dragging(),
+		  m_elem_flags.is_focused() }, m_theme->splitter);
+	rm_widget::on_draw(pctx);
+}
+
+bool rm_splitter::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+	RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+{
+	RM_UNUSED(delta);
+	if (event == RM_MOUSE_EVENT_MOVE && m_behaviour.is_dragging() && m_pparent) {
+		const rm_rect& area = m_pparent->get_content_area();
+		const float pointer = m_orientation == RM_ORIENT_VERT
+			? cursor_pos.x - area.x : cursor_pos.y - area.y;
+		const float available = available_extent();
+		const RmBehaviourUpdate update = m_behaviour.drag_to(
+			available > FLT_EPSILON ? pointer / available : 0.0f);
+		if (update.state_changed) {
+			apply_layout();
+			if (is_valid_callback())
+				get_callback()(this, m_behaviour.fraction());
+		}
+		return false;
+	}
+	if (event != RM_MOUSE_EVENT_CLICK || vk != RM_KEY_LMOUSE)
+		return true;
+	if (state == RM_KEY_STATE::DOWN && m_bbox.inside(cursor_pos)) {
+		const RmBehaviourUpdate update = m_behaviour.begin_drag();
+		if (update.handled && get_root())
+			get_root()->capture_pointer(this);
+		return !update.handled;
+	}
+	if (state == RM_KEY_STATE::UP) {
+		const RmBehaviourUpdate update = m_behaviour.end_drag();
+		return !update.handled;
+	}
+	return true;
+}
+
+rm_splitter::rm_splitter(rm_widget* p_parent, rm_widget* p_first,
+	rm_widget* p_second, RM_ORIENT orientation, float fraction,
+	rm_splitter_cb callback, RmThemeRef theme) :
+	rm_widget(0, 0, 0, 0, p_parent, "rm_splitter", RM_FLAG_DEFAULT),
+	m_pfirst(p_first), m_psecond(p_second),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()),
+	m_orientation(orientation == RM_ORIENT_HORZ ? RM_ORIENT_HORZ : RM_ORIENT_VERT)
+{
+	set_callback(callback);
+	set_fixed_to_viewport(true);
+	m_behaviour.set_fraction(fraction);
+	set_targets(p_first, p_second);
+}
+
+void rm_splitter::set_targets(rm_widget* p_first, rm_widget* p_second)
+{
+	m_pfirst = p_first;
+	m_psecond = p_second;
+	if (m_pfirst) {
+		m_pfirst->set_min_size(rm_vec2(0.0f, 0.0f));
+		m_pfirst->set_max_size(rm_vec2(0.0f, 0.0f));
+	}
+	if (m_psecond) {
+		m_psecond->set_min_size(rm_vec2(0.0f, 0.0f));
+		m_psecond->set_max_size(rm_vec2(0.0f, 0.0f));
+	}
+	apply_layout();
+}
+
+void rm_splitter::set_fraction(float fraction, bool notify)
+{
+	update_limits();
+	const RmBehaviourUpdate update = m_behaviour.set_fraction(fraction);
+	apply_layout();
+	if (notify && update.state_changed && is_valid_callback())
+		get_callback()(this, m_behaviour.fraction());
+}
+
+void rm_splitter::set_minimum_extents(float first, float second)
+{
+	m_min_first = std::max(0.0f, first);
+	m_min_second = std::max(0.0f, second);
+	apply_layout();
+}
+
+void rm_splitter::set_theme(RmThemeRef theme)
+{
+	m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+	apply_layout();
 }
 
 rm_tabcontrol::rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height,

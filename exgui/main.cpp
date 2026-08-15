@@ -109,6 +109,117 @@ static rm_tabcontrol* create_tabs_preview(rm_widget* p_parent, int x, int y,
   return ptabs;
 }
 
+static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme)
+{
+  new rm_label(p_parent, 14, 8,
+    "CAD command bars, tool palette, splitter and scrollable viewport", theme);
+
+  rm_rebar* pcommand_rebar = new rm_rebar(
+    p_parent, 12, 36, 976, 108, RM_ORIENT_HORZ, theme);
+  rm_toolbar* pfile_toolbar = new rm_toolbar(
+    pcommand_rebar, 0, 0, 300, 100, RM_ORIENT_HORZ,
+    [](rm_toolstrip*, uint32_t id) { printf("Toolbar command: %u\n", id); }, theme);
+  const size_t file_group = pfile_toolbar->add_group(
+    "Project", RmToolGroupLabelPlacement::bottom, 2);
+  pfile_toolbar->add_tool(file_group, 100, "N", "New project");
+  pfile_toolbar->add_tool(file_group, 101, "O", "Open project");
+  pfile_toolbar->add_tool(file_group, 102, "S", "Save");
+  pfile_toolbar->add_tool(file_group, 103, "P", "Print");
+  pfile_toolbar->add_tool(file_group, 104, "C", "Copy");
+  pfile_toolbar->add_tool(file_group, 105, "V", "Paste");
+
+  rm_toolbar* pview_toolbar = new rm_toolbar(
+    pcommand_rebar, 0, 0, 290, 100, RM_ORIENT_HORZ,
+    [](rm_toolstrip*, uint32_t id) { printf("View command: %u\n", id); }, theme);
+  const size_t view_group = pview_toolbar->add_group(
+    "View", RmToolGroupLabelPlacement::top, 2);
+  pview_toolbar->add_tool(view_group, 200, "+", "Zoom in");
+  pview_toolbar->add_tool(view_group, 201, "-", "Zoom out");
+  pview_toolbar->add_tool(view_group, 202, "F", "Fit model");
+  pview_toolbar->add_tool(view_group, 203, "R", "Rotate view");
+  pview_toolbar->add_tool(view_group, 204, "W", "Wireframe");
+  pview_toolbar->add_tool(view_group, 205, "3D", "Isometric view");
+
+  rm_toolbar* pglobal_toolbar = new rm_toolbar(
+    pcommand_rebar, 0, 0, 210, 68, RM_ORIENT_HORZ,
+    [](rm_toolstrip*, uint32_t id) { printf("Global command: %u\n", id); }, theme);
+  const size_t global_group = pglobal_toolbar->add_group(
+    "Global", RmToolGroupLabelPlacement::bottom, 1);
+  pglobal_toolbar->add_tool(global_group, 300, "U", "Undo");
+  pglobal_toolbar->add_tool(global_group, 301, "R", "Redo");
+  pglobal_toolbar->add_tool(global_group, 302, "?", "Help");
+
+  pcommand_rebar->add_band(pfile_toolbar, 230.0f, 110.0f);
+  pcommand_rebar->add_band(pview_toolbar, 230.0f, 110.0f, true);
+  pcommand_rebar->add_band(pglobal_toolbar, 130.0f, 95.0f);
+
+  rm_rebar* ptool_rebar = new rm_rebar(
+    p_parent, 12, 154, 96, 400, RM_ORIENT_VERT, theme);
+  rm_toolbox* ptoolbox = new rm_toolbox(
+    ptool_rebar, 0, 0, 88, 330, RM_ORIENT_VERT,
+    [](rm_toolstrip*, uint32_t id) { printf("Current designer tool: %u\n", id); }, theme);
+  const size_t selection_group = ptoolbox->add_group(
+    "Select", RmToolGroupLabelPlacement::bottom, 2);
+  ptoolbox->add_tool(selection_group, 1, "S", "Select widget");
+  ptoolbox->add_tool(selection_group, 2, "M", "Move widget");
+  ptoolbox->add_tool(selection_group, 3, "Z", "Zoom viewport");
+  ptoolbox->add_tool(selection_group, 4, "H", "Pan viewport");
+  const size_t creation_group = ptoolbox->add_group(
+    "Create", RmToolGroupLabelPlacement::top, 2);
+  ptoolbox->add_tool(creation_group, 10, "B", "Create button");
+  ptoolbox->add_tool(creation_group, 11, "T", "Create text field");
+  ptoolbox->add_tool(creation_group, 12, "P", "Create panel");
+  ptoolbox->add_tool(creation_group, 13, "I", "Create image");
+  ptoolbox->select_tool(1);
+  ptool_rebar->add_band(ptoolbox, 350.0f, 180.0f, true);
+
+  rm_theme_preview_panel* pworkspace = new rm_theme_preview_panel(
+    p_parent, 120, 154, 868, 400, theme);
+  rm_theme_preview_panel* poverflow = new rm_theme_preview_panel(
+    pworkspace, 0, 0, 430, 400, theme);
+  rm_theme_preview_panel* pinspector = new rm_theme_preview_panel(
+    pworkspace, 436, 0, 432, 400, theme);
+
+  new rm_label(poverflow, 16, 14,
+    "Auto-measured scrollable designer canvas", theme);
+  for (int row = 0; row < 8; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      const int index = row * 4 + column + 1;
+      new rm_button(poverflow, 20 + column * 175, 54 + row * 74,
+        150, 42, "Widget " + std::to_string(index), theme,
+        index % 3 == 0 ? RmButtonVariant::outline : RmButtonVariant::secondary);
+    }
+  }
+  new rm_label(poverflow, 550, 650,
+    "Bottom-right content boundary", theme);
+  rm_scrollbar* pvertical_scroll = new rm_scrollbar(
+    poverflow, RM_ORIENT_VERT, 0.0f, nullptr, theme);
+  rm_scrollbar* phorizontal_scroll = new rm_scrollbar(
+    poverflow, RM_ORIENT_HORZ, 0.0f, nullptr, theme);
+  pvertical_scroll->bind_to(poverflow);
+  phorizontal_scroll->bind_to(poverflow);
+
+  new rm_label(pinspector, 16, 14, "Selected widget properties", theme);
+  rm_propertyview* pproperties = new rm_propertyview(
+    pinspector, 16, 50, 400, 316, nullptr, theme);
+  pproperties->add_property("Name", "rm_button_17", RmPropertyType::text);
+  rm_property_group* pgeometry = pproperties->add_group("Geometry");
+  pproperties->add_property("X", "370", RmPropertyType::integer, pgeometry);
+  pproperties->add_property("Y", "424", RmPropertyType::integer, pgeometry);
+  pproperties->add_property("Width", "150", RmPropertyType::integer, pgeometry);
+  pproperties->add_property("Height", "42", RmPropertyType::integer, pgeometry);
+  rm_property_group* pappearance = pproperties->add_group("Appearance");
+  pproperties->add_choice_property("Variant", "Secondary",
+    { "Primary", "Secondary", "Outline", "Subtle" }, pappearance);
+
+  rm_splitter* psplitter = new rm_splitter(pworkspace, poverflow, pinspector,
+    RM_ORIENT_VERT, 0.54f,
+    [](rm_splitter*, float fraction) {
+      printf("Workspace splitter: %.3f\n", fraction);
+    }, theme);
+  psplitter->set_minimum_extents(250.0f, 260.0f);
+}
+
 #pragma region TEMPLATE1
 void drawParagraph(NVGcontext* vg, float x, float y, float width, float height, float mx, float my)
 {
@@ -413,8 +524,9 @@ void example_widgets(rm_surface* gui)
   rm_widget* ptab12 = ptabctl->add_tab("Effects", 2);
   rm_widget* ptab_theme = ptabctl->add_tab("Themes", 3);
   rm_widget* ptab_tabs = ptabctl->add_tab("Tabs", 4);
+  rm_widget* ptab_docking = ptabctl->add_tab("Docking", 5);
 #if defined(RMGUI_ENABLE_BLENDISH_DEMO)
-  rm_widget* ptab_bui = ptabctl->add_tab("Blendish Controls", 5);
+  rm_widget* ptab_bui = ptabctl->add_tab("Blendish Controls", 6);
 #endif
 
   rm_widget* effects_page = ptab12;
@@ -448,6 +560,7 @@ void example_widgets(rm_surface* gui)
     shell_theme, RmTabVariant::segmented, RmTabPlacement::top);
   create_tabs_preview(ptab_tabs, 400, 280, 360, 230, "Tool tabs / left",
     shell_theme, RmTabVariant::tool, RmTabPlacement::left);
+  create_docking_preview(ptab_docking, shell_theme);
 
   rm_flexbox_layout* pflexlayout = new rm_flexbox_layout();
   pflexlayout->set_dir(rm_flex_direction::Column);
@@ -586,7 +699,7 @@ void example_widgets(rm_surface* gui)
       return true;
     }, controls_theme);
 
-  ptabctl->set_selected_index(1);
+  ptabctl->set_selected_index(5);
 
   new rm_radiobutton(pdiv, 10, 10, 150, 30, "Holding",
     [](rm_radiobutton* rb) {

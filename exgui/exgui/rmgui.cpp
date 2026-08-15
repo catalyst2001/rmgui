@@ -29,10 +29,66 @@ void rm_widget::move_to(rm_widget* proot_widget, float xpos, float ypos)
 
 void rm_widget::resize_nolayout(float width, float height)
 {
+	const rm_vec2 old_size = m_size;
+	const bool default_area = m_content_area.x == 0.0f &&
+		m_content_area.y == 0.0f && m_content_area.width == old_size.x &&
+		m_content_area.height == old_size.y;
+	const bool default_extent = m_content_extent.x == old_size.x &&
+		m_content_extent.y == old_size.y;
 	rm_vec2 constrained = constrain_size(rm_vec2(width, height));
 	m_size = constrained;
 	m_bbox.init(m_pos_of_parent, m_size);
-	m_content_area.init(0.f, 0.f, m_size.x, m_size.y);
+	if (default_area)
+		m_content_area.init(0.f, 0.f, m_size.x, m_size.y);
+	if (default_extent)
+		m_content_extent = m_size;
+	set_content_offset(m_content_offset);
+}
+
+rm_vec2 rm_widget::get_max_content_offset() const
+{
+	return { std::max(0.0f, m_content_extent.x - m_content_area.width),
+		std::max(0.0f, m_content_extent.y - m_content_area.height) };
+}
+
+void rm_widget::set_content_area(const rm_rect& area)
+{
+	m_content_area.x = std::clamp(area.x, 0.0f, m_size.x);
+	m_content_area.y = std::clamp(area.y, 0.0f, m_size.y);
+	m_content_area.width = std::clamp(area.width, 0.0f,
+		std::max(0.0f, m_size.x - m_content_area.x));
+	m_content_area.height = std::clamp(area.height, 0.0f,
+		std::max(0.0f, m_size.y - m_content_area.y));
+	set_content_offset(m_content_offset);
+}
+
+void rm_widget::set_content_extent(float width, float height)
+{
+	m_content_extent.x = std::max(m_content_area.width, width);
+	m_content_extent.y = std::max(m_content_area.height, height);
+	set_content_offset(m_content_offset);
+}
+
+void rm_widget::update_content_extent_from_children(bool allow_shrink)
+{
+	float width = allow_shrink ? m_content_area.width : m_content_extent.x;
+	float height = allow_shrink ? m_content_area.height : m_content_extent.y;
+	for (const rm_widget* child : m_childs) {
+		if (!child || child->is_fixed_to_viewport() || !child->is_visible())
+			continue;
+		width = std::max(width,
+			child->m_pos_of_parent.x + child->m_size.x);
+		height = std::max(height,
+			child->m_pos_of_parent.y + child->m_size.y);
+	}
+	set_content_extent(width, height);
+}
+
+void rm_widget::set_content_offset(float x, float y)
+{
+	const rm_vec2 maximum = get_max_content_offset();
+	m_content_offset.x = std::clamp(x, 0.0f, maximum.x);
+	m_content_offset.y = std::clamp(y, 0.0f, maximum.y);
 }
 
 void rm_widget::move_relative(rm_vec2& delta)
@@ -264,16 +320,22 @@ void rm_surface::release_pointer(rm_widget* widget)
 
 rm_vec2 rm_surface::cursor_for_widget(const rm_widget* widget, const rm_vec2& surface_cursor) const
 {
-	std::vector<const rm_widget*> ancestors;
+	struct Edge { const rm_widget* parent; const rm_widget* child; };
+	std::vector<Edge> ancestors;
+	const rm_widget* child = widget;
 	for (const rm_widget* current = widget ? widget->m_pparent : nullptr;
-		current; current = current->m_pparent)
-		ancestors.push_back(current);
+		current; child = current, current = current->m_pparent)
+		ancestors.push_back({ current, child });
 
 	rm_vec2 result = surface_cursor;
 	for (auto it = ancestors.rbegin(); it != ancestors.rend(); ++it) {
-		const rm_widget* ancestor = *it;
-		result.x -= ancestor->m_pos_of_parent.x + ancestor->m_content_area.x;
-		result.y -= ancestor->m_pos_of_parent.y + ancestor->m_content_area.y;
+		const rm_widget* ancestor = it->parent;
+		result.x -= ancestor->m_pos_of_parent.x;
+		result.y -= ancestor->m_pos_of_parent.y;
+		if (!it->child->is_fixed_to_viewport()) {
+			result.x -= ancestor->m_content_area.x - ancestor->m_content_offset.x;
+			result.y -= ancestor->m_content_area.y - ancestor->m_content_offset.y;
+		}
 	}
 	return result;
 }
@@ -292,9 +354,20 @@ void rm_surface::update_hover_states(rm_widget* p_elem, const rm_vec2& cursor_po
 
 	rm_vec2 local = p_elem->cursor_to_local(cursor_pos);
 	const rm_rect& content = p_elem->get_content_area();
-	rm_vec2 child_cursor(local.x - content.x, local.y - content.y);
-	for (rm_widget* child : p_elem->m_childs)
-		update_hover_states(child, child_cursor);
+	rm_vec2 child_cursor(local.x - content.x + p_elem->m_content_offset.x,
+		local.y - content.y + p_elem->m_content_offset.y);
+	const bool inside_content = local.x >= content.x && local.y >= content.y &&
+		local.x <= content.x + content.width &&
+		local.y <= content.y + content.height;
+	for (rm_widget* child : p_elem->m_childs) {
+		const bool escapes_clip = child->get_elem_flags().is_set(
+			RM_FLAG_DISABLE_SCISSOR | RM_FLAG_GLOBAL);
+		if (!child->is_fixed_to_viewport() && !inside_content && !escapes_clip)
+			update_hover_states(child, rm_vec2(-FLT_MAX, -FLT_MAX));
+		else
+			update_hover_states(child,
+				child->is_fixed_to_viewport() ? local : child_cursor);
+	}
 }
 
 rm_widget* rm_surface::hit_test(rm_widget* p_elem, const rm_vec2& cursor_pos)
@@ -304,14 +377,23 @@ rm_widget* rm_surface::hit_test(rm_widget* p_elem, const rm_vec2& cursor_pos)
 
 	rm_vec2 local = p_elem->cursor_to_local(cursor_pos);
 	const rm_rect& content = p_elem->get_content_area();
-	rm_vec2 child_cursor(local.x - content.x, local.y - content.y);
+	rm_vec2 child_cursor(local.x - content.x + p_elem->m_content_offset.x,
+		local.y - content.y + p_elem->m_content_offset.y);
 
 	std::vector<rm_widget*> ordered(p_elem->m_childs.rbegin(), p_elem->m_childs.rend());
 	std::stable_sort(ordered.begin(), ordered.end(), [](const rm_widget* lhs, const rm_widget* rhs) {
 		return lhs->get_zindex() > rhs->get_zindex();
 	});
+	const bool inside_content = local.x >= content.x && local.y >= content.y &&
+		local.x <= content.x + content.width &&
+		local.y <= content.y + content.height;
 	for (rm_widget* child : ordered) {
-		if (rm_widget* hit = hit_test(child, child_cursor))
+		const bool escapes_clip = child->get_elem_flags().is_set(
+			RM_FLAG_DISABLE_SCISSOR | RM_FLAG_GLOBAL);
+		if (!child->is_fixed_to_viewport() && !inside_content && !escapes_clip)
+			continue;
+		rm_vec2 cursor = child->is_fixed_to_viewport() ? local : child_cursor;
+		if (rm_widget* hit = hit_test(child, cursor))
 			return hit;
 	}
 
@@ -342,8 +424,8 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
 	rm_vec2 local = p_elem->cursor_to_local(cursor_pos);
 	const rm_rect& content = p_elem->get_content_area();
 	rm_vec2 child_cursor{
-			local.x - content.x,
-			local.y - content.y
+			local.x - content.x + p_elem->m_content_offset.x,
+			local.y - content.y + p_elem->m_content_offset.y
 	};
 	if (p_elem->get_elem_flags().has_active() &&
 		p_elem->get_elem_flags().has_childs() &&
@@ -355,15 +437,23 @@ bool rm_surface::mouse_dispatcher(rm_widget* p_elem,
 		std::stable_sort(ordered.begin(), ordered.end(), [](const rm_widget* lhs, const rm_widget* rhs) {
 			return lhs->get_zindex() > rhs->get_zindex();
 		});
+		const bool inside_content = local.x >= content.x && local.y >= content.y &&
+			local.x <= content.x + content.width &&
+			local.y <= content.y + content.height;
 		for (rm_widget* pchild : ordered) {
-			if (!mouse_dispatcher(pchild, event, vk, state, child_cursor)) {
+			const bool escapes_clip = pchild->get_elem_flags().is_set(
+				RM_FLAG_DISABLE_SCISSOR | RM_FLAG_GLOBAL);
+			if (!pchild->is_fixed_to_viewport() && !inside_content && !escapes_clip)
+				continue;
+			rm_vec2 cursor = pchild->is_fixed_to_viewport() ? local : child_cursor;
+			if (!mouse_dispatcher(pchild, event, vk, state, cursor)) {
 				/* For UP events, keep dispatching to all siblings so that
 				   every widget can clear its pressed/dragging state.
 				   But if the child is OPAQUE and cursor is inside it,
 				   block propagation even for UP — nothing behind an
 				   opaque element should receive events. */
 				if (event == RM_MOUSE_EVENT_CLICK && state == UP) {
-					if (pchild->get_bbox().inside(child_cursor) &&
+					if (pchild->get_bbox().inside(cursor) &&
 						pchild->get_elem_flags().is_set(RM_FLAG_OPAQUE)) {
 						return false;
 					}
@@ -402,15 +492,28 @@ void rm_surface::draw_recursive(rm_widget* pwidget, float dt)
 		m_pctx->scissor(abs_pos.x, abs_pos.y, size.x, size.y);
 
 	m_pctx->setZIndex(pwidget->get_zindex());
-	m_pctx->translate(abs_pos.x + content.x, abs_pos.y + content.y);
+	m_pctx->translate(abs_pos.x, abs_pos.y);
 	pwidget->on_draw(m_pctx.get());
 
 	/* element has childs? */
 	if (pwidget->get_elem_flags().has_childs()) {
-		/* recursive enum childs */
+		m_pctx->save();
+		if (!pwidget->get_elem_flags().is_set(RM_FLAG_DISABLE_SCISSOR))
+			m_pctx->intersectScissor(content.x, content.y,
+				content.width, content.height);
+		m_pctx->translate(content.x - pwidget->m_content_offset.x,
+			content.y - pwidget->m_content_offset.y);
 		for (size_t i = 0; i < pwidget->get_num_childs(); i++) {
-			/* enter recursively */
-			draw_recursive(pwidget->get_child(i), dt);
+			rm_widget* child = pwidget->get_child(i);
+			if (!child->is_fixed_to_viewport())
+				draw_recursive(child, dt);
+		}
+		m_pctx->restore();
+
+		for (size_t i = 0; i < pwidget->get_num_childs(); i++) {
+			rm_widget* child = pwidget->get_child(i);
+			if (child->is_fixed_to_viewport())
+				draw_recursive(child, dt);
 		}
 	}
 	//m_pctx->ResetTransform();

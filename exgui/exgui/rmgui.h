@@ -377,6 +377,7 @@ enum RM_EVENT : uint32_t {
 #define RM_FLAG_DISABLE_SCISSOR (1 << 11)
 #define RM_FLAG_HIGHEST_PRIORITY      (1 << 12)
 #define RM_FLAG_OPAQUE                (1 << 13)
+#define RM_FLAG_FIXED_TO_VIEWPORT     (1 << 14)
 
 /* default flags for each widget */
 #define RM_FLAG_DEFAULT       (RM_FLAG_VISIBLE|RM_FLAG_ACTIVE|RM_FLAG_NOTIFY_CHILDS|RM_FLAG_HAS_SYM|RM_FLAG_HAS_KEYBD|RM_FLAG_HAS_MOUSE|RM_FLAG_HAS_CHILDS)
@@ -392,15 +393,15 @@ public:
   rmgui_flags(uint32_t flags) : m_flags(flags) {}
   ~rmgui_flags() {}
 
-  inline uint32_t get() { return m_flags; }
+  inline uint32_t get() const { return m_flags; }
   inline void     set(uint32_t f) { m_flags = f; }
-  inline bool     is_set(uint32_t flag) { return (m_flags & flag) == flag; }
+  inline bool     is_set(uint32_t flag) const { return (m_flags & flag) == flag; }
   inline void     set_bit(uint32_t bit) { m_flags |= bit; }
   inline void     inverse_bit(uint32_t bit) { m_flags &= ~bit; }
   inline void     toggle_bits(uint32_t bit) { m_flags ^= bit; }
   inline void     toggle_bits(uint32_t bits, bool state) { m_flags = state ? (m_flags | bits) : (m_flags & ~bits); }
 
-  operator        uint32_t() { return m_flags; }
+  operator        uint32_t() const { return m_flags; }
   //uint32_t        operator=(uint32_t f) { m_flags = f; }
   uint32_t        operator=(uint32_t f) { m_flags = f; return m_flags; }
 };
@@ -414,17 +415,17 @@ public:
   rmgui_flags_elem() : rmgui_flags(RM_FLAG_DEFAULT) {}
   ~rmgui_flags_elem() {}
 
-  inline bool has_visible() { return is_set(RM_FLAG_VISIBLE); }
-  inline bool has_active() { return is_set(RM_FLAG_ACTIVE); }
-  inline bool has_notify_childs() { return is_set(RM_FLAG_NOTIFY_CHILDS); }
-  inline bool has_symbols_input() { return is_set(RM_FLAG_HAS_SYM); }
-  inline bool has_keybd() { return is_set(RM_FLAG_HAS_KEYBD); }
-  inline bool has_mouse() { return is_set(RM_FLAG_HAS_MOUSE); }
-  inline bool has_childs() { return is_set(RM_FLAG_HAS_CHILDS); }
+  inline bool has_visible() const { return is_set(RM_FLAG_VISIBLE); }
+  inline bool has_active() const { return is_set(RM_FLAG_ACTIVE); }
+  inline bool has_notify_childs() const { return is_set(RM_FLAG_NOTIFY_CHILDS); }
+  inline bool has_symbols_input() const { return is_set(RM_FLAG_HAS_SYM); }
+  inline bool has_keybd() const { return is_set(RM_FLAG_HAS_KEYBD); }
+  inline bool has_mouse() const { return is_set(RM_FLAG_HAS_MOUSE); }
+  inline bool has_childs() const { return is_set(RM_FLAG_HAS_CHILDS); }
 
   /* state flags */
-  inline bool is_hovered() { return is_set(RM_FLAG_HOVERED); }
-  inline bool is_focused() { return is_set(RM_FLAG_FOCUSED); }
+  inline bool is_hovered() const { return is_set(RM_FLAG_HOVERED); }
+  inline bool is_focused() const { return is_set(RM_FLAG_FOCUSED); }
 
   uint32_t operator=(uint32_t f) {
     m_flags = f;
@@ -905,6 +906,8 @@ protected:
   rm_vec2          m_size; //width;height
   rm_vec2          m_pos_of_parent;
   rm_rect          m_content_area;
+  rm_vec2          m_content_extent;
+  rm_vec2          m_content_offset;
   int              m_zindex;
 
   ///* rmgui_root::rebuild_draw_cache accessor class */
@@ -955,6 +958,8 @@ public:
     m_size.init(static_cast<float>(width), static_cast<float>(height));
     m_bbox.init(m_pos_of_parent, m_size);
     m_content_area.init(0.f, 0.f, m_size.x, m_size.y);
+    m_content_extent = m_size;
+    m_content_offset.init(0.f, 0.f);
 
     /* set font from root */
     if (m_proot)
@@ -979,6 +984,8 @@ public:
     m_size.init(width, height);
     m_bbox.init(m_pos_of_parent, m_size);
     m_content_area.init(0.f, 0.f, m_size.x, m_size.y);
+    m_content_extent = m_size;
+    m_content_offset.init(0.f, 0.f);
 
     /* set font from root */
     if (m_proot)
@@ -1010,9 +1017,23 @@ public:
   inline rm_vec2    &get_pos_of_parent() { return m_pos_of_parent; }
   inline rm_vec2    &get_size() { return m_size; }
   inline rm_rect    &get_content_area() { return m_content_area; }
+  inline const rm_rect& get_content_area() const { return m_content_area; }
+  inline const rm_vec2& get_content_extent() const { return m_content_extent; }
+  inline const rm_vec2& get_content_offset() const { return m_content_offset; }
+  rm_vec2 get_max_content_offset() const;
+  void set_content_area(const rm_rect& area);
+  void set_content_extent(float width, float height);
+  void update_content_extent_from_children(bool allow_shrink = false);
+  void set_content_offset(float x, float y);
+  void set_content_offset(const rm_vec2& offset) {
+    set_content_offset(offset.x, offset.y);
+  }
+  void scroll_content_by(float x, float y) {
+    set_content_offset(m_content_offset.x + x, m_content_offset.y + y);
+  }
 
   /* visual */
-  inline bool        is_visible() { return m_elem_flags.has_visible(); }
+  inline bool        is_visible() const { return m_elem_flags.has_visible(); }
   void               show(bool b_show = true);
   inline void        hide() { show(false); }
 
@@ -1032,6 +1053,12 @@ public:
   /* flags */
   inline rmgui_flags_elem get_elem_flags() { return m_elem_flags; }
   inline uint32_t       get_user_flags() { return m_user_flags; }
+  inline bool is_fixed_to_viewport() const {
+    return m_elem_flags.is_set(RM_FLAG_FIXED_TO_VIEWPORT);
+  }
+  inline void set_fixed_to_viewport(bool fixed) {
+    m_elem_flags.toggle_bits(RM_FLAG_FIXED_TO_VIEWPORT, fixed);
+  }
 
   /* state active */
   void              set_enabled(bool enabled);

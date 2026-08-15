@@ -1387,6 +1387,152 @@ public:
   RmBehaviourUpdate cancel() noexcept { return end_drag(); }
 };
 
+class RmToolStripBehaviour {
+public:
+  static constexpr size_t invalid_index = std::numeric_limits<size_t>::max();
+
+private:
+  size_t m_count = 0;
+  size_t m_hovered = invalid_index;
+  size_t m_pressed = invalid_index;
+  size_t m_selected = invalid_index;
+  bool m_exclusive = false;
+  bool m_enabled = true;
+
+public:
+  explicit RmToolStripBehaviour(bool exclusive = false) noexcept
+    : m_exclusive(exclusive) {}
+
+  size_t count() const noexcept { return m_count; }
+  size_t hovered_index() const noexcept { return m_hovered; }
+  size_t pressed_index() const noexcept { return m_pressed; }
+  size_t selected_index() const noexcept { return m_selected; }
+  bool is_exclusive() const noexcept { return m_exclusive; }
+
+  void set_count(size_t count) noexcept {
+    m_count = count;
+    if (m_hovered >= count) m_hovered = invalid_index;
+    if (m_pressed >= count) m_pressed = invalid_index;
+    if (m_selected >= count) m_selected = invalid_index;
+  }
+
+  RmBehaviourUpdate set_enabled(bool enabled) noexcept {
+    const bool changed = m_enabled != enabled;
+    m_enabled = enabled;
+    if (!enabled) {
+      m_hovered = invalid_index;
+      m_pressed = invalid_index;
+    }
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_move(size_t index) noexcept {
+    if (!m_enabled || index >= m_count)
+      index = invalid_index;
+    const bool changed = m_hovered != index;
+    m_hovered = index;
+    return { m_pressed != invalid_index, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_down(size_t index) noexcept {
+    if (!m_enabled || index >= m_count)
+      return {};
+    m_pressed = index;
+    m_hovered = index;
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate pointer_up(size_t index) noexcept {
+    if (m_pressed == invalid_index)
+      return {};
+    const bool activated = m_enabled && index == m_pressed && index < m_count;
+    m_pressed = invalid_index;
+    m_hovered = index < m_count ? index : invalid_index;
+    if (activated && m_exclusive)
+      m_selected = index;
+    return { true, true, activated };
+  }
+
+  RmBehaviourUpdate select(size_t index) noexcept {
+    if (!m_exclusive || !m_enabled || index >= m_count)
+      return {};
+    const bool changed = m_selected != index;
+    m_selected = index;
+    return { true, changed, changed };
+  }
+
+  RmBehaviourUpdate cancel() noexcept {
+    if (m_pressed == invalid_index)
+      return {};
+    m_pressed = invalid_index;
+    return { false, true, false };
+  }
+};
+
+class RmToolbarBehaviour : public RmToolStripBehaviour {
+public:
+  RmToolbarBehaviour() noexcept : RmToolStripBehaviour(false) {}
+};
+
+class RmToolboxBehaviour : public RmToolStripBehaviour {
+public:
+  RmToolboxBehaviour() noexcept : RmToolStripBehaviour(true) {}
+};
+
+class RmSplitterBehaviour {
+  float m_fraction = 0.5f;
+  float m_minimum_fraction = 0.0f;
+  float m_maximum_fraction = 1.0f;
+  bool m_dragging = false;
+  bool m_enabled = true;
+
+public:
+  float fraction() const noexcept { return m_fraction; }
+  bool is_dragging() const noexcept { return m_dragging; }
+
+  RmBehaviourUpdate set_enabled(bool enabled) noexcept {
+    const bool changed = m_enabled != enabled || (!enabled && m_dragging);
+    m_enabled = enabled;
+    if (!enabled) m_dragging = false;
+    return { false, changed, false };
+  }
+
+  void set_limits(float minimum, float maximum) noexcept {
+    m_minimum_fraction = std::clamp(minimum, 0.0f, 1.0f);
+    m_maximum_fraction = std::clamp(maximum, m_minimum_fraction, 1.0f);
+    set_fraction(m_fraction);
+  }
+
+  RmBehaviourUpdate set_fraction(float fraction) noexcept {
+    const float clamped = std::clamp(fraction, m_minimum_fraction,
+      m_maximum_fraction);
+    const bool changed = std::fabs(m_fraction - clamped) > 1.0e-6f;
+    m_fraction = clamped;
+    return { false, changed, changed };
+  }
+
+  RmBehaviourUpdate begin_drag() noexcept {
+    if (!m_enabled) return {};
+    m_dragging = true;
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate drag_to(float fraction) noexcept {
+    if (!m_enabled || !m_dragging) return {};
+    RmBehaviourUpdate update = set_fraction(fraction);
+    update.handled = true;
+    return update;
+  }
+
+  RmBehaviourUpdate end_drag() noexcept {
+    if (!m_dragging) return {};
+    m_dragging = false;
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate cancel() noexcept { return end_drag(); }
+};
+
 class RmProgressBehaviour {
   float percent_ = 0.0f;
 

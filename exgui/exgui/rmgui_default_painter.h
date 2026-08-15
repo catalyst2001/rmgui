@@ -295,6 +295,56 @@ struct RmScrollbarVisual {
   bool focused = false;
 };
 
+struct RmToolStripSurfaceVisual {
+  float width = 0.0f;
+  float height = 0.0f;
+};
+
+struct RmVisualRect {
+  float x = 0.0f;
+  float y = 0.0f;
+  float width = 0.0f;
+  float height = 0.0f;
+};
+
+struct RmToolStripGroupVisual {
+  RmVisualRect bounds;
+  RmVisualRect label_bounds;
+  NVGhandle font;
+  const char* text = nullptr;
+};
+
+struct RmToolStripButtonVisual {
+  RmVisualRect bounds;
+  NVGhandle font;
+  NVGhandle icon;
+  const char* text = nullptr;
+  bool enabled = true;
+  bool hovered = false;
+  bool pressed = false;
+  bool selected = false;
+};
+
+struct RmRebarVisual {
+  float width = 0.0f;
+  float height = 0.0f;
+};
+
+struct RmRebarBandVisual {
+  RmVisualRect bounds;
+  bool vertical = false;
+};
+
+struct RmSplitterVisual {
+  float width = 0.0f;
+  float height = 0.0f;
+  bool vertical = true;
+  bool enabled = true;
+  bool hovered = false;
+  bool dragging = false;
+  bool focused = false;
+};
+
 struct RmProgressVisual {
   float width = 0.0f;
   float height = 0.0f;
@@ -373,6 +423,18 @@ public:
     const RmSliderStyle& style);
   static void draw_scrollbar(NVGcontext& context, const RmScrollbarVisual& visual,
     const RmScrollbarStyle& style);
+  static void draw_toolstrip_surface(NVGcontext& context,
+    const RmToolStripSurfaceVisual& visual, const RmToolStripStyle& style);
+  static void draw_toolstrip_group(NVGcontext& context,
+    const RmToolStripGroupVisual& visual, const RmToolStripStyle& style);
+  static void draw_toolstrip_button(NVGcontext& context,
+    const RmToolStripButtonVisual& visual, const RmToolStripStyle& style);
+  static void draw_rebar(NVGcontext& context, const RmRebarVisual& visual,
+    const RmRebarStyle& style);
+  static void draw_rebar_band(NVGcontext& context,
+    const RmRebarBandVisual& visual, const RmRebarStyle& style);
+  static void draw_splitter(NVGcontext& context,
+    const RmSplitterVisual& visual, const RmSplitterStyle& style);
   static void draw_progress(NVGcontext& context, const RmProgressVisual& visual,
     const RmProgressStyle& style);
   static void draw_switch(NVGcontext& context, const RmSwitchVisual& visual,

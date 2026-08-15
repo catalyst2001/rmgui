@@ -294,6 +294,45 @@ void test_scrollbar_behaviour()
     "scrollbar disables dragging when all content is visible");
 }
 
+void test_toolstrip_behaviour()
+{
+  RmToolbarBehaviour toolbar;
+  toolbar.set_count(3);
+  toolbar.pointer_down(1);
+  expect(toolbar.pointer_up(1).activated,
+    "toolbar reports a momentary command activation");
+  expect(toolbar.selected_index() == RmToolStripBehaviour::invalid_index,
+    "toolbar does not retain a selected command");
+
+  RmToolboxBehaviour toolbox;
+  toolbox.set_count(4);
+  toolbox.pointer_down(2);
+  expect(toolbox.pointer_up(2).activated && toolbox.selected_index() == 2,
+    "toolbox retains the current tool after pointer activation");
+  expect(toolbox.select(3).activated && toolbox.selected_index() == 3,
+    "toolbox supports programmatic current-tool selection");
+  toolbox.pointer_down(1);
+  toolbox.pointer_up(0);
+  expect(toolbox.selected_index() == 3,
+    "toolbox does not change selection after a mismatched release");
+}
+
+void test_splitter_behaviour()
+{
+  RmSplitterBehaviour splitter;
+  splitter.set_limits(0.2f, 0.75f);
+  splitter.set_fraction(0.9f);
+  expect(std::fabs(splitter.fraction() - 0.75f) < 1.0e-6f,
+    "splitter clamps its fraction to the second pane minimum");
+  expect(splitter.begin_drag().handled && splitter.is_dragging(),
+    "splitter begins pointer dragging");
+  splitter.drag_to(0.1f);
+  expect(std::fabs(splitter.fraction() - 0.2f) < 1.0e-6f,
+    "splitter clamps a drag to the first pane minimum");
+  splitter.end_drag();
+  expect(!splitter.is_dragging(), "splitter ends pointer dragging");
+}
+
 void test_progress_behaviour()
 {
   RmProgressBehaviour progress(25.0f);
@@ -395,6 +434,8 @@ int main()
   test_listview_behaviour();
   test_slider_behaviour();
   test_scrollbar_behaviour();
+  test_toolstrip_behaviour();
+  test_splitter_behaviour();
   test_progress_behaviour();
   test_switch_behaviour();
   test_tab_behaviour();
