@@ -9,79 +9,6 @@
 
 #include "stb_image.h"
 
-namespace {
-
-template <typename Style>
-RmStateColors same_color_for_all_states(Style color)
-{
-	return { color, color, color, color };
-}
-
-RmThemeRef theme_from_legacy_checkbox(const rm_checkbox_style* legacy)
-{
-	if (!legacy)
-		return RmTheme::default_theme();
-
-	auto theme = std::make_shared<RmTheme>(*RmTheme::default_theme());
-	theme->checkbox.background = same_color_for_all_states(legacy->get_background_color());
-	theme->checkbox.border = same_color_for_all_states(legacy->get_border_color());
-	theme->checkbox.mark = same_color_for_all_states(legacy->get_mark_color());
-	theme->checkbox.text = same_color_for_all_states(legacy->get_text_color());
-	theme->checkbox.box_size = static_cast<float>(legacy->get_check_size());
-	theme->checkbox.corner_radius = legacy->get_avg_radius();
-	theme->checkbox.border_width = legacy->get_border_width();
-	theme->checkbox.text_gap = legacy->get_text_offsets().x;
-	theme->checkbox.font_size = legacy->get_font_size();
-	return theme;
-}
-
-RmThemeRef theme_with_progress_radius(RmThemeRef source, float radius)
-{
-	auto theme = std::make_shared<RmTheme>(
-		source ? *source : *RmTheme::default_theme());
-	theme->progress.corner_radius = std::max(0.0f, radius);
-	return theme;
-}
-
-RmThemeRef theme_from_legacy_switch(const rm_switch_style* legacy)
-{
-	if (!legacy)
-		return RmTheme::default_theme();
-
-	auto theme = std::make_shared<RmTheme>(*RmTheme::default_theme());
-	theme->switch_control.track_on = same_color_for_all_states(legacy->get_track_on());
-	theme->switch_control.track_off = same_color_for_all_states(legacy->get_track_off());
-	theme->switch_control.knob = same_color_for_all_states(legacy->get_knob_color());
-	theme->switch_control.track_height = legacy->get_track_height();
-	theme->switch_control.padding = legacy->get_padding();
-	theme->switch_control.animation_duration = legacy->get_anim_time();
-	theme->switch_control.knob_radius = legacy->get_knob_radius();
-	theme->switch_control.corner_radius = legacy->get_avg_radius();
-	theme->switch_control.shadow_offset = legacy->get_shadow_offset();
-	theme->switch_control.shadow_size = legacy->get_shadow_size();
-	theme->switch_control.shadow = legacy->get_shadow_color();
-	return theme;
-}
-
-RmThemeRef theme_from_legacy_slider(const rm_slider_style* legacy)
-{
-	if (!legacy)
-		return RmTheme::default_theme();
-
-	auto theme = std::make_shared<RmTheme>(*RmTheme::default_theme());
-	theme->slider.track = same_color_for_all_states(legacy->get_track_bg());
-	theme->slider.fill = same_color_for_all_states(legacy->get_track_fill());
-	theme->slider.thumb = same_color_for_all_states(legacy->get_thumb_color());
-	theme->slider.thumb_border = same_color_for_all_states(legacy->get_thumb_border_color());
-	theme->slider.track_height = legacy->get_track_height();
-	theme->slider.padding = legacy->get_padding();
-	theme->slider.thumb_radius = legacy->get_thumb_radius();
-	theme->slider.thumb_border_width = legacy->get_thumb_border_width();
-	return theme;
-}
-
-} // namespace
-
 /**
 * drawImage
 *
@@ -674,10 +601,6 @@ rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width,
 	set_callback(pcallback);
 }
 
-rm_checkbox::rm_checkbox(rm_widget* p_parent, int x, int y, int width,
-	rm_checkbox_style* pstyle, const std::string& label, rm_checkbox_cb pcallback)
-	: rm_checkbox(p_parent, x, y, width, label, pcallback, theme_from_legacy_checkbox(pstyle)) {}
-
 rm_checkbox::~rm_checkbox() {}
 
 void rm_checkbox::on_draw(NVGcontext* pctx) {
@@ -875,11 +798,6 @@ rm_slider::rm_slider(rm_widget* p_parent, int x, int y, int width, int height,
 	m_theme(theme ? std::move(theme) : RmTheme::default_theme()) {
 }
 
-rm_slider::rm_slider(rm_widget* p_parent, int x, int y, int width, int height,
-	rm_slider_style* pstyle, float min, float max, float initial, rm_slider_callback pcallback)
-	: rm_slider(p_parent, x, y, width, height, min, max, initial, pcallback,
-		theme_from_legacy_slider(pstyle)) {}
-
 rm_slider::~rm_slider() {}
 
 void rm_slider::on_draw(NVGcontext* pctx) {
@@ -917,17 +835,17 @@ bool rm_slider::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm
 	return true;
 }
 
-rm_progress_base::rm_progress_base(rm_widget* p_parent, int x, int y, int width, int height,
-	float initial, float corner_round, RmThemeRef theme) :
-	rm_widget(x, y, width, height, p_parent, "ui_progress_base"),
-	m_behaviour(initial), m_theme(theme_with_progress_radius(std::move(theme), corner_round))
+rm_progress::rm_progress(rm_widget* p_parent, int x, int y, int width, int height,
+	float initial, RmThemeRef theme) :
+	rm_widget(x, y, width, height, p_parent, "ui_progress"),
+	m_behaviour(initial), m_theme(theme ? std::move(theme) : RmTheme::default_theme())
 {}
 
-rm_progress_base::~rm_progress_base()
+rm_progress::~rm_progress()
 {
 }
 
-void rm_progress_base::on_draw(NVGcontext* pctx)
+void rm_progress::on_draw(NVGcontext* pctx)
 {
 	RmDefaultControlPainter::draw_progress(*pctx,
 		{ m_size.x, m_size.y, m_behaviour.fraction(), is_enabled() },
@@ -935,14 +853,9 @@ void rm_progress_base::on_draw(NVGcontext* pctx)
 	rm_widget::on_draw(pctx);
 }
 
-void rm_progress_base::set_corner_round(float radius)
-{
-	m_theme = theme_with_progress_radius(m_theme, radius);
-}
-
 rm_progress_image::rm_progress_image(rm_widget* p_parent, int x, int y, int width, int height,
-	rm_image img, float pattern_angle, float pattern_alpha, float initial, float corner_round) :
-	rm_progress_base(p_parent, x, y, width, height, initial, corner_round)
+	rm_image img, float pattern_angle, float pattern_alpha, float initial, RmThemeRef theme) :
+	rm_progress(p_parent, x, y, width, height, initial, std::move(theme))
 {
 	m_angle = pattern_angle;
 	m_alpha = pattern_alpha;
@@ -959,7 +872,7 @@ void rm_progress_image::on_draw(NVGcontext* pctx)
 	pctx->beginPath();
 	pctx->fillColor(m_theme->progress.background.resolve(
 		is_enabled() ? RmVisualState::normal : RmVisualState::disabled));
-	pctx->roundedRect(0.f, 0.f, m_size.x, m_size.y, get_corner_round());
+	pctx->roundedRect(0.f, 0.f, m_size.x, m_size.y, m_theme->progress.corner_radius);
 	pctx->fill();
 
 	// paint progres bar
@@ -972,13 +885,14 @@ void rm_progress_image::on_draw(NVGcontext* pctx)
 		pctx->beginPath();
 		pctx->roundedRect(
 			percent_rect.x, percent_rect.y,
-			percent_rect.width, percent_rect.height, get_corner_round());
+			percent_rect.width, percent_rect.height, m_theme->progress.corner_radius);
 		pctx->fillPaint(paint);
 		pctx->fill();
 
 		drawSprite(pctx, m_image, m_alpha, 0.f, 0.f, 13.f, 15.f,
 			percent_rect.x, percent_rect.y, percent_rect.width, percent_rect.height,
-			get_corner_round(), get_corner_round(), get_corner_round(), get_corner_round());
+			m_theme->progress.corner_radius, m_theme->progress.corner_radius,
+			m_theme->progress.corner_radius, m_theme->progress.corner_radius);
 	}
 	rm_widget::on_draw(pctx);
 }
@@ -2418,11 +2332,6 @@ rm_switch::rm_switch(rm_widget* parent, int x, int y, int width,
 {
 	set_callback(cb);
 }
-
-rm_switch::rm_switch(rm_widget* parent, int x, int y, int width,
-	rm_switch_style* pstyle, bool initial, rm_switch_cb cb) :
-	rm_switch(parent, x, y, width, initial, cb, theme_from_legacy_switch(pstyle))
-{}
 
 void rm_switch::on_draw(NVGcontext* pctx)
 {

@@ -155,7 +155,7 @@
     <ClCompile Include="exgui\rm_effects.cpp" />
     <ClCompile Include="exgui\rmgui_resources.cpp" />
     <ClCompile Include="main.cpp">
-      <PreprocessorDefinitions Condition="'$(RmGuiBuildBlendishDemo)'=='true'">RMGUI_ENABLE_LEGACY_BLENDISH_DEMO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(RmGuiBuildBlendishDemo)'=='true'">RMGUI_ENABLE_BLENDISH_DEMO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile Include="vendor\glad\src\glad.c" />
     <ClCompile Include="vendor\nanovg\blendish.cpp">

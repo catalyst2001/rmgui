@@ -1,7 +1,7 @@
 ﻿#include "backend/rmgui_glfw_opnegl33.h"
 #include "rmgui_controls.h"
 #include "rm_effects.h"
-#if defined(RMGUI_ENABLE_LEGACY_BLENDISH_DEMO)
+#if defined(RMGUI_ENABLE_BLENDISH_DEMO)
 #include "blend_ui.h"
 #include "blendish_test.h"
 #endif
@@ -178,7 +178,7 @@ void testtrb()
   }
 }
 
-void test_old(rm_surface* gui)
+void example_core_widgets(rm_surface* gui)
 {
   static rm_window_style default_style;
   default_style.apply_defaults();
@@ -201,25 +201,22 @@ void test_old(rm_surface* gui)
   //RMGUI_TEXT_INPUT_MULTILINE RMGUI_TEXT_INPUT_SINGLELINE
   rm_text_input* textInput = new rm_text_input(pwindow, 300, 100, 200, 20, &style_inp, RMGUI_TEXT_INPUT_SINGLELINE);
 
-  static rm_checkbox_style style;
-  style.set_font_size(14.f);
-  style.set_background_color(NVGcolor::RGB(20, 20, 20));
-  style.set_border_color(NVGcolor::RGB(80, 80, 80));
-  style.set_mark_color(NVGcolor::RGB(111, 111, 255));
-  style.set_border_width(1.f);
+  auto checkbox_theme = std::make_shared<RmTheme>(*RmTheme::default_theme());
+  checkbox_theme->checkbox.font_size = 14.f;
+  checkbox_theme->checkbox.background.normal = NVGcolor::RGB(20, 20, 20);
+  checkbox_theme->checkbox.border.normal = NVGcolor::RGB(80, 80, 80);
+  checkbox_theme->checkbox.mark.normal = NVGcolor::RGB(111, 111, 255);
+  checkbox_theme->checkbox.border_width = 1.f;
 
-  //style.set_corner_radius(LEFT_TOP, 4.f);
-  //style.set_corner_radius(RIGHT_TOP, 4.f);
-  //style.set_corner_radius(RIGHT_BOTTOM, 4.f);
-  //style.set_corner_radius(LEFT_BOTTOM, 4.f);
-  rm_checkbox* checkbox = new rm_checkbox(pwindow, 20, 40 + 30 + 20, 100, &style, "Enable",
+  rm_checkbox* checkbox = new rm_checkbox(pwindow, 20, 40 + 30 + 20, 100, "Enable",
     [](rm_checkbox* pcheckbox) -> bool {
       pcheckbox->get_userptr<rm_output_text>()->printf("%s time output", pcheckbox->is_checked() ? "Enabled" : "Disabled");
       return true;
-    }
+    }, checkbox_theme
   );
 
-  rm_checkbox* checkbox2 = new rm_checkbox(pwindow, 150, 40 + 30 + 20, 100, &style, u8"Включить");
+  rm_checkbox* checkbox2 = new rm_checkbox(pwindow, 150, 40 + 30 + 20, 100,
+    u8"Включить", nullptr, checkbox_theme);
 
   static rm_tabcontrol_style tabcontrol_style;
   tabcontrol_style.set_all_corners_radius(4.f);
@@ -244,7 +241,8 @@ void test_old(rm_surface* gui)
   rm_label* home_label = new rm_label(t0, 0, 0, "Welcome to the Home tab");
 
   rm_button* home_btn = new rm_button(t0, 10, 25, 120, 30, "Home Action");
-  rm_checkbox* setting_chk = new rm_checkbox(t1, 10, 0, 150, &style, "Enable Feature");
+  rm_checkbox* setting_chk = new rm_checkbox(t1, 10, 0, 150,
+    "Enable Feature", nullptr, checkbox_theme);
   //rm_text_input* setting_input = new rm_text_input(t1, 10, 25, 200, 20, RMGUI_TEXT_INPUT_SINGLELINE);
 
   rm_vec2& size = pwindow->get_size();
@@ -285,15 +283,18 @@ void test_old(rm_surface* gui)
   //scrollbar_style.set_thumb_size(10);
   //rm_scrollbar* pscroll = new rm_scrollbar(pwindow, RM_ORIENT_VERT, &scrollbar_style);
    
-  rm_slider* slider = new rm_slider(pwindow, 50, 400, 400, 40, nullptr, 0.0f, 100.0f, 50.0f,
+  rm_slider* slider = new rm_slider(pwindow, 50, 400, 400, 40, 0.0f, 100.0f, 50.0f,
     [](rm_slider* psilder) {
       psilder->get_userptr<rm_output_text>()->printf("slider value changed: %f", psilder->get_value());
     }
   );
   slider->set_userptr(potext);
 
-  rm_progress_base* progress = new rm_progress_base(pwindow, 50, 350, 300, 10, 0.f, 5.f);
-  //rm_progress_image* progress2 = new rm_progress_image(pwindow, 50, 350 + 10 + 5, 300, 10, image_pat, 0.f, 1.f, 0.f, 5.f);
+  auto progress_theme = std::make_shared<RmTheme>(*RmTheme::default_theme());
+  progress_theme->progress.corner_radius = 5.f;
+  rm_progress* progress = new rm_progress(pwindow, 50, 350, 300, 10, 0.f, progress_theme);
+  //rm_progress_image* progress2 = new rm_progress_image(
+  //  pwindow, 50, 365, 300, 10, image_pat, 0.f, 1.f, 0.f, progress_theme);
 }
 
 void example_widgets(rm_surface* gui)
@@ -345,7 +346,7 @@ void example_widgets(rm_surface* gui)
 
   tc::tab* ptab11 = ptabctl->add_tab("Main page asdasda", 0, 10);
   tc::tab* ptab12 = ptabctl->add_tab("Page 2 asdasdasd", 1, 10);
-#if defined(RMGUI_ENABLE_LEGACY_BLENDISH_DEMO)
+#if defined(RMGUI_ENABLE_BLENDISH_DEMO)
   tc::tab* ptab_bui = ptabctl->add_tab("Blendish Controls", 2, 10);
 #endif
 
@@ -373,12 +374,12 @@ void example_widgets(rm_surface* gui)
   pdiv->set_style(&wstyle);
   pdiv->set_layout(pflexlayout);
 
-  static rm_checkbox_style checkstyle;
-  rm_checkbox *pcb = new rm_checkbox(pdiv, 10, 100, 200, &checkstyle, "This is checkbox",
+  auto controls_theme = std::make_shared<RmTheme>(*RmTheme::default_theme());
+  rm_checkbox *pcb = new rm_checkbox(pdiv, 10, 100, 200, "This is checkbox",
     [](rm_checkbox* pcheckbox) {
       printf("checkbox is %s\n", pcheckbox->is_checked() ? "checked" : "unchecked");
       return true;
-    });
+    }, controls_theme);
 
   size_t effects_idx = ptabctl->find_tab_idx_in_row(0, ptab12->get_id());
   if (!tc::is_valid_tab(effects_idx)) {
@@ -411,39 +412,39 @@ void example_widgets(rm_surface* gui)
   rm_radiobutton::select_default(pdiv, 0);
 
 
-  static rm_switch_style style_switch;
-  style_switch.set_track_height(30.f);
-  style_switch.set_padding(4.f);
-  style_switch.set_track_on(NVGcolor::RGB(53, 77, 230));
-  style_switch.set_track_off(NVGcolor::RGB(28, 41, 103));
-  style_switch.set_knob_color(NVGcolor::RGB(255, 255, 255));
-  style_switch.set_anim_time(0.25f);
-  //style_switch->set_shadow_size(12.f);
-  style_switch.set_all_corners_radius(style_switch.get_track_height() * 0.5f);
+  controls_theme->switch_control.track_height = 30.f;
+  controls_theme->switch_control.padding = 4.f;
+  controls_theme->switch_control.track_on = {
+    NVGcolor::RGB(53, 77, 230), NVGcolor::RGB(73, 99, 245),
+    NVGcolor::RGB(42, 61, 190), NVGcolor::RGB(75, 81, 119)
+  };
+  controls_theme->switch_control.track_off = {
+    NVGcolor::RGB(28, 41, 103), NVGcolor::RGB(38, 54, 128),
+    NVGcolor::RGB(22, 32, 82), NVGcolor::RGB(67, 69, 79)
+  };
+  controls_theme->switch_control.animation_duration = 0.25f;
+  controls_theme->switch_control.corner_radius = controls_theme->switch_control.track_height * 0.5f;
 
-  rm_switch* sw = new rm_switch(pdiv, 10, 120, 60, &style_switch, false,
+  rm_switch* sw = new rm_switch(pdiv, 10, 120, 60, false,
     [](rm_switch* sw) {
       //if (sw->is_on())
       //  printf("switch enabled \n");
-    });
+    }, controls_theme);
   sw->set_max_size({ 60.f, sw->get_size().y });
 
   //sw->set_on(true, 1);
 
-  static rm_slider_style style_slider;
-  style_slider.set_track_height(7.f);
-  style_slider.set_padding(9.8f);
-  style_slider.set_track_bg(NVGcolor::RGB(109, 119, 213));
-  style_slider.set_track_fill(NVGcolor::RGB(53, 79, 206));
-  style_slider.set_thumb_radius(7.f);
-  style_slider.set_thumb_color(NVGcolor::RGB(255, 255, 255));
-  style_slider.set_thumb_border_color(NVGcolor::RGB(57, 76, 195));
-  style_slider.set_thumb_border_width(3.5f);
-  style_slider.set_all_corners_radius(style_slider.get_track_height() * 0.5f);
-  rm_slider* slider = new rm_slider(pdiv, 10, 160, 200, 40, &style_slider, 0.0f, 100.0f, 50.0f,
+  controls_theme->slider.track_height = 7.f;
+  controls_theme->slider.padding = 9.8f;
+  controls_theme->slider.track.normal = NVGcolor::RGB(109, 119, 213);
+  controls_theme->slider.fill.normal = NVGcolor::RGB(53, 79, 206);
+  controls_theme->slider.thumb_radius = 7.f;
+  controls_theme->slider.thumb_border.normal = NVGcolor::RGB(57, 76, 195);
+  controls_theme->slider.thumb_border_width = 3.5f;
+  rm_slider* slider = new rm_slider(pdiv, 10, 160, 200, 40, 0.0f, 100.0f, 50.0f,
     [](rm_slider* psilder) {
       //psilder->get_userptr<rm_output_text>()->printf("slider value changed: %f", psilder->get_value());
-    }
+    }, controls_theme
   );
   slider->set_max_size({ 200*2, 40 });
 
@@ -468,8 +469,8 @@ void example_widgets(rm_surface* gui)
   list->add_item("Third option");
   list->add_item("Another item");
 
-#if defined(RMGUI_ENABLE_LEGACY_BLENDISH_DEMO)
-  // Legacy Blendish visualization experiment. Kept out of the default build.
+#if defined(RMGUI_ENABLE_BLENDISH_DEMO)
+  // Isolated Blendish visualization experiment. Kept out of the default build.
   {
     rm_widget* bui_page = ptab_bui->get_page_widget();
 
@@ -763,8 +764,8 @@ int main() {
 
   g_gui->set_font(default_font);
 
-#if defined(RMGUI_ENABLE_LEGACY_BLENDISH_DEMO)
-  // Initialize the isolated legacy Blendish demo.
+#if defined(RMGUI_ENABLE_BLENDISH_DEMO)
+  // Initialize the isolated Blendish demo.
   bndSetFont(g_gui->get_context()->findFont("default"));
 
   // Load blendish icon sheet (Blender 2.6 compatible, 602x640 px grid)

@@ -156,49 +156,6 @@ public:
 };
 
 /**
-* CHECKBOX
-*/
-class rm_checkbox_style : public rm_corners_style {
-  rm_vec2 m_text_offset;
-  NVGcolor      m_text_color;
-  NVGcolor      m_bg_color;
-  NVGcolor      m_mark_color;
-  NVGcolor      m_border_color;
-  int           m_check_size;
-  float         m_font_size;
-  float         m_border_width;
-public:
-  rm_checkbox_style() :
-    m_text_offset(5.f, 0.f),
-    m_text_color(NVGcolor::RGB(255, 255, 255)),
-    m_bg_color(NVGcolor::RGB(255, 255, 255)),
-    m_mark_color(NVGcolor::RGB(0, 0, 0)),
-    m_border_color(NVGcolor::RGB(0, 0, 0)),
-    m_check_size(20),
-    m_font_size(18.f), m_border_width(1.f){}
-
-  /* selectors  */
-  inline const rm_vec2& get_text_offsets() const { return m_text_offset; }
-  inline const NVGcolor& get_text_color() const { return m_text_color; }
-  inline const NVGcolor& get_background_color() const { return m_bg_color; }
-  inline const NVGcolor& get_mark_color() const { return m_mark_color; }
-  inline const NVGcolor& get_border_color() const { return m_border_color; }
-  inline int             get_check_size() const { return m_check_size; }
-  inline float           get_font_size() const { return m_font_size; }
-  inline float           get_border_width() const { return m_border_width; }
-
-  /* modifiers */
-  inline void set_text_offsets(rm_vec2 offset) { m_text_offset = offset; }
-  inline void set_text_color(NVGcolor clr) { m_text_color = clr; }
-  inline void set_background_color(NVGcolor clr) { m_bg_color = clr; }
-  inline void set_mark_color(NVGcolor clr) { m_mark_color = clr; }
-  inline void set_border_color(NVGcolor clr) { m_border_color = clr; }
-  inline void set_check_size(int newsize) { m_check_size = newsize; }
-  inline void set_font_size(float fsize) { m_font_size = fsize; }
-  inline void set_border_width(float bsize) { m_border_width = bsize; }
-};
-
-/**
 * =============================================
 * CheckBox
 * 
@@ -221,8 +178,6 @@ class rm_checkbox : public rm_widget, public rm_callback<rm_checkbox_cb> {
 public:
   rm_checkbox(rm_widget* p_parent, int x, int y, int width,
     const std::string& label, rm_checkbox_cb pcallback = nullptr, RmThemeRef theme = {});
-  // Compatibility adapter for the original mutable style API.
-  rm_checkbox(rm_widget* p_parent, int x, int y, int width, rm_checkbox_style *pstyle, const std::string& label, rm_checkbox_cb pcallback=nullptr);
   virtual ~rm_checkbox();
   inline bool        is_checked() const { return m_behaviour.is_checked(); }
   inline const char* get_label() const { return m_label.c_str(); }
@@ -275,48 +230,6 @@ public:
 };
 
 /**
- * SLIDER STYLE
- */
-class rm_slider_style : public rm_corners_style {
-  float   m_track_height;       
-  float   m_padding;            
-  NVGcolor m_track_bg;          
-  NVGcolor m_track_fill;        
-  float   m_thumb_radius;       
-  float   m_thumb_border_width; 
-  NVGcolor m_thumb_color;       
-  NVGcolor m_thumb_border_color;
-
-public:
-  rm_slider_style(): m_track_height(4.f), 
-    m_padding(8.f), m_track_bg(NVGcolor::RGB(200, 200, 200)),
-    m_track_fill(NVGcolor::RGB(57, 76, 195)), m_thumb_radius(12.f), 
-    m_thumb_border_width(2.f), m_thumb_color(NVGcolor::RGB(255, 255, 255)), 
-    m_thumb_border_color(NVGcolor::RGB(57, 76, 195)){
-  }
-
-  /* selectors */
-  inline float   get_track_height()       const { return m_track_height; }
-  inline float   get_padding()            const { return m_padding; }
-  inline NVGcolor get_track_bg()           const { return m_track_bg; }
-  inline NVGcolor get_track_fill()         const { return m_track_fill; }
-  inline float   get_thumb_radius()       const { return m_thumb_radius; }
-  inline float   get_thumb_border_width() const { return m_thumb_border_width; }
-  inline NVGcolor get_thumb_color()        const { return m_thumb_color; }
-  inline NVGcolor get_thumb_border_color() const { return m_thumb_border_color; }
-
-  /* modificators */
-  inline void set_track_height(float h) { m_track_height = h; }
-  inline void set_padding(float p) { m_padding = p; }
-  inline void set_track_bg(NVGcolor c) { m_track_bg = c; }
-  inline void set_track_fill(NVGcolor c) { m_track_fill = c; }
-  inline void set_thumb_radius(float r) { m_thumb_radius = r; }
-  inline void set_thumb_border_width(float w) { m_thumb_border_width = w; }
-  inline void set_thumb_color(NVGcolor c) { m_thumb_color = c; }
-  inline void set_thumb_border_color(NVGcolor c) { m_thumb_border_color = c; }
-};
-
-/**
 * =============================================
 * Slider
 *
@@ -339,8 +252,6 @@ class rm_slider : public rm_widget {
 public:
   rm_slider(rm_widget* p_parent, int x, int y, int width, int height,
     float min, float max, float initial, rm_slider_callback pcallback = nullptr, RmThemeRef theme = {});
-  // Compatibility adapter for the original mutable style API.
-  rm_slider(rm_widget* p_parent, int x, int y, int width, int height, rm_slider_style* style, float min, float max, float initial, rm_slider_callback pcallback=nullptr);
   virtual ~rm_slider();
   float get_value() const { return m_behaviour.value(); }
   void set_value(float value) { m_behaviour.set_value(value); }
@@ -355,19 +266,17 @@ public:
 *
 * =============================================
 */
-class rm_progress_base : public rm_widget
+class rm_progress : public rm_widget
 {
 protected:
   RmProgressBehaviour m_behaviour;
   RmThemeRef m_theme;
 public:
-  rm_progress_base(rm_widget* p_parent, int x, int y, int width, int height,
-    float initial = 0.1f, float corner_round = 0.5f, RmThemeRef theme = {});
-  virtual ~rm_progress_base();
+  rm_progress(rm_widget* p_parent, int x, int y, int width, int height,
+    float initial = 0.1f, RmThemeRef theme = {});
+  virtual ~rm_progress();
   void         set_percent(float percent) { m_behaviour.set_percent(percent); }
   inline float get_percent() const { return m_behaviour.percent(); }
-  void         set_corner_round(float radius);
-  inline float get_corner_round() const { return m_theme->progress.corner_radius; }
   const RmProgressBehaviour& behaviour() const { return m_behaviour; }
   void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmTheme::default_theme(); }
   virtual void on_draw(NVGcontext* pctx) override;
@@ -380,7 +289,7 @@ public:
 *
 * =============================================
 */
-class rm_progress_image : public rm_progress_base
+class rm_progress_image : public rm_progress
 {
   rm_image m_image;
   float    m_angle;
@@ -388,7 +297,7 @@ class rm_progress_image : public rm_progress_base
 public:
   rm_progress_image(rm_widget* p_parent, int x, int y, int width, int height, 
     rm_image img, float pattern_angle = 0.f, float pattern_alpha = 1.f,
-    float initial = 0.1f, float corner_round = 0.5f);
+    float initial = 0.1f, RmThemeRef theme = {});
   ~rm_progress_image();
   inline void     set_image(rm_image img) { m_image = img; }
   inline rm_image get_image() const { return m_image; }
@@ -1208,55 +1117,6 @@ public:
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& pos, rm_vec2 delta) override;
 };
 
-/**
- * SWITCH STYLE
-*/
-class rm_switch_style : public rm_corners_style {
-  float     m_track_height;
-  float     m_padding;
-  float     m_anim_time;
-  NVGcolor  m_track_on;
-  NVGcolor  m_track_off;
-  NVGcolor  m_knob_color;
-  float     m_knob_radius;
-  float     m_shadow_offset;
-  float     m_shadow_size;
-  NVGcolor  m_shadow_color;
-public:
-  rm_switch_style() : m_track_height(24.f), m_padding(4.f), m_anim_time(0.2f), 
-    m_track_on(NVGcolor::RGB(57, 76, 195)), m_track_off(NVGcolor::RGBA(200, 200, 200, 128)), 
-    m_knob_color(NVGcolor::RGB(255, 255, 255)), m_knob_radius(11.f),
-    m_shadow_offset(5.f), m_shadow_size(7.f),
-    m_shadow_color(NVGcolor::RGBAf(0.0f, 0.0f, 0.0f, 0.25f)) {
-  }
-
-  /* selectors */
-  inline float          get_track_height() const { return m_track_height; }
-  inline float          get_padding()      const { return m_padding; }
-  inline float          get_anim_time()    const { return m_anim_time; }
-  inline NVGcolor       get_track_on()     const { return m_track_on; }
-  inline NVGcolor       get_track_off()    const { return m_track_off; }
-  inline NVGcolor       get_knob_color()   const { return m_knob_color; }
-  inline float          get_knob_radius() const { return m_knob_radius; }
-  inline float          get_shadow_offset() const { return m_shadow_offset; }
-  inline float          get_shadow_size()   const { return m_shadow_size; }
-  inline NVGcolor       get_shadow_color()  const { return m_shadow_color; }
-
-  /* modificators */
-  inline void set_track_height(float h) { m_track_height = h;}
-  inline void set_padding(float p) { m_padding = p; }
-  inline void set_anim_time(float t) {
-    m_anim_time = rm_max(0.0001f, t);
-  }
-  inline void set_track_on(NVGcolor c) { m_track_on = c; }
-  inline void set_track_off(NVGcolor c) { m_track_off = c; }
-  inline void set_knob_color(NVGcolor c) { m_knob_color = c; }
-  inline void set_knob_radius(float r) { m_knob_radius = r; }
-  inline void set_shadow_offset(float offset) { m_shadow_offset = offset; }
-  inline void set_shadow_size(float size) { m_shadow_size = size; }
-  inline void set_shadow_color(NVGcolor c) { m_shadow_color = c; }
-};
-
 class rm_switch;
 using rm_switch_cb = void(*)(rm_switch*);
 /**
@@ -1273,9 +1133,6 @@ class rm_switch : public rm_widget, public rm_callback<rm_switch_cb>{
 public:
   rm_switch(rm_widget* parent, int x, int y, int width,
     bool initial = false, rm_switch_cb cb = nullptr, RmThemeRef theme = {});
-  // Compatibility adapter for the original mutable style API.
-  rm_switch(rm_widget* parent, int x, int y, int width, 
-    rm_switch_style* pstyle, bool initial = false, rm_switch_cb cb = nullptr);
 
   virtual void on_draw(NVGcontext* pctx) override;
   virtual void on_keybd(int sc, RM_KEY key, RM_KEY_STATE state) override;
