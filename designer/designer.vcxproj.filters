@@ -42,6 +42,9 @@
     <ClCompile Include="..\exgui\exgui\rmgui_data_visual.cpp">
       <Filter>rmgui</Filter>
     </ClCompile>
+    <ClCompile Include="..\exgui\exgui\rmgui_particle_anim.cpp">
+      <Filter>rmgui</Filter>
+    </ClCompile>
     <ClCompile Include="..\exgui\exgui\rmgui_controls.cpp">
       <Filter>rmgui</Filter>
     </ClCompile>
@@ -87,6 +90,9 @@
       <Filter>rmgui</Filter>
     </ClInclude>
     <ClInclude Include="..\exgui\exgui\rmgui_data_visual.h">
+      <Filter>rmgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\exgui\rmgui_particle_anim.h">
       <Filter>rmgui</Filter>
     </ClInclude>
     <ClInclude Include="..\exgui\exgui\rmgui_controls.h">

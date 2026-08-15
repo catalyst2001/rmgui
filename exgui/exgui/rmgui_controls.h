@@ -3,6 +3,7 @@
 #include "rmgui_behaviour.h"
 #include "rmgui_data_visual.h"
 #include "rmgui_default_painter.h"
+#include "rmgui_particle_anim.h"
 #include "rmgui_theme.h"
 #include "smalldelegate.h"
 #include <string>

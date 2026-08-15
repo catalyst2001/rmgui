@@ -734,6 +734,20 @@ RmVisualResourceSnapshot rm_surface::snapshot_visual_resources() const
 	return result;
 }
 
+rm_vec2 rm_surface::get_cursor_position(
+	const rm_widget* p_relative_to) const
+{
+	if (!p_relative_to)
+		return m_last_cursor;
+	if (p_relative_to->m_proot != this)
+		return rm_vec2(-FLT_MAX, -FLT_MAX);
+	const rm_vec2 parent_cursor = cursor_for_widget(
+		p_relative_to, m_last_cursor);
+	return rm_vec2(
+		parent_cursor.x - p_relative_to->m_pos_of_parent.x,
+		parent_cursor.y - p_relative_to->m_pos_of_parent.y);
+}
+
 rm_image rm_surface::load_image(const char* pfilename, int flags)
 {
 	return m_pctx->createImage(pfilename, flags);

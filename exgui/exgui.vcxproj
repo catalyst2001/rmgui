@@ -149,6 +149,7 @@
     <ClCompile Include="exgui\rmgui.cpp" />
     <ClCompile Include="exgui\rmgui_data_visual.cpp" />
     <ClCompile Include="exgui\rmgui_default_painter.cpp" />
+    <ClCompile Include="exgui\rmgui_particle_anim.cpp" />
     <ClCompile Include="exgui\rmgui_controls.cpp" />
     <ClCompile Include="exgui\blend_ui.cpp">
       <ExcludedFromBuild Condition="'$(RmGuiBuildBlendishDemo)'!='true'">true</ExcludedFromBuild>
@@ -175,6 +176,7 @@
     <ClInclude Include="exgui\rmgui_data_visual.h" />
     <ClInclude Include="exgui\rmgui_behaviour.h" />
     <ClInclude Include="exgui\rmgui_default_painter.h" />
+    <ClInclude Include="exgui\rmgui_particle_anim.h" />
     <ClInclude Include="exgui\rmgui_controls.h" />
     <ClInclude Include="exgui\rmgui_theme.h" />
     <ClInclude Include="exgui\blend_ui.h" />

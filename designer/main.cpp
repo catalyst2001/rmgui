@@ -25,6 +25,16 @@ int main(int argc, char** argv)
 
 	g_gui->set_font(default_font);
 
+	RmParticleAnimConfig particle_config;
+	particle_config.particle_count = 96;
+	particle_config.connection_distance = 132.0f;
+	particle_config.cursor_break_radius = 96.0f;
+	particle_config.cursor_repulsion = 18.0f;
+	rm_particle_anim* p_home_background = new rm_particle_anim(
+		g_gui, 0, 0, 1280, 720, particle_config,
+		RmParticleAnimStyle::designer_home());
+	p_home_background->set_zindex(-100);
+
 	bndSetFont(g_gui->get_context()->findFont("default"));
 
 	rm_image icon_sheet = g_gui->load_image("blender_icons16.png", 0);
@@ -44,6 +54,10 @@ int main(int argc, char** argv)
 		last_time = current_time;
 		current_time = g_gui->get_sysdf()->get_time();
 		float dt = current_time - last_time;
+		const rm_vec2& surface_size = g_gui->get_size();
+		if (p_home_background->get_size().x != surface_size.x ||
+			p_home_background->get_size().y != surface_size.y)
+			p_home_background->resize(surface_size.x, surface_size.y);
 
 		g_gui->draw(dt);
 		sdl3_swap(g_gui);

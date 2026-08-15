@@ -1282,6 +1282,8 @@ public:
 
   /* delta time */
   inline float get_delta_time() const { return m_delta_time; }
+  rm_vec2 get_cursor_position(
+    const rm_widget* p_relative_to = nullptr) const;
 
   /* images */
   rm_resource_id register_imagelist(const char* p_resource_name,
