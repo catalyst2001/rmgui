@@ -393,10 +393,14 @@ struct RmRebarStyle {
   NVGcolor border;
   NVGcolor separator;
   NVGcolor gripper;
+  NVGcolor gripper_hovered;
+  NVGcolor gripper_active;
+  NVGcolor resize_handle;
   float band_gap = 0.0f;
   float band_padding = 0.0f;
   float row_gap = 0.0f;
   float gripper_extent = 0.0f;
+  float resize_handle_extent = 0.0f;
   float border_width = 0.0f;
   float separator_width = 0.0f;
   float corner_radius = 0.0f;
@@ -597,6 +601,7 @@ struct RmControlMetricsTokens {
   float rebar_band_padding = 2.0f;
   float rebar_row_gap = 2.0f;
   float rebar_gripper_extent = 6.0f;
+  float rebar_resize_handle_extent = 5.0f;
   float splitter_thickness = 6.0f;
   float splitter_grip_extent = 18.0f;
   float splitter_grip_width = 1.0f;
@@ -837,6 +842,7 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.rebar_band_padding, 0.0f, 128.0f, "tokens.controls.rebar_band_padding", diagnostics);
     sanitize_metric(tokens.controls.rebar_row_gap, 0.0f, 128.0f, "tokens.controls.rebar_row_gap", diagnostics);
     sanitize_metric(tokens.controls.rebar_gripper_extent, 0.0f, 64.0f, "tokens.controls.rebar_gripper_extent", diagnostics);
+    sanitize_metric(tokens.controls.rebar_resize_handle_extent, 1.0f, 64.0f, "tokens.controls.rebar_resize_handle_extent", diagnostics);
     sanitize_metric(tokens.controls.splitter_thickness, 2.0f, 64.0f, "tokens.controls.splitter_thickness", diagnostics);
     sanitize_metric(tokens.controls.splitter_grip_extent, 1.0f, 128.0f, "tokens.controls.splitter_grip_extent", diagnostics);
     sanitize_metric(tokens.controls.splitter_grip_width, 0.0f, 16.0f, "tokens.controls.splitter_grip_width", diagnostics);
@@ -1294,10 +1300,14 @@ public:
     p_theme->rebar.border = colors.border;
     p_theme->rebar.separator = colors.border;
     p_theme->rebar.gripper = colors.text_muted;
+    p_theme->rebar.gripper_hovered = colors.control_hovered;
+    p_theme->rebar.gripper_active = colors.accent;
+    p_theme->rebar.resize_handle = colors.border_hovered;
     p_theme->rebar.band_gap = controls.rebar_band_gap;
     p_theme->rebar.band_padding = controls.rebar_band_padding;
     p_theme->rebar.row_gap = controls.rebar_row_gap;
     p_theme->rebar.gripper_extent = controls.rebar_gripper_extent;
+    p_theme->rebar.resize_handle_extent = controls.rebar_resize_handle_extent;
     p_theme->rebar.border_width = controls.border_width;
     p_theme->rebar.separator_width = controls.border_width;
     p_theme->rebar.corner_radius = tokens.radius.small;

@@ -1366,11 +1366,12 @@ void rm_toolstrip::resize(float width, float height)
 }
 
 rm_rebar::rm_rebar(rm_widget* p_parent, int x, int y, int width, int height,
-	RM_ORIENT orientation, RmThemeRef theme) :
+	RM_ORIENT orientation, RmThemeRef theme, rm_rebar_cb callback) :
 	rm_widget(x, y, width, height, p_parent, "rm_rebar", RM_FLAG_DEFAULT),
 	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()),
 	m_orientation(orientation == RM_ORIENT_VERT ? RM_ORIENT_VERT : RM_ORIENT_HORZ)
 {
+	m_pcallback = callback;
 }
 
 void rm_rebar::layout_bands()
@@ -1378,6 +1379,7 @@ void rm_rebar::layout_bands()
 	if (m_layouting)
 		return;
 	m_layouting = true;
+	m_behaviour.set_count(m_bands.size());
 	const RmRebarStyle& style = m_theme->rebar;
 	const bool horizontal = m_orientation == RM_ORIENT_HORZ;
 	const float available_main = std::max(0.0f,
@@ -1443,17 +1445,163 @@ void rm_rebar::layout_bands()
 	m_layouting = false;
 }
 
+float rm_rebar::pointer_axis(const rm_vec2& cursor_pos) const noexcept
+{
+	return m_orientation == RM_ORIENT_VERT
+		? cursor_pos.y - m_pos_of_parent.y
+		: cursor_pos.x - m_pos_of_parent.x;
+}
+
+rm_rebar::Hit rm_rebar::hit_test_interaction(
+	const rm_vec2& cursor_pos) const
+{
+	if (!m_bbox.inside(cursor_pos))
+		return {};
+	const float local_x = cursor_pos.x - m_pos_of_parent.x;
+	const float local_y = cursor_pos.y - m_pos_of_parent.y;
+	const RmRebarStyle& style = m_theme->rebar;
+	for (size_t index = 0; index < m_bands.size(); ++index) {
+		const rm_rect& bounds = m_bands[index].bounds;
+		if (local_x < bounds.x || local_y < bounds.y ||
+			local_x > bounds.x + bounds.width ||
+			local_y > bounds.y + bounds.height)
+			continue;
+		const float axis = m_orientation == RM_ORIENT_VERT ? local_y : local_x;
+		const float leading = m_orientation == RM_ORIENT_VERT ? bounds.y : bounds.x;
+		const float trailing = leading +
+			(m_orientation == RM_ORIENT_VERT ? bounds.height : bounds.width);
+		if (axis >= trailing - style.resize_handle_extent)
+			return { index, RmRebarInteraction::resize };
+		if (axis <= leading + style.gripper_extent)
+			return { index, RmRebarInteraction::reorder };
+		return {};
+	}
+	return {};
+}
+
+size_t rm_rebar::hit_test_band(const rm_vec2& cursor_pos) const
+{
+	const float local_x = cursor_pos.x - m_pos_of_parent.x;
+	const float local_y = cursor_pos.y - m_pos_of_parent.y;
+	for (size_t index = 0; index < m_bands.size(); ++index) {
+		const rm_rect& bounds = m_bands[index].bounds;
+		if (local_x >= bounds.x && local_y >= bounds.y &&
+			local_x <= bounds.x + bounds.width &&
+			local_y <= bounds.y + bounds.height)
+			return index;
+	}
+	return RmRebarBehaviour::invalid_index;
+}
+
+float rm_rebar::maximum_band_extent(size_t index) const
+{
+	if (index >= m_bands.size())
+		return 0.0f;
+	const RmRebarStyle& style = m_theme->rebar;
+	const float main = m_orientation == RM_ORIENT_VERT ? m_size.y : m_size.x;
+	return std::max(m_bands[index].minimum_extent,
+		main - style.band_padding * 2.0f - style.gripper_extent);
+}
+
+bool rm_rebar::move_band(size_t from, size_t to, bool notify)
+{
+	if (from >= m_bands.size() || to >= m_bands.size() || from == to)
+		return false;
+	Band moved = std::move(m_bands[from]);
+	m_bands.erase(m_bands.begin() + static_cast<std::ptrdiff_t>(from));
+	m_bands.insert(m_bands.begin() + static_cast<std::ptrdiff_t>(to),
+		std::move(moved));
+	layout_bands();
+	if (notify && m_pcallback) {
+		const Band& band = m_bands[to];
+		m_pcallback(this, band.widget, RmRebarChange::reordered, to,
+			band.preferred_extent);
+	}
+	return true;
+}
+
+bool rm_rebar::set_band_extent(size_t index, float extent, bool notify)
+{
+	if (index >= m_bands.size())
+		return false;
+	Band& band = m_bands[index];
+	extent = std::clamp(extent, band.minimum_extent,
+		maximum_band_extent(index));
+	if (std::fabs(band.preferred_extent - extent) <= FLT_EPSILON)
+		return false;
+	band.preferred_extent = extent;
+	band.stretch = false;
+	layout_bands();
+	if (notify && m_pcallback)
+		m_pcallback(this, band.widget, RmRebarChange::resized, index,
+			band.preferred_extent);
+	return true;
+}
+
 void rm_rebar::on_draw(NVGcontext* pctx)
 {
 	layout_bands();
 	RmDefaultControlPainter::draw_rebar(*pctx, { m_size.x, m_size.y },
 		m_theme->rebar);
-	for (const Band& band : m_bands)
+	for (size_t index = 0; index < m_bands.size(); ++index) {
+		const Band& band = m_bands[index];
+		const bool hovered = m_behaviour.hovered_band() == index;
+		const bool active = m_behaviour.active_band() == index;
 		RmDefaultControlPainter::draw_rebar_band(*pctx,
 			{ { band.bounds.x, band.bounds.y, band.bounds.width,
-			    band.bounds.height }, m_orientation == RM_ORIENT_VERT },
+			    band.bounds.height }, m_orientation == RM_ORIENT_VERT,
+			  hovered && m_behaviour.hovered_interaction() ==
+				RmRebarInteraction::reorder,
+			  active && m_behaviour.interaction() == RmRebarInteraction::reorder,
+			  hovered && m_behaviour.hovered_interaction() ==
+				RmRebarInteraction::resize,
+			  active && m_behaviour.interaction() == RmRebarInteraction::resize },
 			m_theme->rebar);
+	}
 	rm_widget::on_draw(pctx);
+}
+
+bool rm_rebar::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+	RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+{
+	RM_UNUSED(delta);
+	if (event == RM_MOUSE_EVENT_MOVE) {
+		if (m_behaviour.is_interacting()) {
+			const size_t active = m_behaviour.active_band();
+			const float minimum = active < m_bands.size()
+				? m_bands[active].minimum_extent : 0.0f;
+			const RmRebarDragUpdate update = m_behaviour.drag(
+				pointer_axis(cursor_pos), hit_test_band(cursor_pos), minimum,
+				maximum_band_extent(active));
+			if (update.reordered)
+				move_band(update.from_index, update.to_index, true);
+			else if (update.resized)
+				set_band_extent(active, update.preferred_extent, true);
+			return !update.state.handled;
+		}
+		const Hit hit = hit_test_interaction(cursor_pos);
+		const RmBehaviourUpdate update =
+			m_behaviour.pointer_move(hit.band, hit.interaction);
+		return !update.handled;
+	}
+
+	if (event != RM_MOUSE_EVENT_CLICK || vk != RM_KEY_LMOUSE)
+		return true;
+	if (state == RM_KEY_STATE::DOWN) {
+		const Hit hit = hit_test_interaction(cursor_pos);
+		const float extent = hit.band < m_bands.size()
+			? m_bands[hit.band].preferred_extent : 0.0f;
+		const RmBehaviourUpdate update = m_behaviour.begin(
+			hit.band, hit.interaction, pointer_axis(cursor_pos), extent);
+		if (update.handled && get_root())
+			get_root()->capture_pointer(this);
+		return !update.handled;
+	}
+	if (state == RM_KEY_STATE::UP) {
+		const RmBehaviourUpdate update = m_behaviour.end();
+		return !update.handled;
+	}
+	return true;
 }
 
 bool rm_rebar::add_band(rm_widget* p_widget, float preferred_extent,
@@ -1461,13 +1609,20 @@ bool rm_rebar::add_band(rm_widget* p_widget, float preferred_extent,
 {
 	if (!p_widget)
 		return false;
+	if (std::any_of(m_bands.begin(), m_bands.end(),
+		[p_widget](const Band& band) { return band.widget == p_widget; }))
+		return false;
 	if (p_widget->get_parent() != this)
 		p_widget->set_parent(this);
 	p_widget->set_min_size(m_orientation == RM_ORIENT_HORZ
 		? rm_vec2(std::max(0.0f, minimum_extent), 0.0f)
 		: rm_vec2(0.0f, std::max(0.0f, minimum_extent)));
 	p_widget->set_max_size(rm_vec2(0.0f, 0.0f));
-	m_bands.push_back({ p_widget, preferred_extent, minimum_extent, stretch, {} });
+	const rm_vec2 child_size = p_widget->get_size();
+	const float actual_extent = preferred_extent > 0.0f ? preferred_extent
+		: (m_orientation == RM_ORIENT_VERT ? child_size.y : child_size.x);
+	m_bands.push_back({ p_widget, std::max(actual_extent, minimum_extent),
+		minimum_extent, stretch, {} });
 	layout_bands();
 	return true;
 }
@@ -1479,6 +1634,8 @@ bool rm_rebar::remove_band(rm_widget* p_widget)
 	if (found == m_bands.end())
 		return false;
 	m_bands.erase(found);
+	m_behaviour.cancel();
+	m_behaviour.set_count(m_bands.size());
 	layout_bands();
 	return true;
 }

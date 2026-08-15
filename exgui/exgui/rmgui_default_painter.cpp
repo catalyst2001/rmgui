@@ -1470,6 +1470,18 @@ void RmDefaultControlPainter::draw_rebar(NVGcontext& context,
 void RmDefaultControlPainter::draw_rebar_band(NVGcontext& context,
   const RmRebarBandVisual& visual, const RmRebarStyle& style)
 {
+  const float gripper_width = visual.vertical
+    ? visual.bounds.width : style.gripper_extent;
+  const float gripper_height = visual.vertical
+    ? style.gripper_extent : visual.bounds.height;
+  if (visual.gripper_hovered || visual.gripper_active) {
+    context.beginPath();
+    context.roundedRect(visual.bounds.x, visual.bounds.y,
+      gripper_width, gripper_height, style.corner_radius);
+    context.fillColor(visual.gripper_active
+      ? style.gripper_active : style.gripper_hovered);
+    context.fill();
+  }
   const float axis = visual.vertical ? visual.bounds.y : visual.bounds.x;
   const float cross = visual.vertical ? visual.bounds.x : visual.bounds.y;
   const float cross_extent = visual.vertical
@@ -1486,6 +1498,27 @@ void RmDefaultControlPainter::draw_rebar_band(NVGcontext& context,
     }
     context.StrokeWidth(style.separator_width);
     context.strokeColor(style.gripper);
+    context.stroke();
+  }
+
+  if (visual.resize_hovered || visual.resize_active) {
+    const float trailing = visual.vertical
+      ? visual.bounds.y + visual.bounds.height
+      : visual.bounds.x + visual.bounds.width;
+    context.beginPath();
+    if (visual.vertical) {
+      context.moveTo(visual.bounds.x, trailing - 0.5f);
+      context.lineTo(visual.bounds.x + visual.bounds.width, trailing - 0.5f);
+    }
+    else {
+      context.moveTo(trailing - 0.5f, visual.bounds.y);
+      context.lineTo(trailing - 0.5f, visual.bounds.y + visual.bounds.height);
+    }
+    context.StrokeWidth(visual.resize_active
+      ? std::max(1.0f, style.separator_width * 2.0f)
+      : std::max(1.0f, style.separator_width));
+    context.strokeColor(visual.resize_active
+      ? style.gripper_active : style.resize_handle);
     context.stroke();
   }
 }

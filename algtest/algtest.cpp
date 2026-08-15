@@ -362,6 +362,37 @@ void test_toolstrip_behaviour()
     "toolbox does not change selection after a mismatched release");
 }
 
+void test_rebar_behaviour()
+{
+  RmRebarBehaviour rebar;
+  rebar.set_count(3);
+  rebar.pointer_move(1, RmRebarInteraction::resize);
+  expect(rebar.hovered_band() == 1 &&
+    rebar.hovered_interaction() == RmRebarInteraction::resize,
+    "rebar tracks the hovered resize handle");
+
+  expect(rebar.begin(1, RmRebarInteraction::resize, 100.0f, 200.0f).handled,
+    "rebar begins band resizing from a handle");
+  const RmRebarDragUpdate resized = rebar.drag(
+    130.0f, RmRebarBehaviour::invalid_index, 120.0f, 240.0f);
+  expect(resized.resized && std::fabs(resized.preferred_extent - 230.0f) < 1.0e-6f,
+    "rebar resize preserves the pointer-to-extent delta");
+  const RmRebarDragUpdate clamped = rebar.drag(
+    200.0f, RmRebarBehaviour::invalid_index, 120.0f, 240.0f);
+  expect(clamped.preferred_extent == 240.0f,
+    "rebar clamps resizing to the available band extent");
+  rebar.end();
+
+  rebar.begin(0, RmRebarInteraction::reorder, 10.0f, 100.0f);
+  const RmRebarDragUpdate reordered = rebar.drag(80.0f, 2, 0.0f, 0.0f);
+  expect(reordered.reordered && reordered.from_index == 0 &&
+    reordered.to_index == 2 && rebar.active_band() == 2,
+    "rebar reports band reorder operations and follows the moved band");
+  rebar.set_enabled(false);
+  expect(!rebar.is_interacting(),
+    "disabling rebar cancels an active interaction");
+}
+
 void test_splitter_behaviour()
 {
   RmSplitterBehaviour splitter;
@@ -481,6 +512,7 @@ int main()
   test_slider_behaviour();
   test_scrollbar_behaviour();
   test_toolstrip_behaviour();
+  test_rebar_behaviour();
   test_splitter_behaviour();
   test_progress_behaviour();
   test_switch_behaviour();

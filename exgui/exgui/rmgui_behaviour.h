@@ -1708,6 +1708,132 @@ public:
   RmToolboxBehaviour() noexcept : RmToolStripBehaviour(true) {}
 };
 
+enum class RmRebarInteraction {
+  none,
+  reorder,
+  resize
+};
+
+struct RmRebarDragUpdate {
+  RmBehaviourUpdate state;
+  size_t from_index = std::numeric_limits<size_t>::max();
+  size_t to_index = std::numeric_limits<size_t>::max();
+  float preferred_extent = 0.0f;
+  bool reordered = false;
+  bool resized = false;
+};
+
+class RmRebarBehaviour {
+public:
+  static constexpr size_t invalid_index = std::numeric_limits<size_t>::max();
+
+private:
+  size_t m_count = 0;
+  size_t m_hovered_band = invalid_index;
+  size_t m_active_band = invalid_index;
+  RmRebarInteraction m_hovered_interaction = RmRebarInteraction::none;
+  RmRebarInteraction m_interaction = RmRebarInteraction::none;
+  float m_pointer_start = 0.0f;
+  float m_extent_start = 0.0f;
+  bool m_enabled = true;
+
+public:
+  size_t hovered_band() const noexcept { return m_hovered_band; }
+  size_t active_band() const noexcept { return m_active_band; }
+  RmRebarInteraction hovered_interaction() const noexcept {
+    return m_hovered_interaction;
+  }
+  RmRebarInteraction interaction() const noexcept { return m_interaction; }
+  bool is_interacting() const noexcept {
+    return m_interaction != RmRebarInteraction::none;
+  }
+
+  void set_count(size_t count) noexcept {
+    m_count = count;
+    if (m_hovered_band >= count) {
+      m_hovered_band = invalid_index;
+      m_hovered_interaction = RmRebarInteraction::none;
+    }
+    if (m_active_band >= count)
+      cancel();
+  }
+
+  RmBehaviourUpdate set_enabled(bool enabled) noexcept {
+    const bool changed = m_enabled != enabled || (!enabled && is_interacting());
+    m_enabled = enabled;
+    if (!enabled) {
+      cancel();
+      m_hovered_band = invalid_index;
+      m_hovered_interaction = RmRebarInteraction::none;
+    }
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_move(size_t band,
+    RmRebarInteraction interaction) noexcept {
+    if (!m_enabled || band >= m_count) {
+      band = invalid_index;
+      interaction = RmRebarInteraction::none;
+    }
+    const bool changed = m_hovered_band != band ||
+      m_hovered_interaction != interaction;
+    m_hovered_band = band;
+    m_hovered_interaction = interaction;
+    return { is_interacting(), changed, false };
+  }
+
+  RmBehaviourUpdate begin(size_t band, RmRebarInteraction interaction,
+    float pointer_axis, float preferred_extent) noexcept {
+    if (!m_enabled || band >= m_count || interaction == RmRebarInteraction::none)
+      return {};
+    m_active_band = band;
+    m_interaction = interaction;
+    m_pointer_start = pointer_axis;
+    m_extent_start = preferred_extent;
+    m_hovered_band = band;
+    m_hovered_interaction = interaction;
+    return { true, true, false };
+  }
+
+  RmRebarDragUpdate drag(float pointer_axis, size_t target_band,
+    float minimum_extent, float maximum_extent) noexcept {
+    RmRebarDragUpdate result;
+    if (!m_enabled || !is_interacting() || m_active_band >= m_count)
+      return result;
+    result.state.handled = true;
+    if (m_interaction == RmRebarInteraction::resize) {
+      const float maximum = maximum_extent > 0.0f
+        ? std::max(minimum_extent, maximum_extent)
+        : std::numeric_limits<float>::max();
+      result.preferred_extent = std::clamp(
+        m_extent_start + pointer_axis - m_pointer_start,
+        std::max(0.0f, minimum_extent), maximum);
+      result.resized = std::fabs(result.preferred_extent - m_extent_start) >
+        std::numeric_limits<float>::epsilon();
+      result.state.state_changed = result.resized;
+      return result;
+    }
+    if (target_band < m_count && target_band != m_active_band) {
+      result.from_index = m_active_band;
+      result.to_index = target_band;
+      result.reordered = true;
+      result.state.state_changed = true;
+      m_active_band = target_band;
+    }
+    return result;
+  }
+
+  RmBehaviourUpdate end() noexcept {
+    if (!is_interacting())
+      return {};
+    m_active_band = invalid_index;
+    m_interaction = RmRebarInteraction::none;
+    return { true, true, false };
+  }
+
+  RmBehaviourUpdate cancel() noexcept { return end(); }
+};
+
 class RmSplitterBehaviour {
   float m_fraction = 0.5f;
   float m_minimum_fraction = 0.0f;

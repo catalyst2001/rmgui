@@ -467,7 +467,15 @@ public:
       callback, std::move(theme)) { set_classname("rm_toolbox"); }
 };
 
-class rm_rebar : public rm_widget {
+class rm_rebar;
+enum class RmRebarChange {
+  reordered,
+  resized
+};
+using rm_rebar_cb = Delegate<void, rm_rebar*, rm_widget*, RmRebarChange,
+  size_t, float>;
+
+class rm_rebar : public rm_widget, public rm_callback<rm_rebar_cb> {
   struct Band {
     rm_widget* widget = nullptr;
     float preferred_extent = 0.0f;
@@ -475,22 +483,47 @@ class rm_rebar : public rm_widget {
     bool stretch = false;
     rm_rect bounds;
   };
+  struct Hit {
+    size_t band = RmRebarBehaviour::invalid_index;
+    RmRebarInteraction interaction = RmRebarInteraction::none;
+  };
   std::vector<Band> m_bands;
+  RmRebarBehaviour m_behaviour;
   RmThemeRef m_theme;
   RM_ORIENT m_orientation;
   bool m_layouting = false;
 
   void layout_bands();
+  Hit hit_test_interaction(const rm_vec2& cursor_pos) const;
+  size_t hit_test_band(const rm_vec2& cursor_pos) const;
+  float pointer_axis(const rm_vec2& cursor_pos) const noexcept;
+  float maximum_band_extent(size_t index) const;
+  bool move_band(size_t from, size_t to, bool notify);
+  void on_enabled_changed(bool enabled) override {
+    m_behaviour.set_enabled(enabled);
+  }
+  void on_pointer_capture_lost() override { m_behaviour.cancel(); }
 protected:
   void on_draw(NVGcontext* pctx) override;
+  bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
+    rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
   rm_rebar(rm_widget* p_parent, int x, int y, int width, int height,
-    RM_ORIENT orientation = RM_ORIENT_HORZ, RmThemeRef theme = {});
+    RM_ORIENT orientation = RM_ORIENT_HORZ, RmThemeRef theme = {},
+    rm_rebar_cb callback = nullptr);
   bool add_band(rm_widget* p_widget, float preferred_extent = 0.0f,
     float minimum_extent = 0.0f, bool stretch = false);
   bool remove_band(rm_widget* p_widget);
+  bool reorder_band(size_t from, size_t to, bool notify = false) {
+    return move_band(from, to, notify);
+  }
+  bool set_band_extent(size_t index, float extent, bool notify = false);
+  float get_band_extent(size_t index) const noexcept {
+    return index < m_bands.size() ? m_bands[index].preferred_extent : 0.0f;
+  }
   size_t get_num_bands() const noexcept { return m_bands.size(); }
   RM_ORIENT get_orientation() const noexcept { return m_orientation; }
+  const RmRebarBehaviour& behaviour() const noexcept { return m_behaviour; }
   void set_theme(RmThemeRef theme);
   void resize(float width, float height) override;
 };

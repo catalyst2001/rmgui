@@ -338,6 +338,10 @@ struct RmRebarVisual {
 struct RmRebarBandVisual {
   RmVisualRect bounds;
   bool vertical = false;
+  bool gripper_hovered = false;
+  bool gripper_active = false;
+  bool resize_hovered = false;
+  bool resize_active = false;
 };
 
 struct RmSplitterVisual {

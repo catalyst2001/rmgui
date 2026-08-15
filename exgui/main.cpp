@@ -116,7 +116,13 @@ static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme,
     "CAD command bars, tool palette, splitter and scrollable viewport", theme);
 
   rm_rebar* pcommand_rebar = new rm_rebar(
-    p_parent, 12, 36, 976, 108, RM_ORIENT_HORZ, theme);
+    p_parent, 12, 36, 976, 108, RM_ORIENT_HORZ, theme,
+    [](rm_rebar*, rm_widget*, RmRebarChange change, size_t index,
+      float extent) {
+      printf("Rebar band %s: index=%zu extent=%.1f\n",
+        change == RmRebarChange::reordered ? "reordered" : "resized",
+        index, extent);
+    });
   rm_toolbar* pfile_toolbar = new rm_toolbar(
     pcommand_rebar, 0, 0, 300, 100, RM_ORIENT_HORZ,
     [](rm_toolstrip*, uint32_t id) { printf("Toolbar command: %u\n", id); }, theme);
