@@ -97,6 +97,31 @@ void test_switch_behaviour()
     "switch supports an immediate programmatic state change");
 }
 
+void test_tab_behaviour()
+{
+  RmTabBehaviour tabs;
+  tabs.set_count(3);
+  expect(tabs.selected_index() == 0, "tabs select the first item when populated");
+
+  tabs.pointer_down(2);
+  expect(tabs.pointer_up(2).activated, "tabs activate after press and release on one item");
+  expect(tabs.selected_index() == 2, "tab pointer activation updates selection");
+
+  tabs.select_relative(1);
+  expect(tabs.selected_index() == 0, "tab keyboard navigation wraps forward");
+  tabs.select_relative(-1);
+  expect(tabs.selected_index() == 2, "tab keyboard navigation wraps backward");
+
+  tabs.remove(1);
+  expect(tabs.count() == 2 && tabs.selected_index() == 1,
+    "removing an earlier tab preserves the selected item");
+  tabs.remove(1);
+  expect(tabs.selected_index() == 0, "removing the selected last tab selects its neighbour");
+  tabs.remove(0);
+  expect(tabs.selected_index() == RmTabBehaviour::invalid_index,
+    "empty tabs have no selected index");
+}
+
 } // namespace
 
 int main()
@@ -106,6 +131,7 @@ int main()
   test_slider_behaviour();
   test_progress_behaviour();
   test_switch_behaviour();
+  test_tab_behaviour();
 
   if (failures != 0) {
     std::fprintf(stderr, "%d behaviour test(s) failed\n", failures);

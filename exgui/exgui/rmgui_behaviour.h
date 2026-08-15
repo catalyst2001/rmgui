@@ -1,7 +1,9 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
 #include <cmath>
+#include <limits>
 
 // Renderer-free interaction state machines. These classes intentionally do
 // not depend on rm_widget, NanoVG, platform key codes, or style data.
@@ -294,5 +296,139 @@ public:
     else
       animation_progress_ = std::max(animation_progress_ - step, animation_target_);
     return { false, true, false };
+  }
+};
+
+class RmTabBehaviour {
+public:
+  static constexpr size_t invalid_index = std::numeric_limits<size_t>::max();
+
+private:
+  size_t m_count = 0;
+  size_t m_selected = invalid_index;
+  size_t m_hovered = invalid_index;
+  size_t m_pressed = invalid_index;
+  bool m_enabled = true;
+
+  bool is_valid(size_t index) const noexcept { return index < m_count; }
+
+public:
+  size_t count() const noexcept { return m_count; }
+  size_t selected_index() const noexcept { return m_selected; }
+  size_t hovered_index() const noexcept { return m_hovered; }
+  size_t pressed_index() const noexcept { return m_pressed; }
+  bool is_enabled() const noexcept { return m_enabled; }
+
+  RmBehaviourUpdate set_enabled(bool enabled) noexcept {
+    const bool changed = m_enabled != enabled || (!enabled && m_pressed != invalid_index);
+    m_enabled = enabled;
+    if (!m_enabled)
+      m_pressed = invalid_index;
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate set_count(size_t count) noexcept {
+    const size_t old_selected = m_selected;
+    m_count = count;
+    if (m_count == 0)
+      m_selected = invalid_index;
+    else if (!is_valid(m_selected))
+      m_selected = 0;
+    if (!is_valid(m_hovered))
+      m_hovered = invalid_index;
+    if (!is_valid(m_pressed))
+      m_pressed = invalid_index;
+    return { false, old_selected != m_selected, false };
+  }
+
+  RmBehaviourUpdate select(size_t index) noexcept {
+    if (!m_enabled || !is_valid(index))
+      return {};
+    const bool changed = m_selected != index;
+    m_selected = index;
+    return { true, changed, changed };
+  }
+
+  RmBehaviourUpdate remove(size_t index) noexcept {
+    if (!is_valid(index))
+      return {};
+
+    const size_t old_selected = m_selected;
+    --m_count;
+    if (m_count == 0) {
+      m_selected = invalid_index;
+    }
+    else if (old_selected == index) {
+      m_selected = std::min(index, m_count - 1);
+    }
+    else if (old_selected > index) {
+      m_selected = old_selected - 1;
+    }
+
+    const auto adjust_index = [index](size_t value) noexcept {
+      if (value == invalid_index || value == index)
+        return invalid_index;
+      return value > index ? value - 1 : value;
+    };
+    m_hovered = adjust_index(m_hovered);
+    m_pressed = adjust_index(m_pressed);
+    return { false, old_selected == index || old_selected != m_selected, false };
+  }
+
+  RmBehaviourUpdate pointer_move(size_t index) noexcept {
+    if (!is_valid(index))
+      index = invalid_index;
+    const bool changed = m_hovered != index;
+    m_hovered = index;
+    return { m_enabled && m_pressed != invalid_index, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_down(size_t index) noexcept {
+    if (!m_enabled || !is_valid(index))
+      return {};
+    const bool changed = m_pressed != index || m_hovered != index;
+    m_pressed = index;
+    m_hovered = index;
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_up(size_t index) noexcept {
+    if (m_pressed == invalid_index)
+      return {};
+    const size_t pressed = m_pressed;
+    m_pressed = invalid_index;
+    if (!is_valid(index))
+      index = invalid_index;
+    m_hovered = index;
+    if (!m_enabled || pressed != index)
+      return { true, true, false };
+    const bool changed = m_selected != index;
+    m_selected = index;
+    return { true, true, changed };
+  }
+
+  RmBehaviourUpdate select_relative(int delta, bool wrap = true) noexcept {
+    if (!m_enabled || m_count == 0 || delta == 0)
+      return {};
+    if (m_selected == invalid_index)
+      return select(0);
+
+    const int count = static_cast<int>(m_count);
+    int next = static_cast<int>(m_selected) + delta;
+    if (wrap) {
+      next %= count;
+      if (next < 0)
+        next += count;
+    }
+    else {
+      next = std::clamp(next, 0, count - 1);
+    }
+    return select(static_cast<size_t>(next));
+  }
+
+  RmBehaviourUpdate cancel() noexcept {
+    const bool changed = m_pressed != invalid_index;
+    m_pressed = invalid_index;
+    return { changed, changed, false };
   }
 };

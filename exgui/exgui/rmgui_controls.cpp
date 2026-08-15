@@ -1081,171 +1081,347 @@ rm_scrollbar::~rm_scrollbar()
 }
 
 rm_tabcontrol::rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height,
-	rm_tabcontrol_cb cb)
-	: rm_widget(x, y, width, height, p_parent, "ui_tabcontrol",
-		RM_FLAG_DEFAULT, 0, nullptr),
-	m_selected(0)
+	rm_tabcontrol_cb p_callback, RmThemeRef theme, RmTabVariant variant,
+	RmTabPlacement placement) :
+	rm_widget(x, y, width, height, p_parent, "ui_tabcontrol", RM_FLAG_DEFAULT),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()),
+	m_variant(variant), m_placement(placement), m_pclose_callback(nullptr),
+	m_close_hovered(RmTabBehaviour::invalid_index),
+	m_close_pressed(RmTabBehaviour::invalid_index)
 {
-	set_callback(cb);
-	set_zindex(998);
+	set_callback(p_callback);
 }
 
-rm_widget* rm_tabcontrol::add_tab(const char* pname, void* puserdata)
+const RmTabStyle& rm_tabcontrol::tab_style() const
 {
-	rm_vec2 widget_pos, widget_size;
-	get_widget_size(widget_pos, widget_size);
-	rm_widget* page = new rm_widget(
-		int(widget_pos.x), int(widget_pos.y), int(widget_size.x), int(widget_size.y),
-		this,
-		"ui_tabpage",
-		RM_FLAG_DEFAULT,
-		0, nullptr
-	);
-
-	m_tabs.emplace_back(pname, page, puserdata);
-	update_children_active();
-	return page;
+	return m_theme->tabs.resolve(m_variant);
 }
 
-rm_widget* rm_tabcontrol::find_tab(const char* pname)
+bool rm_tabcontrol::is_horizontal() const noexcept
 {
-	auto it = std::find_if(m_tabs.begin(), m_tabs.end(),
-		[pname](rm_tab_item& item) { return strcmp(item.get_name(), pname) == 0; }
-	);
-
-	if (it != m_tabs.end())
-		return it->get_page();
-
-	return nullptr;
+	return m_placement == RmTabPlacement::top || m_placement == RmTabPlacement::bottom;
 }
 
-void rm_tabcontrol::set_selected_index(int idx)
+rm_rect rm_tabcontrol::get_bar_bounds() const
 {
-	if (idx < 0 || idx >= static_cast<int>(m_tabs.size()))
-		return;
-	m_selected = idx;
-	update_children_active();
-	if (is_valid_callback())
-		get_callback()(this, &m_tabs[m_selected], m_selected);
-}
-
-void rm_tabcontrol::get_tabcontrol_size(rm_vec2& dst)
-{
-	if (m_pstyle->is_horizontal()) {
-		dst.init(m_size.x, m_pstyle->get_tab_height());
-		return;
-	}
-	dst.init(m_pstyle->get_tab_height(), m_size.y);
-}
-
-void rm_tabcontrol::on_draw(NVGcontext* pctx) {
-	//m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
-	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
-
-	// background
-	//pctx->BeginPath();
-	//pctx->RoundedRect( 0.f, 0.f, m_relative.width, m_relative.height, 4.0f);
-	//pctx->FillColor( m_pstyle->get_background_color());
-	//pctx->Fill();
-	//pctx->StrokeColor( m_pstyle->get_border_color());
-	//pctx->Stroke();
-	bool is_horizontal = m_pstyle->is_horizontal();
-	size_t num_tabs = m_tabs.size();
-	if (!num_tabs)
-		return;
-
-	rm_vec2 tab_size;
-	get_one_tab_size(tab_size);
-
-	pctx->setFontSize(m_pstyle->get_font_size());
-	pctx->setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-
-	for (size_t i = 0; i < num_tabs; ++i) {
-		bool is_first = i == 0;
-		bool is_last = i == num_tabs - 1;
-		float x = (is_horizontal ? i * tab_size.x : 0.f);
-		float y = (is_horizontal ? 0.f : i * tab_size.y);
-
-		pctx->beginPath();
-		pctx->fillColor((int(i) == m_selected) ? m_pstyle->get_selected_color() : m_pstyle->get_unselected_color());
-		pctx->roundedRectVarying(x, y, tab_size.x, tab_size.y,
-			is_first ? m_pstyle->get_corner_radius(LEFT_TOP) : 0.f,
-			(is_horizontal ? is_last : is_first) ? m_pstyle->get_corner_radius(RIGHT_TOP) : 0.f,
-			is_last ? m_pstyle->get_corner_radius(RIGHT_BOTTOM) : 0.f,
-			(is_horizontal ? is_first : is_last) ? m_pstyle->get_corner_radius(LEFT_BOTTOM) : 0.f);
-		pctx->fill();
-		pctx->strokeColor(m_pstyle->get_border_color());
-		pctx->stroke();
-		pctx->fillColor(m_pstyle->get_text_color());
-		pctx->text((x + tab_size.x * 0.5f) + m_pstyle->get_text_offsets().x,
-			(y + tab_size.y * 0.5f) + m_pstyle->get_text_offsets().y,
-			m_tabs[i].get_name(),
-			NULL);
-		rm_widget::on_draw(pctx);
+	const RmTabStyle& style = tab_style();
+	switch (m_placement) {
+	case RmTabPlacement::bottom:
+		return { 0.f, std::max(0.f, m_size.y - style.tab_height), m_size.x, style.tab_height };
+	case RmTabPlacement::left:
+		return { 0.f, 0.f, style.vertical_bar_width, m_size.y };
+	case RmTabPlacement::right:
+		return { std::max(0.f, m_size.x - style.vertical_bar_width), 0.f,
+			style.vertical_bar_width, m_size.y };
+	case RmTabPlacement::top:
+	default:
+		return { 0.f, 0.f, m_size.x, style.tab_height };
 	}
 }
 
-bool rm_tabcontrol::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
-	int     idx;
-	rm_vec2 tabcontrol_size;
-	get_tabcontrol_size(tabcontrol_size);
-	m_bbox.init(m_pos_of_parent, tabcontrol_size);
-	rm_vec2 local_mouse_pos = cursor_to_local(cursor_pos);
-	size_t num_tabs = m_tabs.size();
-	rm_vec2 sz;
-	get_one_tab_size(sz);
-	float axis = m_pstyle->is_horizontal() ? local_mouse_pos.x : local_mouse_pos.y;
-	if (num_tabs && event == RM_MOUSE_EVENT_CLICK && state == DOWN && m_bbox.inside(cursor_pos)) {
-		idx = int(axis / (m_pstyle->is_horizontal() ? sz.x : sz.y));
-		if (idx >= 0 && idx < int(num_tabs)) {
-			set_selected_index(idx);
-			return false;
+rm_rect rm_tabcontrol::get_page_bounds() const
+{
+	const RmTabStyle& style = tab_style();
+	switch (m_placement) {
+	case RmTabPlacement::bottom:
+		return { 0.f, 0.f, m_size.x, std::max(0.f, m_size.y - style.tab_height) };
+	case RmTabPlacement::left:
+		return { style.vertical_bar_width, 0.f,
+			std::max(0.f, m_size.x - style.vertical_bar_width), m_size.y };
+	case RmTabPlacement::right:
+		return { 0.f, 0.f, std::max(0.f, m_size.x - style.vertical_bar_width), m_size.y };
+	case RmTabPlacement::top:
+	default:
+		return { 0.f, style.tab_height, m_size.x,
+			std::max(0.f, m_size.y - style.tab_height) };
+	}
+}
+
+void rm_tabcontrol::rebuild_tab_layout(NVGcontext* pctx)
+{
+	m_tab_bounds.clear();
+	if (m_tabs.empty())
+		return;
+
+	const RmTabStyle& style = tab_style();
+	const rm_rect bar = get_bar_bounds();
+	m_tab_bounds.reserve(m_tabs.size());
+	if (!is_horizontal()) {
+		float y = bar.y;
+		for (size_t i = 0; i < m_tabs.size(); ++i) {
+			m_tab_bounds.emplace_back(bar.x, y, bar.width, style.tab_height);
+			y += style.tab_height + style.gap;
 		}
+		return;
 	}
-	return true;
+
+	const float gaps = style.gap * static_cast<float>(m_tabs.size() - 1);
+	if (style.fill_available_width) {
+		const float width = std::max(0.f, bar.width - gaps) /
+			static_cast<float>(m_tabs.size());
+		float x = bar.x;
+		for (size_t i = 0; i < m_tabs.size(); ++i) {
+			m_tab_bounds.emplace_back(x, bar.y, width, bar.height);
+			x += width + style.gap;
+		}
+		return;
+	}
+
+	pctx->save();
+	pctx->setFontFaceId(static_cast<int>(get_font().getValue()));
+	pctx->setFontSize(style.font_size);
+	std::vector<float> widths;
+	widths.reserve(m_tabs.size());
+	float total_width = gaps;
+	for (const rm_tab_item& item : m_tabs) {
+		float bounds[4]{};
+		pctx->textBounds(0.f, 0.f, item.get_name(), nullptr, bounds);
+		float width = bounds[2] - bounds[0] + style.horizontal_padding * 2.f;
+		if (item.is_closable() && !item.is_pinned())
+			width += style.close_size + style.horizontal_padding * 0.5f;
+		width = std::clamp(width, style.minimum_width, style.maximum_width);
+		widths.push_back(width);
+		total_width += width;
+	}
+	pctx->restore();
+
+	if (total_width > bar.width && total_width > gaps) {
+		const float scale = std::max(0.f, bar.width - gaps) / (total_width - gaps);
+		for (float& width : widths)
+			width = std::max(style.minimum_width, width * scale);
+	}
+
+	float x = bar.x;
+	for (float width : widths) {
+		m_tab_bounds.emplace_back(x, bar.y, width, bar.height);
+		x += width + style.gap;
+	}
+}
+
+void rm_tabcontrol::update_pages_geometry()
+{
+	const rm_rect page_bounds = get_page_bounds();
+	for (rm_tab_item& item : m_tabs) {
+		item.get_page()->move({ page_bounds.x, page_bounds.y });
+		item.get_page()->resize(page_bounds.width, page_bounds.height);
+	}
 }
 
 void rm_tabcontrol::update_children_active()
 {
-	rm_widget* pwidget;
-	for (size_t t = 0; t < get_num_childs(); ++t) {
-		bool is_active = int(t) == m_selected;
-		pwidget = get_child(t);
-		pwidget->show(is_active);
-		pwidget->set_enabled(is_active);
+	const size_t selected = m_behaviour.selected_index();
+	for (size_t i = 0; i < m_tabs.size(); ++i) {
+		const bool active = i == selected;
+		m_tabs[i].get_page()->show(active);
+		m_tabs[i].get_page()->set_enabled(active);
 	}
 }
 
-void rm_tabcontrol::get_widget_size(rm_vec2& dst_pos, rm_vec2& dst_size)
+size_t rm_tabcontrol::hit_test_tab(const rm_vec2& local_cursor) const
 {
-	assert(m_pstyle && "m_pstyle was nullptr");
-	rm_vec2 tab_size;
-	get_tabcontrol_size(tab_size);
-	if (m_pstyle->is_horizontal()) {
-		dst_pos.init(0.f, tab_size.y);
-		dst_size.init(tab_size.x, m_size.y - tab_size.y);
+	for (size_t i = 0; i < m_tab_bounds.size(); ++i) {
+		const rm_rect& bounds = m_tab_bounds[i];
+		if (local_cursor.x >= bounds.x && local_cursor.x <= bounds.x + bounds.width &&
+			local_cursor.y >= bounds.y && local_cursor.y <= bounds.y + bounds.height)
+			return i;
 	}
-	else {
-		dst_pos.init(tab_size.x, 0.f);
-		dst_size.init(m_size.x - tab_size.x, m_size.y);
+	return RmTabBehaviour::invalid_index;
+}
+
+bool rm_tabcontrol::hit_test_close(size_t index, const rm_vec2& local_cursor) const
+{
+	if (index >= m_tabs.size() || index >= m_tab_bounds.size() ||
+		!m_tabs[index].is_closable() || m_tabs[index].is_pinned())
+		return false;
+	const RmTabStyle& style = tab_style();
+	const rm_rect& bounds = m_tab_bounds[index];
+	const float x = bounds.x + bounds.width - style.horizontal_padding * 0.5f - style.close_size;
+	const float y = bounds.y + (bounds.height - style.close_size) * 0.5f;
+	return local_cursor.x >= x && local_cursor.x <= x + style.close_size &&
+		local_cursor.y >= y && local_cursor.y <= y + style.close_size;
+}
+
+void rm_tabcontrol::notify_selection_changed()
+{
+	const size_t selected = m_behaviour.selected_index();
+	if (is_valid_callback() && selected < m_tabs.size())
+		get_callback()(this, &m_tabs[selected], selected);
+}
+
+rm_widget* rm_tabcontrol::add_tab(const char* p_name, uint32_t id,
+	bool closable, bool pinned, void* p_userdata)
+{
+	const rm_rect page_bounds = get_page_bounds();
+	rm_widget* p_page = new rm_widget(page_bounds.x, page_bounds.y,
+		page_bounds.width, page_bounds.height, this, "ui_tabpage");
+	return add_tab_widget(p_name, id, p_page, closable, pinned, p_userdata);
+}
+
+rm_widget* rm_tabcontrol::add_tab_widget(const char* p_name, uint32_t id,
+	rm_widget* p_page, bool closable, bool pinned, void* p_userdata)
+{
+	if (!p_page)
+		return nullptr;
+	if (id == std::numeric_limits<uint32_t>::max())
+		id = static_cast<uint32_t>(m_tabs.size());
+	p_page->set_parent(this);
+	m_tabs.emplace_back(p_name, id, p_page, closable, pinned, p_userdata);
+	m_behaviour.set_count(m_tabs.size());
+	update_pages_geometry();
+	update_children_active();
+	return p_page;
+}
+
+bool rm_tabcontrol::remove_tab(size_t index)
+{
+	if (index >= m_tabs.size())
+		return false;
+	rm_widget* p_page = m_tabs[index].get_page();
+	m_behaviour.remove(index);
+	m_tabs.erase(m_tabs.begin() + index);
+	remove_child(p_page);
+	delete p_page;
+	update_pages_geometry();
+	update_children_active();
+	notify_selection_changed();
+	return true;
+}
+
+rm_widget* rm_tabcontrol::find_tab(const char* p_name)
+{
+	const auto found = std::find_if(m_tabs.begin(), m_tabs.end(),
+		[p_name](const rm_tab_item& item) {
+			return strcmp(item.get_name(), p_name ? p_name : "") == 0;
+		});
+	return found != m_tabs.end() ? found->get_page() : nullptr;
+}
+
+rm_widget* rm_tabcontrol::find_tab(uint32_t id)
+{
+	const auto found = std::find_if(m_tabs.begin(), m_tabs.end(),
+		[id](const rm_tab_item& item) { return item.get_id() == id; });
+	return found != m_tabs.end() ? found->get_page() : nullptr;
+}
+
+bool rm_tabcontrol::set_selected_index(size_t index)
+{
+	const RmBehaviourUpdate update = m_behaviour.select(index);
+	if (!update.handled)
+		return false;
+	update_children_active();
+	if (update.state_changed)
+		notify_selection_changed();
+	return true;
+}
+
+void rm_tabcontrol::on_draw(NVGcontext* pctx)
+{
+	const RmTabStyle& style = tab_style();
+	const rm_rect bar = get_bar_bounds();
+	const rm_rect page = get_page_bounds();
+	RmDefaultControlPainter::draw_tab_page(*pctx, page.x, page.y,
+		page.width, page.height, style);
+	RmDefaultControlPainter::draw_tab_bar(*pctx, bar.x, bar.y,
+		bar.width, bar.height, style);
+	rebuild_tab_layout(pctx);
+
+	for (size_t i = 0; i < m_tabs.size(); ++i) {
+		const rm_rect& bounds = m_tab_bounds[i];
+		const RmTabVisual visual{
+			bounds.x, bounds.y, bounds.width, bounds.height, get_font(),
+			m_tabs[i].get_name(), m_placement, is_enabled(),
+			m_behaviour.hovered_index() == i,
+			m_behaviour.pressed_index() == i,
+			m_behaviour.selected_index() == i,
+			m_elem_flags.is_focused(),
+			m_tabs[i].is_closable() && !m_tabs[i].is_pinned(),
+			m_close_hovered == i
+		};
+		RmDefaultControlPainter::draw_tab(*pctx, visual, style);
+	}
+	rm_widget::on_draw(pctx);
+}
+
+void rm_tabcontrol::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
+{
+	RM_UNUSED(sc);
+	if (state != DOWN || m_tabs.empty())
+		return;
+	RmBehaviourUpdate update;
+	if (vk == RM_KEY_HOME)
+		update = m_behaviour.select(0);
+	else if (vk == RM_KEY_END)
+		update = m_behaviour.select(m_tabs.size() - 1);
+	else if ((is_horizontal() && vk == RM_KEY_LEFT) || (!is_horizontal() && vk == RM_KEY_UP))
+		update = m_behaviour.select_relative(-1);
+	else if ((is_horizontal() && vk == RM_KEY_RIGHT) || (!is_horizontal() && vk == RM_KEY_DOWN))
+		update = m_behaviour.select_relative(1);
+	if (update.state_changed) {
+		update_children_active();
+		notify_selection_changed();
 	}
 }
 
-void rm_tabcontrol::get_one_tab_size(rm_vec2& dst_size)
+bool rm_tabcontrol::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+	RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
 {
-	assert(m_pstyle && "m_pstyle was nullptr");
-	size_t num_tabs = m_tabs.size();
-	if (num_tabs) {
-		bool is_horizontal = m_pstyle->is_horizontal();
-		if (is_horizontal) {
-			dst_size.x = m_size.x / float(num_tabs);
-			dst_size.y = m_pstyle->get_tab_height();
-		}
-		else {
-			dst_size.x = m_pstyle->get_tab_height();
-			dst_size.y = m_size.y / float(num_tabs);
-		}
+	RM_UNUSED(delta);
+	if (vk != RM_KEY_NONE && vk != RM_KEY_LMOUSE)
+		return true;
+	if (m_tab_bounds.size() != m_tabs.size() && m_proot)
+		rebuild_tab_layout(m_proot->get_context());
+	const rm_vec2 local_cursor = cursor_to_local(cursor_pos);
+	const size_t index = hit_test_tab(local_cursor);
+
+	if (event == RM_MOUSE_EVENT_MOVE) {
+		m_close_hovered = hit_test_close(index, local_cursor)
+			? index : RmTabBehaviour::invalid_index;
+		const RmBehaviourUpdate update = m_behaviour.pointer_move(index);
+		return !update.handled;
 	}
+	if (event != RM_MOUSE_EVENT_CLICK)
+		return true;
+
+	if (state == DOWN) {
+		if (hit_test_close(index, local_cursor)) {
+			m_close_pressed = index;
+			if (get_root())
+				get_root()->capture_pointer(this);
+			return false;
+		}
+		const RmBehaviourUpdate update = m_behaviour.pointer_down(index);
+		if (update.handled && get_root())
+			get_root()->capture_pointer(this);
+		return !update.handled;
+	}
+
+	if (state == UP && m_close_pressed != RmTabBehaviour::invalid_index) {
+		const size_t close_index = m_close_pressed;
+		m_close_pressed = RmTabBehaviour::invalid_index;
+		if (close_index == index && hit_test_close(index, local_cursor)) {
+			const bool allow_close = !m_pclose_callback ||
+				m_pclose_callback(this, &m_tabs[index], index);
+			if (allow_close)
+				remove_tab(index);
+		}
+		return false;
+	}
+
+	if (state == UP) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_up(index);
+		if (update.activated) {
+			update_children_active();
+			notify_selection_changed();
+		}
+		return !update.handled;
+	}
+	return true;
+}
+
+void rm_tabcontrol::resize(float width, float height)
+{
+	rm_widget::resize(width, height);
+	update_pages_geometry();
 }
 
 void rm_treeview::on_draw(NVGcontext* pctx) {

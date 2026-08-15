@@ -136,6 +136,13 @@ void test_theme_document_compilation()
     "subtle buttons must compile as borderless transparent controls");
   require(same_color(result.theme->buttons.destructive.background.normal,
     document.tokens.colors.danger), "destructive buttons must use danger tokens");
+  require(result.theme->tabs.document.tab_height ==
+    document.tokens.controls.tab_height,
+    "tab recipes must use shared control metrics");
+  require(result.theme->tabs.segmented.fill_available_width,
+    "segmented tabs must distribute the available width");
+  require(result.theme->tabs.underline.show_indicator,
+    "underline tabs must compile an active indicator");
   require(result.theme->switch_control.track_height == 30.0f,
     "component metric token must drive switch geometry");
   require(result.theme->switch_control.corner_radius == 15.0f,

@@ -94,6 +94,21 @@ static void create_theme_preview(rm_widget* p_parent, int x, int y,
   new rm_label(ppanel, 20, 424, "Theme tokens compile into immutable styles", theme);
 }
 
+static rm_tabcontrol* create_tabs_preview(rm_widget* p_parent, int x, int y,
+  int width, int height, const char* p_title, RmThemeRef theme,
+  RmTabVariant variant, RmTabPlacement placement)
+{
+  rm_tabcontrol* ptabs = new rm_tabcontrol(p_parent, x, y, width, height,
+    nullptr, theme, variant, placement);
+  rm_widget* pfirst = ptabs->add_tab("Overview", 10, false, true);
+  rm_widget* psecond = ptabs->add_tab("Source.cpp", 11, true);
+  rm_widget* pthird = ptabs->add_tab("Properties", 12, true);
+  new rm_label(pfirst, 18, 18, p_title, theme);
+  new rm_label(psecond, 18, 18, "Closable document page", theme);
+  new rm_label(pthird, 18, 18, "Placement and appearance are independent", theme);
+  return ptabs;
+}
+
 #pragma region TEMPLATE1
 void drawParagraph(NVGcontext* vg, float x, float y, float width, float height, float mx, float my)
 {
@@ -292,21 +307,16 @@ void example_core_widgets(rm_surface* gui)
   rm_checkbox* checkbox2 = new rm_checkbox(pwindow, 150, 40 + 30 + 20, 100,
     u8"Включить", nullptr, checkbox_theme);
 
-  static rm_tabcontrol_style tabcontrol_style;
-  tabcontrol_style.set_all_corners_radius(4.f);
-  tabcontrol_style.set_horizontal(!!true);
-  tabcontrol_style.set_tab_height(30);
   rm_tabcontrol* tabs = new rm_tabcontrol(pwindow, 10, 190, 300, 300,
     [](rm_tabcontrol* ctrl, rm_tab_item* item, size_t idx) {
       printf("Tab %zu active: %s\n", idx, item->get_name());
     }
   );
-  tabs->set_style(&tabcontrol_style);
 
   rm_widget* t0 = tabs->add_tab("Home");
   t0->get_content_area().y = 10;
 
-  rm_widget* t1 = tabs->add_tab("Settings");
+  rm_widget* t1 = tabs->add_tab("Settings", 1, true);
   t1->get_content_area().y = 100;
 
   rm_widget* t2 = tabs->add_tab("Test1");
@@ -400,34 +410,26 @@ void example_widgets(rm_surface* gui)
   psubmenu0->add_item("Create project", 0);
 
 
-  static rm_tabcontrol_ex_style tabstyle;
-  using tc = rm_tabcontrol_ex;
-  tabstyle.set_text_color({ 255, 255, 255 });
-  tabstyle.set_background_color({66, 66, 68});
-  tabstyle.set_selected_color({93, 93, 95});
-  tabstyle.set_text_offsets({ 10.f, 0.f });
-  tabstyle.set_border_color({ 91, 91, 91 });
-  tabstyle.set_all_corners_radius(0.f);
-  tabstyle.set_tab_height(25.f);
-  tabstyle.set_tab_corners_radius(2.f);
-  tabstyle.set_tab_up_offsets({ 0.f, 0.f });
-
-  rm_tabcontrol_ex* ptabctl = new rm_tabcontrol_ex(gui, 0, 105, 800, 600, TCF_NONE, TC_DEFAULT, &tabstyle);
-  tc::tab* ptab01 = ptabctl->add_tab("Main page", 0, 10);
+  RmThemeDocument shell_theme_document = RmThemeDocument::dark_theme();
+  shell_theme_document.name = "ExGUI shell";
+  const RmThemeRef shell_theme = RmThemeCompiler::compile(shell_theme_document).theme;
+  rm_tabcontrol* ptabctl = new rm_tabcontrol(gui, 0, 105, 800, 600,
+    nullptr, shell_theme, RmTabVariant::underline, RmTabPlacement::top);
+  rm_widget* ptab01 = ptabctl->add_tab("Window", 0);
 
   static rm_window_style wstyle;
-  rm_window *pwindow = new rm_window(ptab01->get_page_widget(), 0, 0, 300, 300);
+  rm_window *pwindow = new rm_window(ptab01, 0, 0, 300, 300);
   pwindow->set_style(&wstyle);
 
-
-  tc::tab* ptab11 = ptabctl->add_tab("Main page asdasda", 0, 10);
-  tc::tab* ptab12 = ptabctl->add_tab("Page 2 asdasdasd", 1, 10);
-  tc::tab* ptab_theme = ptabctl->add_tab("Theme Gallery", 2, 10);
+  rm_widget* ptab11 = ptabctl->add_tab("Controls", 1);
+  rm_widget* ptab12 = ptabctl->add_tab("Effects", 2);
+  rm_widget* ptab_theme = ptabctl->add_tab("Themes", 3);
+  rm_widget* ptab_tabs = ptabctl->add_tab("Tabs", 4);
 #if defined(RMGUI_ENABLE_BLENDISH_DEMO)
-  tc::tab* ptab_bui = ptabctl->add_tab("Blendish Controls", 3, 10);
+  rm_widget* ptab_bui = ptabctl->add_tab("Blendish Controls", 5);
 #endif
 
-  rm_widget* effects_page = ptab12->get_page_widget();
+  rm_widget* effects_page = ptab12;
   rm_vec2& effects_size = effects_page->get_size();
   const float effects_pad = 12.0f;
   const float effects_w = rm_max(0.0f, effects_size.x - effects_pad * 2.0f);
@@ -446,9 +448,18 @@ void example_widgets(rm_surface* gui)
   light_theme_document.tokens.colors.accent_hovered = NVGcolor::RGB(56, 122, 234);
   light_theme_document.tokens.colors.accent_pressed = NVGcolor::RGB(29, 80, 173);
 
-  rm_widget* ptheme_page = ptab_theme->get_page_widget();
+  rm_widget* ptheme_page = ptab_theme;
   create_theme_preview(ptheme_page, 20, 30, dark_theme_document);
   create_theme_preview(ptheme_page, 410, 30, light_theme_document);
+
+  create_tabs_preview(ptab_tabs, 20, 20, 360, 230, "Document tabs",
+    shell_theme, RmTabVariant::document, RmTabPlacement::top);
+  create_tabs_preview(ptab_tabs, 400, 20, 360, 230, "Underline / bottom",
+    shell_theme, RmTabVariant::underline, RmTabPlacement::bottom);
+  create_tabs_preview(ptab_tabs, 20, 280, 360, 230, "Segmented tabs",
+    shell_theme, RmTabVariant::segmented, RmTabPlacement::top);
+  create_tabs_preview(ptab_tabs, 400, 280, 360, 230, "Tool tabs / left",
+    shell_theme, RmTabVariant::tool, RmTabPlacement::left);
 
   rm_flexbox_layout* pflexlayout = new rm_flexbox_layout();
   pflexlayout->set_dir(rm_flex_direction::Column);
@@ -463,7 +474,7 @@ void example_widgets(rm_surface* gui)
   pflexlayout->set_fill_x(rm_flex_fill::Clamp);
   pflexlayout->set_fill_y(rm_flex_fill::Clamp);
 
-  rm_window* pdiv = new rm_window(ptab11->get_page_widget(), 10, 10, 200, 300);
+  rm_window* pdiv = new rm_window(ptab11, 10, 10, 200, 300);
   pdiv->set_style(&wstyle);
   pdiv->set_layout(pflexlayout);
 
@@ -490,11 +501,7 @@ void example_widgets(rm_surface* gui)
       return true;
     }, controls_theme);
 
-  size_t effects_idx = ptabctl->find_tab_idx_in_row(0, ptab12->get_id());
-  if (!tc::is_valid_tab(effects_idx)) {
-    effects_idx = 0;
-  }
-  ptabctl->select_tab(0, effects_idx);
+  ptabctl->set_selected_index(4);
 
   static rm_radiobutton_style style_rb;
   style_rb.set_all_corners_radius(8.f);
@@ -560,7 +567,7 @@ void example_widgets(rm_surface* gui)
 #if defined(RMGUI_ENABLE_BLENDISH_DEMO)
   // Isolated Blendish visualization experiment. Kept out of the default build.
   {
-    rm_widget* bui_page = ptab_bui->get_page_widget();
+    rm_widget* bui_page = ptab_bui;
 
     // ---------- bui_window (overlapped) with its own menu bar ----------
     bui_window* bui_wnd = new bui_window(gui, 10, 10, 760, 500,
@@ -820,9 +827,7 @@ void example_widgets(rm_surface* gui)
         "Popup Option", false, nullptr);
 
     // Select this tab by default
-    size_t bui_tab_idx = ptabctl->find_tab_idx_in_row(0, ptab_bui->get_id());
-    if (tc::is_valid_tab(bui_tab_idx))
-      ptabctl->select_tab(0, bui_tab_idx);
+    ptabctl->set_selected_index(5);
   }
 #endif
 

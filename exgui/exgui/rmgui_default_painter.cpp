@@ -75,6 +75,114 @@ void RmDefaultControlPainter::draw_button(NVGcontext& context, const RmButtonVis
     visual.text ? visual.text : "", nullptr);
 }
 
+void RmDefaultControlPainter::draw_tab_bar(NVGcontext& context, float x, float y,
+  float width, float height, const RmTabStyle& style)
+{
+  context.beginPath();
+  context.rect(x, y, std::max(0.0f, width), std::max(0.0f, height));
+  context.fillColor(style.bar_background);
+  context.fill();
+}
+
+void RmDefaultControlPainter::draw_tab_page(NVGcontext& context, float x, float y,
+  float width, float height, const RmTabStyle& style)
+{
+  context.beginPath();
+  context.rect(x, y, std::max(0.0f, width), std::max(0.0f, height));
+  context.fillColor(style.page_background);
+  context.fill();
+  if (style.show_page_border && style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.page_border);
+    context.stroke();
+  }
+}
+
+void RmDefaultControlPainter::draw_tab(NVGcontext& context,
+  const RmTabVisual& visual, const RmTabStyle& style)
+{
+  const RmVisualState state = resolve_state(
+    visual.enabled, visual.hovered, visual.pressed);
+  const RmStateColors& backgrounds = visual.selected
+    ? style.selected_background : style.background;
+  const RmStateColors& borders = visual.selected
+    ? style.selected_border : style.border;
+  const RmStateColors& text = visual.selected
+    ? style.selected_text : style.text;
+  const float half_border = style.border_width * 0.5f;
+
+  context.beginPath();
+  context.roundedRect(visual.x + half_border, visual.y + half_border,
+    std::max(0.0f, visual.width - style.border_width),
+    std::max(0.0f, visual.height - style.border_width), style.corner_radius);
+  context.fillColor(backgrounds.resolve(state));
+  context.fill();
+  if (style.border_width > 0.0f && borders.resolve(state).a > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(borders.resolve(state));
+    context.stroke();
+  }
+
+  if (visual.selected && style.show_indicator && style.indicator_thickness > 0.0f) {
+    context.beginPath();
+    switch (visual.placement) {
+    case RmTabPlacement::bottom:
+      context.rect(visual.x, visual.y, visual.width, style.indicator_thickness);
+      break;
+    case RmTabPlacement::left:
+      context.rect(visual.x + visual.width - style.indicator_thickness, visual.y,
+        style.indicator_thickness, visual.height);
+      break;
+    case RmTabPlacement::right:
+      context.rect(visual.x, visual.y, style.indicator_thickness, visual.height);
+      break;
+    case RmTabPlacement::top:
+    default:
+      context.rect(visual.x, visual.y + visual.height - style.indicator_thickness,
+        visual.width, style.indicator_thickness);
+      break;
+    }
+    context.fillColor(style.indicator);
+    context.fill();
+  }
+
+  if (visual.focused && visual.selected && visual.enabled && style.focus_ring_width > 0.0f) {
+    context.beginPath();
+    context.roundedRect(visual.x + style.focus_ring_width * 0.5f,
+      visual.y + style.focus_ring_width * 0.5f,
+      std::max(0.0f, visual.width - style.focus_ring_width),
+      std::max(0.0f, visual.height - style.focus_ring_width), style.corner_radius);
+    context.StrokeWidth(style.focus_ring_width);
+    context.strokeColor(style.focus_ring);
+    context.stroke();
+  }
+
+  const float close_region = visual.closable
+    ? style.close_size + style.horizontal_padding * 0.5f : 0.0f;
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+  context.fillColor(text.resolve(state));
+  context.text(visual.x + (visual.width - close_region) * 0.5f,
+    visual.y + visual.height * 0.5f, visual.text ? visual.text : "", nullptr);
+
+  if (visual.closable) {
+    const float cx = visual.x + visual.width - style.horizontal_padding * 0.5f
+      - style.close_size * 0.5f;
+    const float cy = visual.y + visual.height * 0.5f;
+    const float radius = style.close_size * 0.28f;
+    context.beginPath();
+    context.moveTo(cx - radius, cy - radius);
+    context.lineTo(cx + radius, cy + radius);
+    context.moveTo(cx + radius, cy - radius);
+    context.lineTo(cx - radius, cy + radius);
+    context.StrokeWidth(visual.close_hovered ? 2.0f : 1.5f);
+    context.strokeColor(style.close_icon.resolve(
+      visual.close_hovered ? RmVisualState::hovered : state));
+    context.stroke();
+  }
+}
+
 void RmDefaultControlPainter::draw_label(NVGcontext& context, const RmLabelVisual& visual,
   const RmLabelStyle& style)
 {

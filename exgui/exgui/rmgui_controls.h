@@ -439,110 +439,107 @@ public:
 
 /**
  * =============================================
- * Tab Control Style
- * =============================================
- */
-class rm_tabcontrol_style : public rm_corners_style {
-  rm_vec2 m_text_offset;
-  NVGcolor      m_text_color;
-  NVGcolor      m_bg_color;
-  NVGcolor      m_border_color;
-  NVGcolor      m_selected_color;
-  NVGcolor      m_unselected_color;
-  float         m_font_size;
-  bool          m_is_horizontal;
-  float         m_tab_height;
-public:
-  rm_tabcontrol_style() :
-    m_text_offset(0.f, 0.f),
-    m_text_color(NVGcolor::RGB(0, 0, 0)),
-    m_bg_color(NVGcolor::RGB(255, 255, 255)),
-    m_border_color(NVGcolor::RGB(0, 0, 0)),
-    m_selected_color(NVGcolor::RGB(240, 240, 240)),
-    m_unselected_color(NVGcolor::RGB(200, 200, 200)),
-    m_font_size(15.f),
-    m_is_horizontal(true), m_tab_height(30.f){
-  }
-  inline bool            is_horizontal() const { return m_is_horizontal; }
-  inline void            set_horizontal(bool enabled) { m_is_horizontal = enabled; }
-
-  /* selectors  */
-  inline const rm_vec2& get_text_offsets() const { return m_text_offset; }
-  inline const float    get_tab_height() const { return m_tab_height; }
-  inline const NVGcolor& get_text_color() const { return m_text_color; }
-  inline const NVGcolor& get_background_color() const { return m_bg_color; }
-  inline const NVGcolor& get_border_color() const { return m_border_color; }
-  inline const NVGcolor& get_selected_color() const { return m_selected_color; }
-  inline const NVGcolor& get_unselected_color() const { return m_unselected_color; }
-  inline float           get_font_size() const { return m_font_size; }
-
-  /* modifiers */
-  inline void set_text_offsets(rm_vec2 offset) { m_text_offset = offset; }
-  inline void set_tab_height(float t) { m_tab_height = t; }
-  inline void set_text_color(NVGcolor clr) { m_text_color = clr; }
-  inline void set_background_color(NVGcolor clr) { m_bg_color = clr; }
-  inline void set_border_color(NVGcolor clr) { m_border_color = clr; }
-  inline void set_selected_color(NVGcolor clr) { m_selected_color = clr; }
-  inline void set_unselected_color(NVGcolor clr) { m_unselected_color = clr; }
-  inline void set_font_size(float fsize) { m_font_size = fsize; }
-};
-
-/**
- * =============================================
  * Tab Control
  * =============================================
  */
 class rm_tab_item {
-  std::string name;
-  void       *pdata;
-  rm_widget  *pwidget;
+  std::string m_name;
+  uint32_t m_id;
+  void* m_pdata;
+  rm_widget* m_pwidget;
+  bool m_closable;
+  bool m_pinned;
 public:
-  rm_tab_item() : pdata(nullptr), pwidget(nullptr) {}
-  rm_tab_item(const char* pname, rm_widget* pw, void* userptr = nullptr)
-    : name(pname), pdata(userptr), pwidget(pw) {
+  rm_tab_item(const char* p_name, uint32_t id, rm_widget* p_widget,
+    bool closable, bool pinned, void* p_userdata = nullptr) :
+    m_name(p_name ? p_name : ""), m_id(id), m_pdata(p_userdata),
+    m_pwidget(p_widget), m_closable(closable), m_pinned(pinned) {
   }
 
-  inline const char* get_name() const { return name.c_str(); }
-  inline void* get_userdata() const { return pdata; }
-  inline rm_widget* get_page() const { return pwidget; }
+  const char* get_name() const noexcept { return m_name.c_str(); }
+  uint32_t get_id() const noexcept { return m_id; }
+  void* get_userdata() const noexcept { return m_pdata; }
+  rm_widget* get_page() const noexcept { return m_pwidget; }
+  bool is_closable() const noexcept { return m_closable; }
+  bool is_pinned() const noexcept { return m_pinned; }
+  void set_name(const char* p_name) { m_name = p_name ? p_name : ""; }
+  void set_closable(bool closable) noexcept { m_closable = closable; }
+  void set_pinned(bool pinned) noexcept { m_pinned = pinned; }
 };
 
 class rm_tabcontrol;
 using rm_tabcontrol_cb = void(*)(rm_tabcontrol* ptabs, rm_tab_item* pitem, size_t tabid);
-class rm_tabcontrol : public rm_widget, public rm_styled<rm_tabcontrol_style>, public rm_callback<rm_tabcontrol_cb> {
-  std::vector<rm_tab_item>             m_tabs;
-  int                                  m_selected;
+using rm_tabcontrol_close_cb = bool(*)(rm_tabcontrol* ptabs, rm_tab_item* pitem, size_t tabid);
+class rm_tabcontrol : public rm_widget, public rm_callback<rm_tabcontrol_cb> {
+  std::vector<rm_tab_item> m_tabs;
+  std::vector<rm_rect> m_tab_bounds;
+  RmTabBehaviour m_behaviour;
+  RmThemeRef m_theme;
+  RmTabVariant m_variant;
+  RmTabPlacement m_placement;
+  rm_tabcontrol_close_cb m_pclose_callback;
+  size_t m_close_hovered;
+  size_t m_close_pressed;
+
+  const RmTabStyle& tab_style() const;
+  bool is_horizontal() const noexcept;
+  rm_rect get_bar_bounds() const;
+  rm_rect get_page_bounds() const;
+  void rebuild_tab_layout(NVGcontext* pctx);
+  void update_pages_geometry();
+  void update_children_active();
+  size_t hit_test_tab(const rm_vec2& local_cursor) const;
+  bool hit_test_close(size_t index, const rm_vec2& local_cursor) const;
+  void notify_selection_changed();
+
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
+  void on_pointer_capture_lost() override {
+    m_behaviour.cancel();
+    m_close_pressed = RmTabBehaviour::invalid_index;
+  }
 protected:
   virtual void on_draw(NVGcontext* pctx) override;
+  virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
-
-  void update_children_active();
-
-  void get_widget_size(rm_vec2 &dst_pos, rm_vec2 &dst_size);
-  void get_one_tab_size(rm_vec2 &dst_size);
 public:
-
-  rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height, rm_tabcontrol_cb cb = nullptr);
+  rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height,
+    rm_tabcontrol_cb p_callback = nullptr, RmThemeRef theme = {},
+    RmTabVariant variant = RmTabVariant::document,
+    RmTabPlacement placement = RmTabPlacement::top);
   virtual ~rm_tabcontrol() {}
 
-  inline size_t get_num_tabs() const { return m_tabs.size(); }
-
-  rm_widget* add_tab(const char* pname, void* puserdata = nullptr);
-  rm_widget* find_tab(const char* pname);
-  inline rm_tab_item* get_tab(size_t idx) {
-    assert(idx < m_tabs.size());
-    return &m_tabs[idx];
+  size_t get_num_tabs() const noexcept { return m_tabs.size(); }
+  rm_widget* add_tab(const char* p_name,
+    uint32_t id = std::numeric_limits<uint32_t>::max(),
+    bool closable = false, bool pinned = false, void* p_userdata = nullptr);
+  rm_widget* add_tab_widget(const char* p_name, uint32_t id, rm_widget* p_page,
+    bool closable = false, bool pinned = false, void* p_userdata = nullptr);
+  bool remove_tab(size_t index);
+  rm_widget* find_tab(const char* p_name);
+  rm_widget* find_tab(uint32_t id);
+  rm_tab_item* get_tab(size_t index) {
+    return index < m_tabs.size() ? &m_tabs[index] : nullptr;
   }
-
-  void set_selected_index(int idx);
-  inline int get_selected_index() const { return m_selected; }
-  inline rm_tab_item* get_selected_tab() {
-    if (m_selected < 0 || m_selected >= static_cast<int>(m_tabs.size()))
-      return nullptr;
-    return &m_tabs[m_selected];
+  const rm_tab_item* get_tab(size_t index) const {
+    return index < m_tabs.size() ? &m_tabs[index] : nullptr;
   }
-
-  void get_tabcontrol_size(rm_vec2& dst);
+  bool set_selected_index(size_t index);
+  size_t get_selected_index() const noexcept { return m_behaviour.selected_index(); }
+  rm_tab_item* get_selected_tab() { return get_tab(get_selected_index()); }
+  const RmTabBehaviour& behaviour() const noexcept { return m_behaviour; }
+  void set_close_callback(rm_tabcontrol_close_cb p_callback) noexcept {
+    m_pclose_callback = p_callback;
+  }
+  void set_theme(RmThemeRef theme) {
+    m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+    update_pages_geometry();
+  }
+  void set_variant(RmTabVariant variant) { m_variant = variant; update_pages_geometry(); }
+  RmTabVariant get_variant() const noexcept { return m_variant; }
+  void set_placement(RmTabPlacement placement) { m_placement = placement; update_pages_geometry(); }
+  RmTabPlacement get_placement() const noexcept { return m_placement; }
+  void resize(float width, float height) override;
 };
 
 /**

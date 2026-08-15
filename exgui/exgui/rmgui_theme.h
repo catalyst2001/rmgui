@@ -28,6 +28,20 @@ enum class RmButtonVariant {
   destructive
 };
 
+enum class RmTabVariant {
+  document,
+  tool,
+  segmented,
+  underline
+};
+
+enum class RmTabPlacement {
+  top,
+  bottom,
+  left,
+  right
+};
+
 struct RmStateColors {
   NVGcolor normal;
   NVGcolor hovered;
@@ -71,6 +85,53 @@ struct RmButtonStyles {
     case RmButtonVariant::destructive: return destructive;
     case RmButtonVariant::primary:
     default: return primary;
+    }
+  }
+};
+
+struct RmTabStyle {
+  RmStateColors background;
+  RmStateColors border;
+  RmStateColors text;
+  RmStateColors selected_background;
+  RmStateColors selected_border;
+  RmStateColors selected_text;
+  RmStateColors close_icon;
+  NVGcolor bar_background;
+  NVGcolor page_background;
+  NVGcolor page_border;
+  NVGcolor indicator;
+  NVGcolor focus_ring;
+  float tab_height = 0.0f;
+  float vertical_bar_width = 0.0f;
+  float horizontal_padding = 0.0f;
+  float minimum_width = 0.0f;
+  float maximum_width = 0.0f;
+  float gap = 0.0f;
+  float corner_radius = 0.0f;
+  float border_width = 0.0f;
+  float indicator_thickness = 0.0f;
+  float close_size = 0.0f;
+  float font_size = 0.0f;
+  float focus_ring_width = 0.0f;
+  bool fill_available_width = false;
+  bool show_indicator = false;
+  bool show_page_border = true;
+};
+
+struct RmTabStyles {
+  RmTabStyle document;
+  RmTabStyle tool;
+  RmTabStyle segmented;
+  RmTabStyle underline;
+
+  const RmTabStyle& resolve(RmTabVariant variant) const noexcept {
+    switch (variant) {
+    case RmTabVariant::tool: return tool;
+    case RmTabVariant::segmented: return segmented;
+    case RmTabVariant::underline: return underline;
+    case RmTabVariant::document:
+    default: return document;
     }
   }
 };
@@ -203,6 +264,14 @@ struct RmControlMetricsTokens {
   float switch_knob_radius = 11.0f;
   float switch_shadow_offset = 5.0f;
   float switch_shadow_size = 7.0f;
+  float tab_height = 36.0f;
+  float tab_vertical_bar_width = 168.0f;
+  float tab_horizontal_padding = 14.0f;
+  float tab_minimum_width = 72.0f;
+  float tab_maximum_width = 220.0f;
+  float tab_gap = 2.0f;
+  float tab_indicator_thickness = 3.0f;
+  float tab_close_size = 14.0f;
 };
 
 struct RmThemeTokens {
@@ -228,6 +297,7 @@ struct RmThemeSnapshot {
   RmThemeMode mode = RmThemeMode::dark;
   RmThemeTokens tokens;
   RmButtonStyles buttons;
+  RmTabStyles tabs;
   RmLabelStyle label;
   RmCheckboxStyle checkbox;
   RmSliderStyle slider;
@@ -343,6 +413,20 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.switch_knob_radius, 1.0f, 256.0f, "tokens.controls.switch_knob_radius", diagnostics);
     sanitize_metric(tokens.controls.switch_shadow_offset, 0.0f, 256.0f, "tokens.controls.switch_shadow_offset", diagnostics);
     sanitize_metric(tokens.controls.switch_shadow_size, 0.0f, 256.0f, "tokens.controls.switch_shadow_size", diagnostics);
+    sanitize_metric(tokens.controls.tab_height, 16.0f, 256.0f, "tokens.controls.tab_height", diagnostics);
+    sanitize_metric(tokens.controls.tab_vertical_bar_width, 32.0f, 1024.0f, "tokens.controls.tab_vertical_bar_width", diagnostics);
+    sanitize_metric(tokens.controls.tab_horizontal_padding, 0.0f, 256.0f, "tokens.controls.tab_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.tab_minimum_width, 1.0f, 1024.0f, "tokens.controls.tab_minimum_width", diagnostics);
+    sanitize_metric(tokens.controls.tab_maximum_width, 1.0f, 4096.0f, "tokens.controls.tab_maximum_width", diagnostics);
+    if (tokens.controls.tab_maximum_width < tokens.controls.tab_minimum_width) {
+      tokens.controls.tab_maximum_width = tokens.controls.tab_minimum_width;
+      diagnostics.push_back({ RmThemeDiagnosticSeverity::warning,
+        "tokens.controls.tab_maximum_width",
+        "Maximum tab width was smaller than minimum tab width and has been corrected." });
+    }
+    sanitize_metric(tokens.controls.tab_gap, 0.0f, 64.0f, "tokens.controls.tab_gap", diagnostics);
+    sanitize_metric(tokens.controls.tab_indicator_thickness, 0.0f, 32.0f, "tokens.controls.tab_indicator_thickness", diagnostics);
+    sanitize_metric(tokens.controls.tab_close_size, 4.0f, 128.0f, "tokens.controls.tab_close_size", diagnostics);
   }
 
 public:
@@ -408,6 +492,71 @@ public:
         colors.border_disabled },
       { colors.text_on_accent, colors.text_on_accent, colors.text_on_accent,
         colors.text_disabled }, controls.border_width);
+
+    const auto configure_tab = [&](RmTabStyle& style) {
+      style.bar_background = colors.surface;
+      style.page_background = colors.surface_elevated;
+      style.page_border = colors.border;
+      style.indicator = colors.accent;
+      style.focus_ring = colors.focus_ring;
+      style.tab_height = controls.tab_height;
+      style.vertical_bar_width = controls.tab_vertical_bar_width;
+      style.horizontal_padding = controls.tab_horizontal_padding;
+      style.minimum_width = controls.tab_minimum_width;
+      style.maximum_width = controls.tab_maximum_width;
+      style.gap = controls.tab_gap;
+      style.corner_radius = tokens.radius.medium;
+      style.border_width = controls.border_width;
+      style.indicator_thickness = controls.tab_indicator_thickness;
+      style.close_size = controls.tab_close_size;
+      style.font_size = tokens.typography.control;
+      style.focus_ring_width = controls.focus_ring_width;
+    };
+
+    configure_tab(p_theme->tabs.document);
+    p_theme->tabs.document.background = { colors.control, colors.control_hovered,
+      colors.control_pressed, colors.control_disabled };
+    p_theme->tabs.document.border = { colors.border, colors.border_hovered,
+      colors.border_pressed, colors.border_disabled };
+    p_theme->tabs.document.text = { colors.text_muted, colors.text,
+      colors.text, colors.text_disabled };
+    p_theme->tabs.document.selected_background = { colors.surface_elevated,
+      colors.surface_elevated, colors.surface_elevated, colors.control_disabled };
+    p_theme->tabs.document.selected_border = { colors.border, colors.border_hovered,
+      colors.border_pressed, colors.border_disabled };
+    p_theme->tabs.document.selected_text = { colors.text, colors.text,
+      colors.text, colors.text_disabled };
+    p_theme->tabs.document.close_icon = { colors.text_muted, colors.text,
+      colors.text, colors.text_disabled };
+
+    p_theme->tabs.tool = p_theme->tabs.document;
+    p_theme->tabs.tool.background = { transparent, colors.control_hovered,
+      colors.control_pressed, transparent };
+    p_theme->tabs.tool.border = { transparent, transparent, transparent, transparent };
+    p_theme->tabs.tool.selected_background = { colors.control_pressed,
+      colors.control_pressed, colors.control_pressed, colors.control_disabled };
+    p_theme->tabs.tool.selected_border = p_theme->tabs.tool.border;
+    p_theme->tabs.tool.tab_height = std::max(12.0f, controls.tab_height - 4.0f);
+    p_theme->tabs.tool.minimum_width = std::max(1.0f, controls.tab_minimum_width - 8.0f);
+    p_theme->tabs.tool.show_page_border = false;
+
+    p_theme->tabs.segmented = p_theme->tabs.document;
+    p_theme->tabs.segmented.bar_background = colors.control;
+    p_theme->tabs.segmented.background = { transparent, colors.control_hovered,
+      colors.control_pressed, transparent };
+    p_theme->tabs.segmented.selected_background = { colors.accent,
+      colors.accent_hovered, colors.accent_pressed, colors.accent_disabled };
+    p_theme->tabs.segmented.selected_text = { colors.text_on_accent,
+      colors.text_on_accent, colors.text_on_accent, colors.text_disabled };
+    p_theme->tabs.segmented.fill_available_width = true;
+    p_theme->tabs.segmented.show_page_border = false;
+
+    p_theme->tabs.underline = p_theme->tabs.tool;
+    p_theme->tabs.underline.selected_background = { transparent, colors.control_hovered,
+      colors.control_pressed, transparent };
+    p_theme->tabs.underline.selected_text = { colors.text, colors.text,
+      colors.text, colors.text_disabled };
+    p_theme->tabs.underline.show_indicator = true;
 
     p_theme->label.text = colors.text;
     p_theme->label.disabled_text = colors.text_disabled;
