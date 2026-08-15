@@ -30,6 +30,28 @@ struct RmTabVisual {
   bool close_hovered = false;
 };
 
+struct RmMenuSurfaceVisual {
+  float width = 0.0f;
+  float height = 0.0f;
+  bool popup = false;
+};
+
+struct RmMenuItemVisual {
+  float x = 0.0f;
+  float y = 0.0f;
+  float width = 0.0f;
+  float height = 0.0f;
+  NVGhandle font;
+  const char* text = nullptr;
+  bool root_item = false;
+  bool enabled = true;
+  bool hovered = false;
+  bool pressed = false;
+  bool opened = false;
+  bool separator = false;
+  bool has_submenu = false;
+};
+
 struct RmLabelVisual {
   float width = 0.0f;
   float height = 0.0f;
@@ -87,6 +109,10 @@ public:
     float height, const RmTabStyle& style);
   static void draw_tab(NVGcontext& context, const RmTabVisual& visual,
     const RmTabStyle& style);
+  static void draw_menu_surface(NVGcontext& context,
+    const RmMenuSurfaceVisual& visual, const RmMenuStyle& style);
+  static void draw_menu_item(NVGcontext& context,
+    const RmMenuItemVisual& visual, const RmMenuStyle& style);
   static void draw_label(NVGcontext& context, const RmLabelVisual& visual,
     const RmLabelStyle& style);
   static void draw_checkbox(NVGcontext& context, const RmCheckboxVisual& visual,

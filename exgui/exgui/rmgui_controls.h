@@ -679,34 +679,41 @@ using rm_menu_fn = void (*)(rm_menu *pmenu, uint32_t menuid, uint32_t id);
 
 class rm_menu : public rm_widget, public rm_callback<rm_menu_fn>
 {
-  enum {
-    MF_NONE = 0,
-    MF_SEPARATOR = 1 << 0,
-    MF_NAVIGATED = 1 << 1
-  };
-protected:
-  uint32_t    m_flags;
-  uint32_t    m_itemid;
-  uint32_t    m_menuid;
-  uint32_t    m_level;
+  RmMenuBehaviour m_behaviour;
+  RmThemeRef m_theme;
+  std::vector<rm_rect> m_item_bounds;
+  uint32_t m_itemid;
+  uint32_t m_menuid;
+  uint32_t m_level;
   std::string m_text;
-  float       m_text_width;
-  float       m_max_text_width;
-  rm_menu    *m_proot_menu;
-private:
-  uint32_t detect_my_level(rm_widget* pparent);
-  void     on_draw(NVGcontext* pctx) override;
-  bool     on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
+  float m_text_width;
+  rm_menu* m_proot_menu;
+  bool m_separator;
 
-  inline bool is_navigated() const { return m_flags & MF_NAVIGATED; }
-  inline void set_navigated(bool b=true) {
-    m_flags = (b) ? (m_flags | MF_NAVIGATED) : (m_flags & ~MF_NAVIGATED);
-  }
-  bool  add_submenu(rm_menu* pmenu);
-  float recompute_text_width();
-  void  hide_all_submenus_except(rm_menu *psubmenu);
+  rm_menu(rm_menu* p_parent, const char* p_name, uint32_t menuid,
+    uint32_t itemid, bool separator);
+  const RmMenuStyle& menu_style() const { return m_theme->menu; }
+  bool is_root_menu() const noexcept { return m_level == 0; }
+  bool has_submenus() const noexcept { return rm_widget::get_num_childs() != 0; }
+  void rebuild_item_layout();
+  void update_popup_geometry();
+  size_t hit_test_item(const rm_vec2& local_cursor) const;
+  size_t find_selectable(size_t start, int direction) const;
+  void open_submenu(size_t index);
+  void close_submenus();
+  void close_tree();
+  bool contains_visible_popup(const rm_vec2& local_cursor) const;
+  void activate_item(size_t index);
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
+  void on_pointer_capture_lost() override { m_behaviour.cancel(); }
+private:
+  void     on_draw(NVGcontext* pctx) override;
+  void     on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
+  bool     on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
-  rm_menu(rm_widget* p_parent, int height, const char *pname);
+  rm_menu(rm_widget* p_parent, rm_menu_fn p_callback = nullptr,
+    RmThemeRef theme = {});
   /* delete methods */
   inline size_t get_num_childs() = delete;
   inline rm_widget* get_child(size_t idx) = delete;
@@ -716,14 +723,14 @@ public:
   rm_widget* find_child_by_classname(const char* pclassname) const = delete;
 
   /* main methods */
-  inline uint32_t get_menu_level() const { return m_level; }
-  inline uint32_t get_menu_id() const { return m_menuid; }
-  inline uint32_t get_item_id() const { return m_itemid; }
+  uint32_t get_menu_level() const noexcept { return m_level; }
+  uint32_t get_menu_id() const noexcept { return m_menuid; }
+  uint32_t get_item_id() const noexcept { return m_itemid; }
+  bool is_separator() const noexcept { return m_separator; }
   rm_menu* create_submenu(const char *pname,
     uint32_t menuid,
-    uint32_t itemid,
-    uint32_t flags=0);
-  size_t   get_num_submenus();
+    uint32_t itemid);
+  size_t   get_num_submenus() const;
   rm_menu* get_submenu(size_t idx);
 
   inline bool add_item(const char* pitemname, uint32_t id) {
@@ -732,6 +739,9 @@ public:
   inline bool add_separator() {
     return create_submenu(nullptr, get_menu_id(), 0) != nullptr;
   }
+  void set_theme(RmThemeRef theme);
+  const RmMenuBehaviour& behaviour() const noexcept { return m_behaviour; }
+  void close() { m_proot_menu->close_tree(); }
 };
 
 /**

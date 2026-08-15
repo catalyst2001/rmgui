@@ -122,6 +122,29 @@ void test_tab_behaviour()
     "empty tabs have no selected index");
 }
 
+void test_menu_behaviour()
+{
+  RmMenuBehaviour menu;
+  menu.set_count(4);
+  menu.pointer_move(1);
+  expect(menu.highlighted_index() == 1, "menu tracks the highlighted item");
+
+  menu.pointer_down(1);
+  expect(menu.pointer_up(1).activated, "menu activates on matching press and release");
+  menu.open(1);
+  expect(menu.opened_index() == 1, "menu tracks the opened submenu");
+
+  menu.select_relative(1);
+  expect(menu.highlighted_index() == 2, "menu supports forward keyboard navigation");
+  menu.select_relative(-3);
+  expect(menu.highlighted_index() == 3, "menu keyboard navigation wraps");
+
+  menu.close();
+  expect(!menu.has_open_item(), "menu close clears opened state");
+  menu.set_enabled(false);
+  expect(!menu.pointer_down(0).handled, "disabled menu ignores pointer input");
+}
+
 } // namespace
 
 int main()
@@ -132,6 +155,7 @@ int main()
   test_progress_behaviour();
   test_switch_behaviour();
   test_tab_behaviour();
+  test_menu_behaviour();
 
   if (failures != 0) {
     std::fprintf(stderr, "%d behaviour test(s) failed\n", failures);

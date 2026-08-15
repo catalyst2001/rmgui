@@ -432,3 +432,113 @@ public:
     return { changed, changed, false };
   }
 };
+
+class RmMenuBehaviour {
+public:
+  static constexpr size_t invalid_index = std::numeric_limits<size_t>::max();
+
+private:
+  size_t m_count = 0;
+  size_t m_highlighted = invalid_index;
+  size_t m_pressed = invalid_index;
+  size_t m_opened = invalid_index;
+  bool m_enabled = true;
+
+  bool is_valid(size_t index) const noexcept { return index < m_count; }
+
+public:
+  size_t count() const noexcept { return m_count; }
+  size_t highlighted_index() const noexcept { return m_highlighted; }
+  size_t pressed_index() const noexcept { return m_pressed; }
+  size_t opened_index() const noexcept { return m_opened; }
+  bool has_open_item() const noexcept { return is_valid(m_opened); }
+
+  RmBehaviourUpdate set_enabled(bool enabled) noexcept {
+    const bool changed = m_enabled != enabled || (!enabled &&
+      (m_pressed != invalid_index || m_opened != invalid_index));
+    m_enabled = enabled;
+    if (!m_enabled) {
+      m_pressed = invalid_index;
+      m_opened = invalid_index;
+    }
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate set_count(size_t count) noexcept {
+    m_count = count;
+    const bool changed = !is_valid(m_highlighted) && m_highlighted != invalid_index;
+    if (!is_valid(m_highlighted))
+      m_highlighted = invalid_index;
+    if (!is_valid(m_pressed))
+      m_pressed = invalid_index;
+    if (!is_valid(m_opened))
+      m_opened = invalid_index;
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_move(size_t index) noexcept {
+    if (!is_valid(index))
+      index = invalid_index;
+    const bool changed = m_highlighted != index;
+    m_highlighted = index;
+    return { m_enabled && m_pressed != invalid_index, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_down(size_t index) noexcept {
+    if (!m_enabled || !is_valid(index))
+      return {};
+    const bool changed = m_pressed != index || m_highlighted != index;
+    m_pressed = index;
+    m_highlighted = index;
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_up(size_t index) noexcept {
+    if (m_pressed == invalid_index)
+      return {};
+    const size_t pressed = m_pressed;
+    m_pressed = invalid_index;
+    if (!is_valid(index))
+      index = invalid_index;
+    m_highlighted = index;
+    return { true, true, m_enabled && pressed == index };
+  }
+
+  RmBehaviourUpdate open(size_t index) noexcept {
+    if (!m_enabled || !is_valid(index))
+      return {};
+    const bool changed = m_opened != index;
+    m_opened = index;
+    m_highlighted = index;
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate close() noexcept {
+    const bool changed = m_opened != invalid_index || m_pressed != invalid_index;
+    m_opened = invalid_index;
+    m_pressed = invalid_index;
+    return { changed, changed, false };
+  }
+
+  RmBehaviourUpdate select_relative(int delta, bool wrap = true) noexcept {
+    if (!m_enabled || m_count == 0 || delta == 0)
+      return {};
+    int next = m_highlighted == invalid_index
+      ? (delta > 0 ? 0 : static_cast<int>(m_count) - 1)
+      : static_cast<int>(m_highlighted) + delta;
+    const int count = static_cast<int>(m_count);
+    if (wrap) {
+      next %= count;
+      if (next < 0)
+        next += count;
+    }
+    else {
+      next = std::clamp(next, 0, count - 1);
+    }
+    const bool changed = m_highlighted != static_cast<size_t>(next);
+    m_highlighted = static_cast<size_t>(next);
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate cancel() noexcept { return close(); }
+};

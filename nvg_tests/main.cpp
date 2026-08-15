@@ -143,6 +143,11 @@ void test_theme_document_compilation()
     "segmented tabs must distribute the available width");
   require(result.theme->tabs.underline.show_indicator,
     "underline tabs must compile an active indicator");
+  require(result.theme->menu.item_height == document.tokens.controls.menu_item_height,
+    "menu recipes must use shared control metrics");
+  require(same_color(result.theme->menu.popup_background,
+    document.tokens.colors.surface_elevated),
+    "popup menus must use the elevated surface token");
   require(result.theme->switch_control.track_height == 30.0f,
     "component metric token must drive switch geometry");
   require(result.theme->switch_control.corner_radius == 15.0f,

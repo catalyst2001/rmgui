@@ -398,16 +398,24 @@ void example_widgets(rm_surface* gui)
     }
   } dbg_widget(gui);
 
-  rm_menu* pmenu = new rm_menu(gui, 20, "");
+  rm_menu* pmenu = new rm_menu(gui,
+    [](rm_menu*, uint32_t menuid, uint32_t itemid) {
+      printf("Menu command: menu=%u item=%u\n", menuid, itemid);
+    });
   rm_menu* psubmenu0 = pmenu->create_submenu("File", 0, 0);
-  pmenu->create_submenu("Settings", 1, 0);
-  pmenu->create_submenu("Elements", 2, 0);
+  rm_menu* psettings = pmenu->create_submenu("Settings", 1, 0);
+  rm_menu* pelements = pmenu->create_submenu("Elements", 2, 0);
   pmenu->create_submenu("Control", 3, 0);
 
   psubmenu0->add_item("Open project", 0);
   psubmenu0->add_item("Close project", 0);
   psubmenu0->add_separator();
   psubmenu0->add_item("Create project", 0);
+  psettings->add_item("Preferences", 0);
+  psettings->add_item("Shortcuts", 1);
+  rm_menu* ptheme_menu = pelements->create_submenu("Theme", 2, 0);
+  ptheme_menu->add_item("Dark", 0);
+  ptheme_menu->add_item("Light", 1);
 
 
   RmThemeDocument shell_theme_document = RmThemeDocument::dark_theme();

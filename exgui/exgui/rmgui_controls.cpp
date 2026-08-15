@@ -1635,259 +1635,318 @@ rm_number_input::rm_number_input(rm_widget* p_parent, int x, int y, int width, i
 }
 
 
-rm_menu* rm_menu::create_submenu(const char* pname,
-	uint32_t menuid,
-	uint32_t itemid,
-	uint32_t flags)
+
+rm_menu::rm_menu(rm_widget* p_parent, rm_menu_fn p_callback, RmThemeRef theme) :
+	rm_widget(0.f, 0.f, p_parent ? p_parent->get_size().x : 0.f, 1.f, p_parent,
+		"ui_menu", RM_FLAG_DEFAULT | RM_FLAG_GLOBAL),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()),
+	m_itemid(0), m_menuid(0), m_level(0), m_text_width(0.f),
+	m_proot_menu(this), m_separator(false)
 {
-	rm_menu* pmenu = new (std::nothrow)rm_menu(this, int(this->m_size.y), pname);
-	if (!pmenu)
+	assert(p_parent && "p_parent was nullptr!");
+	set_callback(p_callback);
+	m_elem_flags.set_bit(RM_FLAG_DISABLE_SCISSOR);
+	resize(p_parent->get_size().x, menu_style().bar_height);
+	m_behaviour.set_count(0);
+}
+
+rm_menu::rm_menu(rm_menu* p_parent, const char* p_name, uint32_t menuid,
+	uint32_t itemid, bool separator) :
+	rm_widget(0.f, 0.f, 1.f, 1.f, p_parent, "ui_menu",
+		RM_FLAG_DEFAULT | RM_FLAG_GLOBAL | RM_FLAG_OPAQUE),
+	m_theme(p_parent->m_theme), m_itemid(itemid), m_menuid(menuid),
+	m_level(p_parent->m_level + 1), m_text(p_name ? p_name : ""),
+	m_text_width(0.f), m_proot_menu(p_parent->m_proot_menu),
+	m_separator(separator)
+{
+	m_elem_flags.set_bit(RM_FLAG_DISABLE_SCISSOR);
+	if (m_proot)
+		m_text_width = m_proot->get_text_width(m_text.c_str(), get_font());
+	m_behaviour.set_count(0);
+	hide();
+}
+
+rm_menu* rm_menu::create_submenu(const char* p_name,
+	uint32_t menuid, uint32_t itemid)
+{
+	rm_menu* p_menu = new (std::nothrow)rm_menu(
+		this, p_name, menuid, itemid, p_name == nullptr);
+	if (!p_menu)
 		return nullptr;
-
-	pmenu->m_flags = MF_NONE;
-	pmenu->m_menuid = menuid;
-	pmenu->m_itemid = itemid;
-
-	/* noname == menu separator */
-	if (!pname)
-		pmenu->m_flags |= MF_SEPARATOR;
-
-	if (m_pparent->classname_is("ui_menu")) {
-		m_max_text_width = recompute_text_width();
-		resize(m_max_text_width, m_size.y);
-	}
-	m_proot_menu->hide_all_submenus_except(nullptr);
-	return pmenu;
+	m_behaviour.set_count(get_num_submenus());
+	update_popup_geometry();
+	return p_menu;
 }
 
-size_t rm_menu::get_num_submenus()
+size_t rm_menu::get_num_submenus() const
 {
-	return rm_widget::get_num_childs();
+	return m_childs.size();
 }
 
-rm_menu* rm_menu::get_submenu(size_t idx)
+rm_menu* rm_menu::get_submenu(size_t index)
 {
-	if (idx >= get_num_submenus()) {
+	if (index >= m_childs.size())
 		return nullptr;
-	}
-
-	rm_widget* child = rm_widget::get_child(idx);
-	if (!child || !child->classname_is("ui_menu")) {
-		return nullptr;
-	}
-
-	return static_cast<rm_menu*>(child);
+	rm_widget* p_child = m_childs[index];
+	return p_child && p_child->classname_is("ui_menu")
+		? static_cast<rm_menu*>(p_child) : nullptr;
 }
 
-/**
- detect_my_level()
- @brief Determines the level of the current menu, hierarchically relative to the parent widget.
- There are only two menu levels.
- The zero-level menu is the menu that is drawn across the entire top border of the window, allowing for the addition of submenus.
- All higher levels are drawn in the same way.
- These menus can have separators, child submenus, and other things that will not be structurally different higher up in the hierarchy.
- @param pparent - address of parent widget
- @return Level of hierarchy depth
-*/
-uint32_t rm_menu::detect_my_level(rm_widget* pparent)
+void rm_menu::rebuild_item_layout()
 {
-	uint32_t   depth = 0;
-	rm_widget* pwidget = pparent;
-	assert(pparent && "pparent was nullptr!");
-	static constexpr const char* MENU_CLASS = "ui_menu";
-	if (!pparent->classname_is(MENU_CLASS)) {
-		assert(pparent->find_child(MENU_CLASS) == this && "ui_menu already exists in pparent! check your code or assign hierarchy");
-		return 0;
+	m_item_bounds.clear();
+	m_item_bounds.reserve(get_num_submenus());
+	const RmMenuStyle& style = menu_style();
+	if (is_root_menu()) {
+		float x = 0.f;
+		for (size_t i = 0; i < get_num_submenus(); ++i) {
+			rm_menu* p_item = get_submenu(i);
+			const float width = p_item->m_text_width + style.horizontal_padding * 2.f;
+			m_item_bounds.emplace_back(x, 0.f, width, style.bar_height);
+			x += width;
+		}
+		return;
 	}
 
-	while (pwidget && pwidget->classname_is(MENU_CLASS)) {
-		depth++;
-		pwidget = pwidget->get_parent();
+	float y = style.vertical_padding;
+	for (size_t i = 0; i < get_num_submenus(); ++i) {
+		rm_menu* p_item = get_submenu(i);
+		const float height = p_item->is_separator()
+			? style.vertical_padding * 2.f + style.separator_thickness
+			: style.item_height;
+		m_item_bounds.emplace_back(style.vertical_padding, y,
+			std::max(0.f, m_size.x - style.vertical_padding * 2.f), height);
+		y += height;
 	}
-	return depth;
 }
 
-//TODO: K.D. add this to styles
-constexpr float menu_text_pad = 5.f;
+void rm_menu::update_popup_geometry()
+{
+	const RmMenuStyle& style = menu_style();
+	if (is_root_menu()) {
+		if (m_pparent)
+			resize(m_pparent->get_size().x, style.bar_height);
+	}
+	else {
+		float width = style.popup_minimum_width;
+		float height = style.vertical_padding * 2.f;
+		for (size_t i = 0; i < get_num_submenus(); ++i) {
+			rm_menu* p_item = get_submenu(i);
+			width = std::max(width, p_item->m_text_width +
+				style.horizontal_padding * 3.f + style.submenu_indicator_size * 2.f);
+			height += p_item->is_separator()
+				? style.vertical_padding * 2.f + style.separator_thickness
+				: style.item_height;
+		}
+		resize(width, height);
+	}
+	for (size_t i = 0; i < get_num_submenus(); ++i)
+		get_submenu(i)->update_popup_geometry();
+	rebuild_item_layout();
+}
+
+size_t rm_menu::hit_test_item(const rm_vec2& local_cursor) const
+{
+	for (size_t i = 0; i < m_item_bounds.size(); ++i) {
+		const rm_rect& bounds = m_item_bounds[i];
+		if (local_cursor.x >= bounds.x && local_cursor.x <= bounds.x + bounds.width &&
+			local_cursor.y >= bounds.y && local_cursor.y <= bounds.y + bounds.height)
+			return i;
+	}
+	return RmMenuBehaviour::invalid_index;
+}
+
+size_t rm_menu::find_selectable(size_t start, int direction) const
+{
+	if (m_childs.empty())
+		return RmMenuBehaviour::invalid_index;
+	const size_t count = m_childs.size();
+	size_t index = start == RmMenuBehaviour::invalid_index
+		? (direction > 0 ? count - 1 : 0) : start;
+	for (size_t attempt = 0; attempt < count; ++attempt) {
+		index = direction > 0 ? (index + 1) % count : (index + count - 1) % count;
+		const rm_menu* p_item = static_cast<const rm_menu*>(m_childs[index]);
+		if (!p_item->is_separator())
+			return index;
+	}
+	return RmMenuBehaviour::invalid_index;
+}
+
+void rm_menu::open_submenu(size_t index)
+{
+	if (index >= get_num_submenus())
+		return;
+	rm_menu* p_menu = get_submenu(index);
+	if (!p_menu || p_menu->is_separator() || !p_menu->has_submenus())
+		return;
+	close_submenus();
+	m_behaviour.open(index);
+	update_popup_geometry();
+	const rm_rect& bounds = m_item_bounds[index];
+	if (is_root_menu())
+		p_menu->move({ bounds.x, menu_style().bar_height });
+	else
+		p_menu->move({ m_size.x, bounds.y - menu_style().vertical_padding });
+	p_menu->show();
+}
+
+void rm_menu::close_submenus()
+{
+	for (size_t i = 0; i < get_num_submenus(); ++i) {
+		rm_menu* p_menu = get_submenu(i);
+		p_menu->close_tree();
+		p_menu->hide();
+	}
+	m_behaviour.close();
+}
+
+void rm_menu::close_tree()
+{
+	close_submenus();
+	if (!is_root_menu())
+		hide();
+}
+
+bool rm_menu::contains_visible_popup(const rm_vec2& local_cursor) const
+{
+	for (rm_widget* p_child_widget : m_childs) {
+		rm_menu* p_child = static_cast<rm_menu*>(p_child_widget);
+		if (!p_child->is_visible())
+			continue;
+		const rm_vec2& pos = p_child->m_pos_of_parent;
+		const rm_vec2& size = p_child->m_size;
+		const bool inside = local_cursor.x >= pos.x && local_cursor.x <= pos.x + size.x &&
+			local_cursor.y >= pos.y && local_cursor.y <= pos.y + size.y;
+		const rm_vec2 child_cursor(local_cursor.x - pos.x, local_cursor.y - pos.y);
+		if (inside || p_child->contains_visible_popup(child_cursor))
+			return true;
+	}
+	return false;
+}
+
+void rm_menu::activate_item(size_t index)
+{
+	if (index >= get_num_submenus())
+		return;
+	rm_menu* p_item = get_submenu(index);
+	if (!p_item || p_item->is_separator())
+		return;
+	if (p_item->has_submenus()) {
+		open_submenu(index);
+		return;
+	}
+	if (m_proot_menu->is_valid_callback())
+		m_proot_menu->get_callback()(m_proot_menu, p_item->m_menuid, p_item->m_itemid);
+	m_proot_menu->close_tree();
+}
 
 void rm_menu::on_draw(NVGcontext* pctx)
 {
-	rm_vec2  pos;
-	float    item_width;
-	float    half_height = m_size.y / 2.f;
-	size_t   num_submenus = get_num_submenus();
-	rm_menu* pmenu_item;
-	/* draw menu in top of window */
-	pos.init(0.f, 0.f);
-	if (!m_level) {
-		static rm_color menu_background(70, 70, 70);
-		static rm_color menu_hover(100, 100, 100);
-
-		/* draw background */
-		pctx->beginPath();
-		pctx->rect(0.f, 0.f, m_size.x, m_size.y);
-		pctx->fillColor(menu_background);
-		pctx->fill();
-		pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
-		pctx->setTextAlign(NVG_ALIGN_MIDDLE);
-		for (size_t i = 0; i < num_submenus; i++) {
-			pmenu_item = get_submenu(i);
-			assert(pmenu_item && "pmenu_item was nullptr!");
-			item_width = menu_text_pad + pmenu_item->m_text_width + menu_text_pad;
-			if (pmenu_item->is_navigated()) {
-				pctx->beginPath();
-				pctx->fillColor(rm_color(180, 180, 180));
-				pctx->rect(pos.x, pos.y, item_width, m_size.y);
-				pctx->fill();
-			}
-
-			pctx->fillColor(rm_color(255, 255, 255));
-			pctx->text(
-				menu_text_pad + pos.x,
-				pos.y + half_height,
-				pmenu_item->m_text.c_str(),
-				nullptr);
-			pos.x += item_width;
-		}
-	}
-	else {
-		/* draw popup menu */
-		pctx->beginPath();
-		pctx->fillColor(rm_color(120, 120, 120));
-		pctx->strokeColor(rm_color(150, 150, 150));
-		pctx->rect(0.f, 0.f, m_size.x, m_size.y);
-		pctx->fill();
-		pctx->stroke();
-		pos.init(0.f, 0.f);
-		for (size_t i = 0; i < num_submenus; i++) {
-			pmenu_item = get_submenu(i);
-			assert(pmenu_item && "pmenu_item was nullptr!");
-			if (pmenu_item->is_navigated()) {
-				pctx->beginPath();
-				pctx->fillColor(rm_color(150, 150, 150));
-				pctx->rect(pos.x, pos.y, m_size.x, m_size.y);
-				pctx->fill();
-			}
-
-			pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
-			pctx->setTextAlign(NVG_ALIGN_MIDDLE);
-			pctx->fillColor(rm_color(255, 255, 255));
-			pctx->text(pos.x, pos.y + half_height, pmenu_item->m_text.c_str(), nullptr);
-			pos.y += 25.f;
-		}
+	update_popup_geometry();
+	const RmMenuStyle& style = menu_style();
+	RmDefaultControlPainter::draw_menu_surface(*pctx,
+		{ m_size.x, m_size.y, !is_root_menu() }, style);
+	for (size_t i = 0; i < get_num_submenus(); ++i) {
+		rm_menu* p_item = get_submenu(i);
+		const rm_rect& bounds = m_item_bounds[i];
+		const RmMenuItemVisual visual{
+			bounds.x, bounds.y, bounds.width, bounds.height, get_font(),
+			p_item->m_text.c_str(), is_root_menu(), is_enabled(),
+			m_behaviour.highlighted_index() == i,
+			m_behaviour.pressed_index() == i,
+			m_behaviour.opened_index() == i,
+			p_item->is_separator(), p_item->has_submenus()
+		};
+		RmDefaultControlPainter::draw_menu_item(*pctx, visual, style);
 	}
 	rm_widget::on_draw(pctx);
 }
 
-bool rm_menu::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+void rm_menu::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 {
-	/* handle root */
-	rm_vec2 pos;
-	float   item_width;
-	rm_vec2 local = cursor_to_local(cursor_pos);
-	rm_menu* psubmenu;
-	if (m_bbox.inside(cursor_pos)) {
-		if (state == DOWN) {
-			if (!m_level) {
-				/* handle root menu */
-				for (size_t i = 0; i < get_num_submenus(); i++) {
-					psubmenu = get_submenu(i);
-					item_width = menu_text_pad + psubmenu->m_text_width + menu_text_pad;
-					bool over_header = (local.y >= 0 && local.y < m_size.y &&
-						local.x >= 0.f && local.x < 0.f + item_width);
-					bool in_submenu = pos.x <= local.x && local.x < pos.x + item_width;
-					if (event == RM_MOUSE_EVENT_MOVE) {
-						if (!over_header)// нужно что бы для каждого так работало, щас ток для первого File (короче это должно быть не скрытие, а открытие след меню при условии если меню какое либо уже открыто посмотри у визуалки как)
-							psubmenu->hide();
-
-						if (psubmenu->is_visible() && !over_header) {
-							psubmenu->show();
-						}
-
-						psubmenu->set_navigated(in_submenu);
-					}
-					else if (event == RM_MOUSE_EVENT_CLICK && in_submenu) {
-						if (!psubmenu->is_visible()) {
-							psubmenu->move({ pos.x, m_size.y });
-							hide_all_submenus_except(psubmenu);
-						}
-						else {
-							psubmenu->hide();
-						}
-					}
-
-					pos.x += item_width;
-				}
-				return false;
-			}
-			else {
-				/* handle child menu */
-
-				return false;
-			}
-		}
+	RM_UNUSED(sc);
+	if (state != DOWN)
+		return;
+	if (vk == RM_KEY_ESCAPE) {
+		m_proot_menu->close_tree();
+		return;
 	}
-	else {
-		for (size_t i = 0; i < get_num_submenus(); i++) {
-			psubmenu = get_submenu(i);
-			psubmenu->set_navigated(false);
-
-			if (event == RM_MOUSE_EVENT_CLICK && state == UP)
-				psubmenu->hide();
+	const bool previous = is_root_menu() ? vk == RM_KEY_LEFT : vk == RM_KEY_UP;
+	const bool next = is_root_menu() ? vk == RM_KEY_RIGHT : vk == RM_KEY_DOWN;
+	if (previous || next) {
+		const size_t selected = find_selectable(m_behaviour.highlighted_index(), next ? 1 : -1);
+		if (selected != RmMenuBehaviour::invalid_index) {
+			m_behaviour.pointer_move(selected);
+			if (m_behaviour.has_open_item())
+				open_submenu(selected);
 		}
+		return;
+	}
+	const size_t highlighted = m_behaviour.highlighted_index();
+	if (highlighted == RmMenuBehaviour::invalid_index)
+		return;
+	if (vk == RM_KEY_ENTER || vk == RM_KEY_SPACE ||
+		(is_root_menu() && vk == RM_KEY_DOWN) || (!is_root_menu() && vk == RM_KEY_RIGHT))
+		activate_item(highlighted);
+	else if (!is_root_menu() && vk == RM_KEY_LEFT) {
+		hide();
+		m_behaviour.close();
+	}
+}
+
+bool rm_menu::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+	RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+{
+	RM_UNUSED(delta);
+	if (vk != RM_KEY_NONE && vk != RM_KEY_LMOUSE)
+		return true;
+	rebuild_item_layout();
+	const rm_vec2 local_cursor = cursor_to_local(cursor_pos);
+	const bool inside_self = local_cursor.x >= 0.f && local_cursor.x <= m_size.x &&
+		local_cursor.y >= 0.f && local_cursor.y <= m_size.y;
+	if (!inside_self) {
+		if (contains_visible_popup(local_cursor))
+			return true;
+		if (is_root_menu() && event == RM_MOUSE_EVENT_CLICK && state == DOWN)
+			close_tree();
+		return true;
 	}
 
+	const size_t index = hit_test_item(local_cursor);
+	if (event == RM_MOUSE_EVENT_MOVE) {
+		m_behaviour.pointer_move(index);
+		if (index < get_num_submenus()) {
+			rm_menu* p_item = get_submenu(index);
+			if (p_item->has_submenus() && (m_behaviour.has_open_item() || !is_root_menu()))
+				open_submenu(index);
+			else if (!is_root_menu())
+				close_submenus();
+		}
+		return false;
+	}
+	if (event != RM_MOUSE_EVENT_CLICK)
+		return false;
+	if (state == DOWN) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_down(index);
+		if (update.handled && get_root())
+			get_root()->capture_pointer(this);
+		return !update.handled;
+	}
+	if (state == UP) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_up(index);
+		if (update.activated)
+			activate_item(index);
+		return !update.handled;
+	}
 	return true;
 }
 
-bool rm_menu::add_submenu(rm_menu* pmenu)
+void rm_menu::set_theme(RmThemeRef theme)
 {
-	m_max_text_width = rm_max(m_max_text_width, pmenu->m_text_width);
-	return rm_widget::add_child(pmenu);
-}
-
-float rm_menu::recompute_text_width()
-{
-	float width = 0.f;
-	for (size_t i = 0; i < get_num_submenus(); i++) {
-		rm_menu* pmenu = get_submenu(i);
-		width = rm_max(width, pmenu->m_text_width);
-	}
-	return width;
-}
-
-void rm_menu::hide_all_submenus_except(rm_menu* psubmenu)
-{
-	rm_menu* pmenu;
-	for (size_t i = 0; i < get_num_submenus(); i++) {
-		pmenu = get_submenu(i);
-		assert(pmenu && "pmenu was nullptr");
-		pmenu->show(pmenu == psubmenu);
-	}
-}
-
-rm_menu::rm_menu(rm_widget* p_parent, int height, const char* pname) :
-	rm_widget(0, 0, 0, height, p_parent, "ui_menu", RM_FLAG_DEFAULT | RM_FLAG_GLOBAL),
-	m_text(pname ? pname : ""), m_max_text_width(0.f), m_proot_menu(nullptr)
-{
-	/* detect menu level from parent */
-	assert(p_parent && "p_parent was nullptr!");
-	assert(m_proot && "m_proot was nullptr!");
-	m_level = detect_my_level(p_parent);
-	m_text_width = m_proot->get_text_width(m_text.c_str(), get_font());
-	if (!m_level) {
-		m_elem_flags.set_bit(RM_FLAG_DISABLE_SCISSOR);
-		m_proot_menu = this;
-		move({ 0.f, 0.f });
-		resize({ p_parent->get_size().x, float(height) });
-		return;
-	}
-	else {
-		/* */
-		//m_elem_flags.set_bit(RM_FLAG_HIGHEST_PRIORITY);
-		rm_menu* parent_menu = static_cast<rm_menu*>(p_parent);
-		m_proot_menu = parent_menu->m_proot_menu;
-	}
+	m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+	for (size_t i = 0; i < get_num_submenus(); ++i)
+		get_submenu(i)->set_theme(m_theme);
+	update_popup_geometry();
 }
 
 std::map<const rm_widget*, std::vector<rm_radiobutton*>> rm_radiobutton::s_groups; // NOTE: d2 mb need refactoring this..

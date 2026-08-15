@@ -183,6 +183,93 @@ void RmDefaultControlPainter::draw_tab(NVGcontext& context,
   }
 }
 
+void RmDefaultControlPainter::draw_menu_surface(NVGcontext& context,
+  const RmMenuSurfaceVisual& visual, const RmMenuStyle& style)
+{
+  if (visual.popup && style.shadow_size > 0.0f) {
+    const NVGcolor transparent = NVGcolor::RGBA(0, 0, 0, 0);
+    const NVGpaint shadow = NVGpaint::boxGradient(0.0f, 3.0f,
+      visual.width, visual.height, style.corner_radius * 2.0f,
+      style.shadow_size, style.shadow, transparent);
+    context.save();
+    context.resetScissor();
+    context.beginPath();
+    context.rect(-style.shadow_size, -style.shadow_size,
+      visual.width + style.shadow_size * 2.0f,
+      visual.height + style.shadow_size * 2.0f);
+    context.roundedRect(0.0f, 0.0f, visual.width, visual.height,
+      style.corner_radius);
+    context.pathWinding(NVG_HOLE);
+    context.fillPaint(shadow);
+    context.fill();
+    context.restore();
+  }
+
+  context.beginPath();
+  if (visual.popup)
+    context.roundedRect(0.0f, 0.0f, visual.width, visual.height,
+      style.corner_radius);
+  else
+    context.rect(0.0f, 0.0f, visual.width, visual.height);
+  context.fillColor(visual.popup ? style.popup_background : style.bar_background);
+  context.fill();
+  if (visual.popup && style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.popup_border);
+    context.stroke();
+  }
+}
+
+void RmDefaultControlPainter::draw_menu_item(NVGcontext& context,
+  const RmMenuItemVisual& visual, const RmMenuStyle& style)
+{
+  if (visual.separator) {
+    const float y = visual.y + visual.height * 0.5f;
+    context.beginPath();
+    context.moveTo(visual.x + style.separator_margin, y);
+    context.lineTo(visual.x + visual.width - style.separator_margin, y);
+    context.StrokeWidth(style.separator_thickness);
+    context.strokeColor(style.separator);
+    context.stroke();
+    return;
+  }
+
+  const RmVisualState state = resolve_state(
+    visual.enabled, visual.hovered || visual.opened, visual.pressed);
+  const NVGcolor background = style.item_background.resolve(state);
+  if (background.a > 0.0f) {
+    context.beginPath();
+    context.roundedRect(visual.x, visual.y, visual.width, visual.height,
+      style.corner_radius * 0.65f);
+    context.fillColor(background);
+    context.fill();
+  }
+
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign((visual.root_item ? NVG_ALIGN_CENTER : NVG_ALIGN_LEFT) |
+    NVG_ALIGN_MIDDLE);
+  context.fillColor(style.item_text.resolve(state));
+  const float text_x = visual.root_item
+    ? visual.x + visual.width * 0.5f
+    : visual.x + style.horizontal_padding;
+  context.text(text_x, visual.y + visual.height * 0.5f,
+    visual.text ? visual.text : "", nullptr);
+
+  if (visual.has_submenu && !visual.root_item) {
+    const float size = style.submenu_indicator_size;
+    const float cx = visual.x + visual.width - style.horizontal_padding;
+    const float cy = visual.y + visual.height * 0.5f;
+    context.beginPath();
+    context.moveTo(cx - size * 0.5f, cy - size);
+    context.lineTo(cx + size * 0.5f, cy);
+    context.lineTo(cx - size * 0.5f, cy + size);
+    context.closePath();
+    context.fillColor(style.item_icon.resolve(state));
+    context.fill();
+  }
+}
+
 void RmDefaultControlPainter::draw_label(NVGcontext& context, const RmLabelVisual& visual,
   const RmLabelStyle& style)
 {

@@ -136,6 +136,29 @@ struct RmTabStyles {
   }
 };
 
+struct RmMenuStyle {
+  RmStateColors item_background;
+  RmStateColors item_text;
+  RmStateColors item_icon;
+  NVGcolor bar_background;
+  NVGcolor popup_background;
+  NVGcolor popup_border;
+  NVGcolor separator;
+  NVGcolor shadow;
+  float bar_height = 0.0f;
+  float item_height = 0.0f;
+  float horizontal_padding = 0.0f;
+  float vertical_padding = 0.0f;
+  float popup_minimum_width = 0.0f;
+  float border_width = 0.0f;
+  float corner_radius = 0.0f;
+  float separator_thickness = 0.0f;
+  float separator_margin = 0.0f;
+  float submenu_indicator_size = 0.0f;
+  float shadow_size = 0.0f;
+  float font_size = 0.0f;
+};
+
 struct RmLabelStyle {
   NVGcolor text;
   NVGcolor disabled_text;
@@ -272,6 +295,15 @@ struct RmControlMetricsTokens {
   float tab_gap = 2.0f;
   float tab_indicator_thickness = 3.0f;
   float tab_close_size = 14.0f;
+  float menu_bar_height = 30.0f;
+  float menu_item_height = 28.0f;
+  float menu_horizontal_padding = 12.0f;
+  float menu_vertical_padding = 6.0f;
+  float menu_popup_minimum_width = 180.0f;
+  float menu_separator_thickness = 1.0f;
+  float menu_separator_margin = 8.0f;
+  float menu_submenu_indicator_size = 6.0f;
+  float menu_shadow_size = 10.0f;
 };
 
 struct RmThemeTokens {
@@ -298,6 +330,7 @@ struct RmThemeSnapshot {
   RmThemeTokens tokens;
   RmButtonStyles buttons;
   RmTabStyles tabs;
+  RmMenuStyle menu;
   RmLabelStyle label;
   RmCheckboxStyle checkbox;
   RmSliderStyle slider;
@@ -427,6 +460,15 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.tab_gap, 0.0f, 64.0f, "tokens.controls.tab_gap", diagnostics);
     sanitize_metric(tokens.controls.tab_indicator_thickness, 0.0f, 32.0f, "tokens.controls.tab_indicator_thickness", diagnostics);
     sanitize_metric(tokens.controls.tab_close_size, 4.0f, 128.0f, "tokens.controls.tab_close_size", diagnostics);
+    sanitize_metric(tokens.controls.menu_bar_height, 16.0f, 256.0f, "tokens.controls.menu_bar_height", diagnostics);
+    sanitize_metric(tokens.controls.menu_item_height, 16.0f, 256.0f, "tokens.controls.menu_item_height", diagnostics);
+    sanitize_metric(tokens.controls.menu_horizontal_padding, 0.0f, 256.0f, "tokens.controls.menu_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.menu_vertical_padding, 0.0f, 256.0f, "tokens.controls.menu_vertical_padding", diagnostics);
+    sanitize_metric(tokens.controls.menu_popup_minimum_width, 32.0f, 2048.0f, "tokens.controls.menu_popup_minimum_width", diagnostics);
+    sanitize_metric(tokens.controls.menu_separator_thickness, 0.0f, 32.0f, "tokens.controls.menu_separator_thickness", diagnostics);
+    sanitize_metric(tokens.controls.menu_separator_margin, 0.0f, 256.0f, "tokens.controls.menu_separator_margin", diagnostics);
+    sanitize_metric(tokens.controls.menu_submenu_indicator_size, 1.0f, 64.0f, "tokens.controls.menu_submenu_indicator_size", diagnostics);
+    sanitize_metric(tokens.controls.menu_shadow_size, 0.0f, 256.0f, "tokens.controls.menu_shadow_size", diagnostics);
   }
 
 public:
@@ -557,6 +599,30 @@ public:
     p_theme->tabs.underline.selected_text = { colors.text, colors.text,
       colors.text, colors.text_disabled };
     p_theme->tabs.underline.show_indicator = true;
+
+    p_theme->menu.item_background = { transparent, colors.control_hovered,
+      colors.control_pressed, transparent };
+    p_theme->menu.item_text = { colors.text, colors.text, colors.text,
+      colors.text_disabled };
+    p_theme->menu.item_icon = { colors.text_muted, colors.text, colors.text,
+      colors.text_disabled };
+    p_theme->menu.bar_background = colors.surface_elevated;
+    p_theme->menu.popup_background = colors.surface_elevated;
+    p_theme->menu.popup_border = colors.border;
+    p_theme->menu.separator = colors.border;
+    p_theme->menu.shadow = colors.shadow;
+    p_theme->menu.bar_height = controls.menu_bar_height;
+    p_theme->menu.item_height = controls.menu_item_height;
+    p_theme->menu.horizontal_padding = controls.menu_horizontal_padding;
+    p_theme->menu.vertical_padding = controls.menu_vertical_padding;
+    p_theme->menu.popup_minimum_width = controls.menu_popup_minimum_width;
+    p_theme->menu.border_width = controls.border_width;
+    p_theme->menu.corner_radius = tokens.radius.medium;
+    p_theme->menu.separator_thickness = controls.menu_separator_thickness;
+    p_theme->menu.separator_margin = controls.menu_separator_margin;
+    p_theme->menu.submenu_indicator_size = controls.menu_submenu_indicator_size;
+    p_theme->menu.shadow_size = controls.menu_shadow_size;
+    p_theme->menu.font_size = tokens.typography.control;
 
     p_theme->label.text = colors.text;
     p_theme->label.disabled_text = colors.text_disabled;
