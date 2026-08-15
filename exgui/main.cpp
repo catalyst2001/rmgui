@@ -110,7 +110,7 @@ static rm_tabcontrol* create_tabs_preview(rm_widget* p_parent, int x, int y,
 }
 
 static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme,
-  rm_imagelist* p_icons)
+  rm_resource_id icons)
 {
   new rm_label(p_parent, 14, 8,
     "CAD command bars, tool palette, splitter and scrollable viewport", theme);
@@ -126,7 +126,7 @@ static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme,
   rm_toolbar* pfile_toolbar = new rm_toolbar(
     pcommand_rebar, 0, 0, 300, 100, RM_ORIENT_HORZ,
     [](rm_toolstrip*, uint32_t id) { printf("Toolbar command: %u\n", id); }, theme);
-  pfile_toolbar->set_imagelist(p_icons);
+  pfile_toolbar->set_imagelist(icons);
   const size_t file_group = pfile_toolbar->add_group(
     "Project", RmToolGroupLabelPlacement::bottom, 2);
   pfile_toolbar->add_tool(file_group, 100, "N", "New project", 0);
@@ -139,7 +139,7 @@ static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme,
   rm_toolbar* pview_toolbar = new rm_toolbar(
     pcommand_rebar, 0, 0, 290, 100, RM_ORIENT_HORZ,
     [](rm_toolstrip*, uint32_t id) { printf("View command: %u\n", id); }, theme);
-  pview_toolbar->set_imagelist(p_icons);
+  pview_toolbar->set_imagelist(icons);
   const size_t view_group = pview_toolbar->add_group(
     "View", RmToolGroupLabelPlacement::top, 2);
   pview_toolbar->add_tool(view_group, 200, "+", "Zoom in", 6);
@@ -152,7 +152,7 @@ static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme,
   rm_toolbar* pglobal_toolbar = new rm_toolbar(
     pcommand_rebar, 0, 0, 210, 68, RM_ORIENT_HORZ,
     [](rm_toolstrip*, uint32_t id) { printf("Global command: %u\n", id); }, theme);
-  pglobal_toolbar->set_imagelist(p_icons);
+  pglobal_toolbar->set_imagelist(icons);
   const size_t global_group = pglobal_toolbar->add_group(
     "Global", RmToolGroupLabelPlacement::bottom, 1);
   pglobal_toolbar->add_tool(global_group, 300, "U", "Undo", 2);
@@ -168,7 +168,7 @@ static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme,
   rm_toolbox* ptoolbox = new rm_toolbox(
     ptool_rebar, 0, 0, 88, 330, RM_ORIENT_VERT,
     [](rm_toolstrip*, uint32_t id) { printf("Current designer tool: %u\n", id); }, theme);
-  ptoolbox->set_imagelist(p_icons);
+  ptoolbox->set_imagelist(icons);
   const size_t selection_group = ptoolbox->add_group(
     "Select", RmToolGroupLabelPlacement::bottom, 2);
   ptoolbox->add_tool(selection_group, 1, "S", "Select widget", 5);
@@ -204,7 +204,7 @@ static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme,
           printf("Button command: %s\n", p_button->get_text().c_str());
         });
       if (row == 0) {
-        pbutton->set_imagelist(p_icons);
+        pbutton->set_imagelist(icons);
         pbutton->set_icon(static_cast<rm_image_index>(column));
       }
       pbutton->set_tooltip("Select this widget in the designer canvas");
@@ -479,10 +479,20 @@ void example_widgets(rm_surface* gui)
     }
   } dbg_widget(gui);
 
-  rm_imagelist* picons = gui->create_imagelist(
-    "icons1.png", 16, NVG_IMAGE_NEAREST);
+  const rm_resource_id icons = gui->register_imagelist(
+    "designer.icons.16", "icons1.png", 16, NVG_IMAGE_NEAREST);
+  const rm_imagelist* picons = gui->resolve_imagelist(icons);
   if (!picons || picons->get_num_images() != 10) {
     printf("icons1.png must be a horizontal strip of ten 16x16 icons\n");
+  }
+  const rm_resource_id duplicate_icons = gui->register_imagelist(
+    "designer.icons.16", "icons1.png", 16, NVG_IMAGE_NEAREST);
+  const RmVisualResourceSnapshot resource_snapshot =
+    gui->snapshot_visual_resources();
+  if (duplicate_icons != RM_INVALID_RESOURCE_ID ||
+    resource_snapshot.imagelists.size() != 1 ||
+    resource_snapshot.imagelists.front().name != "designer.icons.16") {
+    printf("visual resource registry invariant failed\n");
   }
 
   rm_menu* pmenu = new rm_menu(gui,
@@ -576,7 +586,7 @@ void example_widgets(rm_surface* gui)
     shell_theme, RmTabVariant::segmented, RmTabPlacement::top);
   create_tabs_preview(ptab_tabs, 400, 280, 360, 230, "Tool tabs / left",
     shell_theme, RmTabVariant::tool, RmTabPlacement::left);
-  create_docking_preview(ptab_docking, shell_theme, picons);
+  create_docking_preview(ptab_docking, shell_theme, icons);
 
   rm_flexbox_layout* pflexlayout = new rm_flexbox_layout();
   pflexlayout->set_dir(rm_flex_direction::Column);
@@ -683,7 +693,7 @@ void example_widgets(rm_surface* gui)
     [](rm_treeview*, rm_tree_node* p_node) {
       printf("Tree node selected: %s\n", p_node->name.c_str());
     }, controls_theme);
-  ptree->set_imagelist(picons);
+  ptree->set_imagelist(icons);
   rm_tree_node* psource = ptree->add_root("Source");
   psource->set_icons(0, 1);
   psource->expanded = true;

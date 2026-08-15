@@ -114,12 +114,14 @@ rm_button::rm_button(rm_widget* p_parent, int x, int y, int width, int height, c
 rm_button::~rm_button() {}
 
 void rm_button::on_draw(NVGcontext* pctx) {
+	const rm_imagelist* images = get_root()
+		? get_root()->resolve_imagelist(get_imagelist_id()) : nullptr;
 	const RmButtonVisual visual{
 		m_size.x,
 		m_size.y,
 		get_font(),
 		m_text.c_str(),
-		get_imagelist(),
+		images,
 		m_icon,
 		is_enabled(),
 		m_elem_flags.is_hovered(),
@@ -1198,6 +1200,8 @@ void rm_toolstrip::on_draw(NVGcontext* pctx)
 {
 	rebuild_layout();
 	const RmToolStripStyle& style = toolstrip_style();
+	const rm_imagelist* images = get_root()
+		? get_root()->resolve_imagelist(get_imagelist_id()) : nullptr;
 	RmDefaultControlPainter::draw_toolstrip_surface(*pctx,
 		{ m_size.x, m_size.y }, style);
 	for (size_t i = 0; i < m_group_layout.size(); ++i) {
@@ -1213,7 +1217,7 @@ void rm_toolstrip::on_draw(NVGcontext* pctx)
 		const rm_tool_item& item = m_groups[layout.group].items[layout.item];
 		RmDefaultControlPainter::draw_toolstrip_button(*pctx,
 			{ { layout.bounds.x, layout.bounds.y, layout.bounds.width,
-			    layout.bounds.height }, m_font, get_imagelist(), item.icon,
+			    layout.bounds.height }, m_font, images, item.icon,
 			  item.text.c_str(),
 			  is_enabled() && item.enabled,
 			  m_behaviour.hovered_index() == i,
@@ -2275,6 +2279,8 @@ void rm_treeview::on_draw(NVGcontext* pctx)
 {
 	rebuild_visible_rows();
 	const RmTreeViewStyle& style = m_theme->treeview;
+	const rm_imagelist* images = get_root()
+		? get_root()->resolve_imagelist(get_imagelist_id()) : nullptr;
 	RmDefaultControlPainter::draw_treeview_surface(*pctx,
 		{ m_size.x, m_size.y, is_enabled() }, style);
 
@@ -2290,7 +2296,7 @@ void rm_treeview::on_draw(NVGcontext* pctx)
 			m_size.x,
 			get_font(),
 			row.node->name.c_str(),
-			get_imagelist(),
+			images,
 			row.node->current_icon(),
 			row.depth,
 			is_enabled(),

@@ -652,9 +652,11 @@ rm_image rm_surface::load_image_from_memory(const void* psrc, size_t srclen, int
 	return m_pctx->createImageMem(flags, (uint8_t*)psrc, (int)srclen);
 }
 
-rm_imagelist::rm_imagelist(rm_surface* p_owner, rm_image atlas,
-	uint32_t icon_size, uint32_t atlas_width, uint32_t atlas_height) noexcept
-	: m_powner(p_owner), m_atlas(atlas), m_icon_size(icon_size),
+rm_imagelist::rm_imagelist(rm_surface* p_owner, rm_resource_id resource_id,
+	std::string name, rm_image atlas, uint32_t icon_size,
+	uint32_t atlas_width, uint32_t atlas_height) noexcept
+	: m_powner(p_owner), m_resource_id(resource_id), m_name(std::move(name)),
+	m_atlas(atlas), m_icon_size(icon_size),
 	m_atlas_width(atlas_width), m_atlas_height(atlas_height),
 	m_image_count(icon_size > 0 ? atlas_width / icon_size : 0)
 {
@@ -666,14 +668,15 @@ rm_imagelist::~rm_imagelist()
 		m_powner->free_image(m_atlas);
 }
 
-rm_imagelist* rm_surface::create_imagelist(const char* pfilename,
-	uint32_t icon_size, int flags)
+rm_resource_id rm_surface::register_imagelist(const char* p_resource_name,
+	const char* pfilename, uint32_t icon_size, int flags)
 {
-	if (!pfilename || !*pfilename || icon_size == 0)
-		return nullptr;
+	if (!p_resource_name || !*p_resource_name || !pfilename || !*pfilename ||
+		icon_size == 0 || find_imagelist(p_resource_name) != RM_INVALID_RESOURCE_ID)
+		return RM_INVALID_RESOURCE_ID;
 	rm_image atlas = load_image(pfilename, flags);
 	if (!atlas.isValid())
-		return nullptr;
+		return RM_INVALID_RESOURCE_ID;
 
 	int atlas_width = 0;
 	int atlas_height = 0;
@@ -683,14 +686,46 @@ rm_imagelist* rm_surface::create_imagelist(const char* pfilename,
 		atlas_width % static_cast<int>(icon_size) == 0;
 	if (!valid_strip) {
 		free_image(atlas);
-		return nullptr;
+		return RM_INVALID_RESOURCE_ID;
 	}
 
-	std::unique_ptr<rm_imagelist> images(new rm_imagelist(this, atlas,
-		icon_size, static_cast<uint32_t>(atlas_width),
+	const rm_resource_id resource_id =
+		static_cast<rm_resource_id>(m_imagelists.size() + 1);
+	std::unique_ptr<rm_imagelist> images(new rm_imagelist(this, resource_id,
+		p_resource_name, atlas, icon_size, static_cast<uint32_t>(atlas_width),
 		static_cast<uint32_t>(atlas_height)));
-	rm_imagelist* result = images.get();
 	m_imagelists.push_back(std::move(images));
+	m_imagelist_names.emplace(p_resource_name, resource_id);
+	++m_resource_revision;
+	return resource_id;
+}
+
+const rm_imagelist* rm_surface::resolve_imagelist(
+	rm_resource_id resource_id) const noexcept
+{
+	if (resource_id == RM_INVALID_RESOURCE_ID)
+		return nullptr;
+	const size_t index = static_cast<size_t>(resource_id - 1);
+	return index < m_imagelists.size() ? m_imagelists[index].get() : nullptr;
+}
+
+rm_resource_id rm_surface::find_imagelist(
+	std::string_view resource_name) const noexcept
+{
+	for (const auto& entry : m_imagelist_names)
+		if (entry.first == resource_name)
+			return entry.second;
+	return RM_INVALID_RESOURCE_ID;
+}
+
+RmVisualResourceSnapshot rm_surface::snapshot_visual_resources() const
+{
+	RmVisualResourceSnapshot result;
+	result.revision = m_resource_revision;
+	result.imagelists.reserve(m_imagelists.size());
+	for (const std::unique_ptr<rm_imagelist>& images : m_imagelists)
+		if (images)
+			result.imagelists.push_back(images->snapshot());
 	return result;
 }
 
@@ -788,6 +823,7 @@ rm_surface::rm_surface(std::unique_ptr<NVGcontext> pctx, int width, int height, 
 	m_tooltip_target = nullptr;
 	m_tooltip_theme = RmThemeSnapshot::default_theme();
 	m_tooltip_elapsed = 0.0f;
+	m_resource_revision = 0;
 	m_delta_time = 0.f;
 	m_device_pixel_ratio = 1.f;
 	m_last_cursor.init(0.0f, 0.0f);
@@ -803,6 +839,7 @@ rm_surface::~rm_surface()
 	m_tooltip_target = nullptr;
 	destroy_children();
 	m_imagelists.clear();
+	m_imagelist_names.clear();
 	m_proot = nullptr;
 }
 

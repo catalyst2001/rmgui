@@ -32,6 +32,7 @@
 #include <limits>
 #include <memory>
 #include <string_view>
+#include <unordered_map>
 #include "rmgui_resources.h"
 
 struct RmThemeSnapshot;
@@ -785,6 +786,21 @@ class rm_utl;
 using rm_image_index = uint32_t;
 constexpr rm_image_index RM_INVALID_IMAGE_INDEX =
   std::numeric_limits<rm_image_index>::max();
+using rm_resource_id = uint32_t;
+constexpr rm_resource_id RM_INVALID_RESOURCE_ID = 0;
+
+struct RmImageListResourceSnapshot {
+  rm_resource_id id = RM_INVALID_RESOURCE_ID;
+  std::string name;
+  uint32_t icon_size = 0;
+  uint32_t image_count = 0;
+};
+
+struct RmVisualResourceSnapshot {
+  uint32_t schema_version = 1;
+  uint64_t revision = 0;
+  std::vector<RmImageListResourceSnapshot> imagelists;
+};
 
 /**
 * Non-visual horizontal strip of equally-sized square icons. Texture and
@@ -797,13 +813,16 @@ class rm_imagelist final
   friend struct std::default_delete<rm_imagelist>;
 
   rm_surface* m_powner;
+  rm_resource_id m_resource_id;
+  std::string m_name;
   rm_image m_atlas;
   uint32_t m_icon_size;
   uint32_t m_atlas_width;
   uint32_t m_atlas_height;
   uint32_t m_image_count;
 
-  rm_imagelist(rm_surface* p_owner, rm_image atlas, uint32_t icon_size,
+  rm_imagelist(rm_surface* p_owner, rm_resource_id resource_id,
+    std::string name, rm_image atlas, uint32_t icon_size,
     uint32_t atlas_width, uint32_t atlas_height) noexcept;
 
 public:
@@ -811,10 +830,15 @@ public:
   rm_imagelist& operator=(const rm_imagelist&) = delete;
 
   bool is_valid() const noexcept { return m_atlas.isValid(); }
+  rm_resource_id get_resource_id() const noexcept { return m_resource_id; }
+  const std::string& get_name() const noexcept { return m_name; }
   uint32_t get_icon_size() const noexcept { return m_icon_size; }
   uint32_t get_num_images() const noexcept { return m_image_count; }
   bool has_image(rm_image_index index) const noexcept {
     return is_valid() && index < m_image_count;
+  }
+  RmImageListResourceSnapshot snapshot() const {
+    return { m_resource_id, m_name, m_icon_size, m_image_count };
   }
 
 private:
@@ -824,14 +848,14 @@ private:
 /** Lightweight non-owning binding used by controls which can display icons. */
 class rm_imagelist_host
 {
-  rm_imagelist* m_pimagelist = nullptr;
+  rm_resource_id m_imagelist_id = RM_INVALID_RESOURCE_ID;
 
 protected:
-  rm_imagelist* get_imagelist() const noexcept { return m_pimagelist; }
+  rm_resource_id get_imagelist_id() const noexcept { return m_imagelist_id; }
 
 public:
-  void set_imagelist(rm_imagelist* p_imagelist) noexcept {
-    m_pimagelist = p_imagelist;
+  void set_imagelist(rm_resource_id imagelist_id) noexcept {
+    m_imagelist_id = imagelist_id;
   }
 };
 
@@ -1169,6 +1193,8 @@ class rm_surface : public rm_widget
 
   std::unique_ptr<NVGcontext> m_pctx;
   std::vector<std::unique_ptr<rm_imagelist>> m_imagelists;
+  std::unordered_map<std::string, rm_resource_id> m_imagelist_names;
+  uint64_t m_resource_revision;
   rm_widget  *m_pfocus;
   rm_widget  *m_pointer_capture;
   rm_widget  *m_tooltip_target;
@@ -1221,8 +1247,12 @@ public:
   inline float get_delta_time() const { return m_delta_time; }
 
   /* images */
-  rm_imagelist* create_imagelist(const char* pfilename,
-    uint32_t icon_size, int flags = 0);
+  rm_resource_id register_imagelist(const char* p_resource_name,
+    const char* pfilename, uint32_t icon_size, int flags = 0);
+  const rm_imagelist* resolve_imagelist(
+    rm_resource_id resource_id) const noexcept;
+  rm_resource_id find_imagelist(std::string_view resource_name) const noexcept;
+  RmVisualResourceSnapshot snapshot_visual_resources() const;
   rm_image load_image_from_memory(const void *psrc, size_t srclen, int flags);
   rm_image load_image(const char *pfilename, int flags);
   void     free_image(rm_image& image);
