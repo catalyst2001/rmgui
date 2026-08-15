@@ -609,6 +609,48 @@ rm_image rm_surface::load_image_from_memory(const void* psrc, size_t srclen, int
 	return m_pctx->createImageMem(flags, (uint8_t*)psrc, (int)srclen);
 }
 
+rm_imagelist::rm_imagelist(rm_surface* p_owner, rm_image atlas,
+	uint32_t icon_size, uint32_t atlas_width, uint32_t atlas_height) noexcept
+	: m_powner(p_owner), m_atlas(atlas), m_icon_size(icon_size),
+	m_atlas_width(atlas_width), m_atlas_height(atlas_height),
+	m_image_count(icon_size > 0 ? atlas_width / icon_size : 0)
+{
+}
+
+rm_imagelist::~rm_imagelist()
+{
+	if (m_powner)
+		m_powner->free_image(m_atlas);
+}
+
+rm_imagelist* rm_surface::create_imagelist(const char* pfilename,
+	uint32_t icon_size, int flags)
+{
+	if (!pfilename || !*pfilename || icon_size == 0)
+		return nullptr;
+	rm_image atlas = load_image(pfilename, flags);
+	if (!atlas.isValid())
+		return nullptr;
+
+	int atlas_width = 0;
+	int atlas_height = 0;
+	m_pctx->getImageSize(atlas, &atlas_width, &atlas_height);
+	const bool valid_strip = atlas_width > 0 && atlas_height > 0 &&
+		atlas_height == static_cast<int>(icon_size) &&
+		atlas_width % static_cast<int>(icon_size) == 0;
+	if (!valid_strip) {
+		free_image(atlas);
+		return nullptr;
+	}
+
+	std::unique_ptr<rm_imagelist> images(new rm_imagelist(this, atlas,
+		icon_size, static_cast<uint32_t>(atlas_width),
+		static_cast<uint32_t>(atlas_height)));
+	rm_imagelist* result = images.get();
+	m_imagelists.push_back(std::move(images));
+	return result;
+}
+
 rm_image rm_surface::load_image(const char* pfilename, int flags)
 {
 	return m_pctx->createImage(pfilename, flags);
@@ -711,6 +753,7 @@ rm_surface::~rm_surface()
 	m_pfocus = nullptr;
 	m_pointer_capture = nullptr;
 	destroy_children();
+	m_imagelists.clear();
 	m_proot = nullptr;
 }
 
@@ -1022,6 +1065,30 @@ void rm_utl::draw_edge(NVGcontext* pctx, rm_vec2 pos, rm_vec2& size,
 		pcstyle->get_bottom_right(),
 		pcstyle->get_bottom_left());
 	pctx->stroke();
+}
+
+bool rm_utl::draw_image(NVGcontext* pctx, const rm_imagelist* p_imagelist,
+	rm_image_index index, float x, float y, float width, float height, float alpha)
+{
+	if (!pctx || !p_imagelist || !p_imagelist->has_image(index) ||
+		width <= 0.0f || height <= 0.0f || alpha <= 0.0f ||
+		!p_imagelist->m_powner ||
+		p_imagelist->m_powner->get_context() != pctx)
+		return false;
+
+	const float source_x = static_cast<float>(index * p_imagelist->m_icon_size);
+	const float scale_x = width / static_cast<float>(p_imagelist->m_icon_size);
+	const float scale_y = height / static_cast<float>(p_imagelist->m_icon_size);
+	const NVGpaint paint = NVGpaint::imagePattern(
+		x - source_x * scale_x, y,
+		static_cast<float>(p_imagelist->m_atlas_width) * scale_x,
+		static_cast<float>(p_imagelist->m_atlas_height) * scale_y,
+		0.0f, p_imagelist->m_atlas, std::clamp(alpha, 0.0f, 1.0f));
+	pctx->beginPath();
+	pctx->rect(x, y, width, height);
+	pctx->fillPaint(paint);
+	pctx->fill();
+	return true;
 }
 
 rm_flexbox_layout::rm_flexbox_layout(rm_flex_direction dir,

@@ -839,7 +839,9 @@ void RmDefaultControlPainter::draw_treeview_row(NVGcontext& context,
   const float center_y = visual.y + style.row_height * 0.5f;
   const char* text = visual.text ? visual.text : "";
 
-  if (visual.icon.isValid())
+  const bool has_icon = visual.imagelist &&
+    visual.imagelist->has_image(visual.icon);
+  if (has_icon)
     text_x += style.icon_size + style.icon_text_gap;
 
   context.setFontFaceId(static_cast<int>(visual.font.getValue()));
@@ -918,14 +920,12 @@ void RmDefaultControlPainter::draw_treeview_row(NVGcontext& context,
     context.stroke();
   }
 
-  if (visual.icon.isValid()) {
+  if (has_icon) {
     const float icon_x = branch_x + style.indent;
     const float icon_y = center_y - style.icon_size * 0.5f;
-    context.beginPath();
-    context.rect(icon_x, icon_y, style.icon_size, style.icon_size);
-    context.fillPaint(NVGpaint::imagePattern(icon_x, icon_y, style.icon_size,
-      style.icon_size, 0.0f, visual.icon, visual.enabled ? 1.0f : 0.5f));
-    context.fill();
+    rm_utl::draw_image(&context, visual.imagelist, visual.icon,
+      icon_x, icon_y, style.icon_size, style.icon_size,
+      visual.enabled ? 1.0f : 0.5f);
   }
 
   context.fillColor(text_colors.resolve(state));
@@ -1303,18 +1303,22 @@ void RmDefaultControlPainter::draw_toolstrip_button(NVGcontext& context,
     context.stroke();
   }
 
-  const float inset = std::max(3.0f, visual.bounds.height * 0.18f);
-  if (visual.icon.isValid()) {
-    const float extent = std::max(0.0f,
-      std::min(visual.bounds.width, visual.bounds.height) - inset * 2.0f);
-    const float x = visual.bounds.x + (visual.bounds.width - extent) * 0.5f;
-    const float y = visual.bounds.y + (visual.bounds.height - extent) * 0.5f;
-    context.beginPath();
-    context.rect(x, y, extent, extent);
-    context.fillPaint(NVGpaint::imagePattern(x, y, extent, extent, 0.0f,
-      visual.icon, visual.enabled ? 1.0f : 0.45f));
-    context.fill();
-  } else {
+  const float inset = 3.0f;
+  const float available_extent = std::max(0.0f,
+    std::min(visual.bounds.width, visual.bounds.height) - inset * 2.0f);
+  const float icon_extent = visual.imagelist
+    ? std::min(available_extent,
+        static_cast<float>(visual.imagelist->get_icon_size()))
+    : 0.0f;
+  const float icon_x = visual.bounds.x +
+    (visual.bounds.width - icon_extent) * 0.5f;
+  const float icon_y = visual.bounds.y +
+    (visual.bounds.height - icon_extent) * 0.5f;
+  const bool image_drawn = visual.imagelist && rm_utl::draw_image(&context,
+    visual.imagelist, visual.icon,
+    icon_x, icon_y, icon_extent, icon_extent,
+    visual.enabled ? 1.0f : 0.45f);
+  if (!image_drawn) {
     context.setFontFaceId(static_cast<int>(visual.font.getValue()));
     context.setFontSize(style.font_size);
     context.setTextAlign(NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);

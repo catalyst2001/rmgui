@@ -28,6 +28,8 @@
 #include <vector>
 #include <string>
 #include <cassert>
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include "rmgui_resources.h"
 
@@ -774,6 +776,62 @@ public:
   }
 };
 
+class rm_surface;
+class rm_utl;
+
+using rm_image_index = uint32_t;
+constexpr rm_image_index RM_INVALID_IMAGE_INDEX =
+  std::numeric_limits<rm_image_index>::max();
+
+/**
+* Non-visual horizontal strip of equally-sized square icons. Texture and
+* source coordinates are deliberately private; only rm_utl can render them.
+*/
+class rm_imagelist final
+{
+  friend class rm_surface;
+  friend class rm_utl;
+  friend struct std::default_delete<rm_imagelist>;
+
+  rm_surface* m_powner;
+  rm_image m_atlas;
+  uint32_t m_icon_size;
+  uint32_t m_atlas_width;
+  uint32_t m_atlas_height;
+  uint32_t m_image_count;
+
+  rm_imagelist(rm_surface* p_owner, rm_image atlas, uint32_t icon_size,
+    uint32_t atlas_width, uint32_t atlas_height) noexcept;
+
+public:
+  rm_imagelist(const rm_imagelist&) = delete;
+  rm_imagelist& operator=(const rm_imagelist&) = delete;
+
+  bool is_valid() const noexcept { return m_atlas.isValid(); }
+  uint32_t get_icon_size() const noexcept { return m_icon_size; }
+  uint32_t get_num_images() const noexcept { return m_image_count; }
+  bool has_image(rm_image_index index) const noexcept {
+    return is_valid() && index < m_image_count;
+  }
+
+private:
+  ~rm_imagelist();
+};
+
+/** Lightweight non-owning binding used by controls which can display icons. */
+class rm_imagelist_host
+{
+  rm_imagelist* m_pimagelist = nullptr;
+
+protected:
+  rm_imagelist* get_imagelist() const noexcept { return m_pimagelist; }
+
+public:
+  void set_imagelist(rm_imagelist* p_imagelist) noexcept {
+    m_pimagelist = p_imagelist;
+  }
+};
+
 /**
 * rendering utilites
 */
@@ -824,6 +882,10 @@ public:
   static void draw_edge(NVGcontext* pctx, rm_vec2 pos, rm_vec2& size,
     const rm_corners_style *pcstyle, const rm_color& suncolor, const rm_color& shadowcolor);
 
+  static bool draw_image(NVGcontext* pctx, const rm_imagelist* p_imagelist,
+    rm_image_index index, float x, float y, float width, float height,
+    float alpha = 1.0f);
+
   static inline const NVGcolor &get_transparent() {
     static const NVGcolor g_transparent_color = NVGcolor::RGBA(0, 0, 0, 0);
     return g_transparent_color;
@@ -835,8 +897,6 @@ public:
 * 
 * base class for all GUI elements
 */
-class rm_surface;
-
 // A widget attached to the tree is parent-owned by default. Use borrowed for
 // stack/static widgets whose lifetime is managed by their caller.
 enum class RmChildOwnership {
@@ -1095,6 +1155,7 @@ class rm_surface : public rm_widget
   friend class rm_widget;
 
   std::unique_ptr<NVGcontext> m_pctx;
+  std::vector<std::unique_ptr<rm_imagelist>> m_imagelists;
   rm_widget  *m_pfocus;
   rm_widget  *m_pointer_capture;
   float       m_delta_time;
@@ -1140,6 +1201,8 @@ public:
   inline float get_delta_time() const { return m_delta_time; }
 
   /* images */
+  rm_imagelist* create_imagelist(const char* pfilename,
+    uint32_t icon_size, int flags = 0);
   rm_image load_image_from_memory(const void *psrc, size_t srclen, int flags);
   rm_image load_image(const char *pfilename, int flags);
   void     free_image(rm_image& image);

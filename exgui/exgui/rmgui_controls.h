@@ -359,7 +359,7 @@ struct rm_tool_item {
   uint32_t id = 0;
   std::string text;
   std::string tooltip;
-  rm_image icon;
+  rm_image_index icon = RM_INVALID_IMAGE_INDEX;
   bool enabled = true;
   void* userdata = nullptr;
 };
@@ -374,7 +374,8 @@ struct rm_tool_group {
 class rm_toolstrip;
 using rm_toolstrip_cb = Delegate<void, rm_toolstrip*, uint32_t>;
 
-class rm_toolstrip : public rm_widget, public rm_callback<rm_toolstrip_cb> {
+class rm_toolstrip : public rm_widget, public rm_callback<rm_toolstrip_cb>,
+  public rm_imagelist_host {
   struct ItemLayout {
     size_t group = 0;
     size_t item = 0;
@@ -413,7 +414,9 @@ public:
     RmToolGroupLabelPlacement placement = RmToolGroupLabelPlacement::bottom,
     size_t cross_count = 1);
   rm_tool_item* add_tool(size_t group, uint32_t id, const char* p_text,
-    const char* p_tooltip = nullptr, rm_image icon = {}, void* p_userdata = nullptr);
+    const char* p_tooltip = nullptr,
+    rm_image_index icon = RM_INVALID_IMAGE_INDEX,
+    void* p_userdata = nullptr);
   bool select_tool(uint32_t id, bool notify = false);
   uint32_t get_selected_tool_id() const;
   rm_tool_item* find_tool(uint32_t id);
@@ -650,13 +653,15 @@ public:
   std::string            tooltip;
   void* userdata;
   bool                   expanded;
-  rm_image               collapsed_icon;
-  rm_image               expanded_icon;
+  rm_image_index         collapsed_icon;
+  rm_image_index         expanded_icon;
   std::vector<rm_tree_node*> children;
   rm_tree_node* parent;
 
   rm_tree_node(const char* pname, void* puserdata = nullptr)
-    : name(pname), userdata(puserdata), expanded(false), parent(nullptr) {
+    : name(pname), userdata(puserdata), expanded(false),
+    collapsed_icon(RM_INVALID_IMAGE_INDEX),
+    expanded_icon(RM_INVALID_IMAGE_INDEX), parent(nullptr) {
   }
 
   ~rm_tree_node() {
@@ -676,23 +681,27 @@ public:
     return *this;
   }
 
-  rm_tree_node& set_icons(rm_image collapsed, rm_image expanded) {
+  rm_tree_node& set_icons(rm_image_index collapsed,
+    rm_image_index expanded) {
     collapsed_icon = collapsed;
     expanded_icon = expanded;
     return *this;
   }
 
-  rm_image current_icon() const noexcept {
+  rm_image_index current_icon() const noexcept {
     if (expanded)
-      return expanded_icon.isValid() ? expanded_icon : collapsed_icon;
-    return collapsed_icon.isValid() ? collapsed_icon : expanded_icon;
+      return expanded_icon != RM_INVALID_IMAGE_INDEX
+        ? expanded_icon : collapsed_icon;
+    return collapsed_icon != RM_INVALID_IMAGE_INDEX
+      ? collapsed_icon : expanded_icon;
   }
 };
 
 class rm_treeview;
 using rm_treeview_cb = Delegate<void, rm_treeview*, rm_tree_node*>;
 
-class rm_treeview : public rm_widget, public rm_callback<rm_treeview_cb> {
+class rm_treeview : public rm_widget, public rm_callback<rm_treeview_cb>,
+  public rm_imagelist_host {
   struct VisibleRow {
     rm_tree_node* node = nullptr;
     size_t depth = 0;

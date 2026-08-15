@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rmgui.h"
 #include "rmgui_theme.h"
 
 #include <cstddef>
@@ -188,7 +189,8 @@ struct RmTreeViewRowVisual {
   float width = 0.0f;
   NVGhandle font;
   const char* text = nullptr;
-  NVGhandle icon;
+  const rm_imagelist* imagelist = nullptr;
+  rm_image_index icon = RM_INVALID_IMAGE_INDEX;
   size_t depth = 0;
   bool enabled = true;
   bool hovered = false;
@@ -304,7 +306,8 @@ struct RmToolStripGroupVisual {
 struct RmToolStripButtonVisual {
   RmVisualRect bounds;
   NVGhandle font;
-  NVGhandle icon;
+  const rm_imagelist* imagelist = nullptr;
+  rm_image_index icon = RM_INVALID_IMAGE_INDEX;
   const char* text = nullptr;
   bool enabled = true;
   bool hovered = false;

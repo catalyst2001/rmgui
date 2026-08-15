@@ -109,7 +109,8 @@ static rm_tabcontrol* create_tabs_preview(rm_widget* p_parent, int x, int y,
   return ptabs;
 }
 
-static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme)
+static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme,
+  rm_imagelist* p_icons)
 {
   new rm_label(p_parent, 14, 8,
     "CAD command bars, tool palette, splitter and scrollable viewport", theme);
@@ -119,35 +120,38 @@ static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme)
   rm_toolbar* pfile_toolbar = new rm_toolbar(
     pcommand_rebar, 0, 0, 300, 100, RM_ORIENT_HORZ,
     [](rm_toolstrip*, uint32_t id) { printf("Toolbar command: %u\n", id); }, theme);
+  pfile_toolbar->set_imagelist(p_icons);
   const size_t file_group = pfile_toolbar->add_group(
     "Project", RmToolGroupLabelPlacement::bottom, 2);
-  pfile_toolbar->add_tool(file_group, 100, "N", "New project");
-  pfile_toolbar->add_tool(file_group, 101, "O", "Open project");
-  pfile_toolbar->add_tool(file_group, 102, "S", "Save");
-  pfile_toolbar->add_tool(file_group, 103, "P", "Print");
-  pfile_toolbar->add_tool(file_group, 104, "C", "Copy");
-  pfile_toolbar->add_tool(file_group, 105, "V", "Paste");
+  pfile_toolbar->add_tool(file_group, 100, "N", "New project", 0);
+  pfile_toolbar->add_tool(file_group, 101, "O", "Open project", 1);
+  pfile_toolbar->add_tool(file_group, 102, "S", "Save", 2);
+  pfile_toolbar->add_tool(file_group, 103, "P", "Print", 3);
+  pfile_toolbar->add_tool(file_group, 104, "C", "Copy", 4);
+  pfile_toolbar->add_tool(file_group, 105, "V", "Paste", 5);
 
   rm_toolbar* pview_toolbar = new rm_toolbar(
     pcommand_rebar, 0, 0, 290, 100, RM_ORIENT_HORZ,
     [](rm_toolstrip*, uint32_t id) { printf("View command: %u\n", id); }, theme);
+  pview_toolbar->set_imagelist(p_icons);
   const size_t view_group = pview_toolbar->add_group(
     "View", RmToolGroupLabelPlacement::top, 2);
-  pview_toolbar->add_tool(view_group, 200, "+", "Zoom in");
-  pview_toolbar->add_tool(view_group, 201, "-", "Zoom out");
-  pview_toolbar->add_tool(view_group, 202, "F", "Fit model");
-  pview_toolbar->add_tool(view_group, 203, "R", "Rotate view");
-  pview_toolbar->add_tool(view_group, 204, "W", "Wireframe");
-  pview_toolbar->add_tool(view_group, 205, "3D", "Isometric view");
+  pview_toolbar->add_tool(view_group, 200, "+", "Zoom in", 6);
+  pview_toolbar->add_tool(view_group, 201, "-", "Zoom out", 7);
+  pview_toolbar->add_tool(view_group, 202, "F", "Fit model", 8);
+  pview_toolbar->add_tool(view_group, 203, "R", "Rotate view", 9);
+  pview_toolbar->add_tool(view_group, 204, "W", "Wireframe", 0);
+  pview_toolbar->add_tool(view_group, 205, "3D", "Isometric view", 1);
 
   rm_toolbar* pglobal_toolbar = new rm_toolbar(
     pcommand_rebar, 0, 0, 210, 68, RM_ORIENT_HORZ,
     [](rm_toolstrip*, uint32_t id) { printf("Global command: %u\n", id); }, theme);
+  pglobal_toolbar->set_imagelist(p_icons);
   const size_t global_group = pglobal_toolbar->add_group(
     "Global", RmToolGroupLabelPlacement::bottom, 1);
-  pglobal_toolbar->add_tool(global_group, 300, "U", "Undo");
-  pglobal_toolbar->add_tool(global_group, 301, "R", "Redo");
-  pglobal_toolbar->add_tool(global_group, 302, "?", "Help");
+  pglobal_toolbar->add_tool(global_group, 300, "U", "Undo", 2);
+  pglobal_toolbar->add_tool(global_group, 301, "R", "Redo", 3);
+  pglobal_toolbar->add_tool(global_group, 302, "?", "Help", 4);
 
   pcommand_rebar->add_band(pfile_toolbar, 230.0f, 110.0f);
   pcommand_rebar->add_band(pview_toolbar, 230.0f, 110.0f, true);
@@ -158,18 +162,19 @@ static void create_docking_preview(rm_widget* p_parent, RmThemeRef theme)
   rm_toolbox* ptoolbox = new rm_toolbox(
     ptool_rebar, 0, 0, 88, 330, RM_ORIENT_VERT,
     [](rm_toolstrip*, uint32_t id) { printf("Current designer tool: %u\n", id); }, theme);
+  ptoolbox->set_imagelist(p_icons);
   const size_t selection_group = ptoolbox->add_group(
     "Select", RmToolGroupLabelPlacement::bottom, 2);
-  ptoolbox->add_tool(selection_group, 1, "S", "Select widget");
-  ptoolbox->add_tool(selection_group, 2, "M", "Move widget");
-  ptoolbox->add_tool(selection_group, 3, "Z", "Zoom viewport");
-  ptoolbox->add_tool(selection_group, 4, "H", "Pan viewport");
+  ptoolbox->add_tool(selection_group, 1, "S", "Select widget", 5);
+  ptoolbox->add_tool(selection_group, 2, "M", "Move widget", 6);
+  ptoolbox->add_tool(selection_group, 3, "Z", "Zoom viewport", 7);
+  ptoolbox->add_tool(selection_group, 4, "H", "Pan viewport", 8);
   const size_t creation_group = ptoolbox->add_group(
     "Create", RmToolGroupLabelPlacement::top, 2);
-  ptoolbox->add_tool(creation_group, 10, "B", "Create button");
-  ptoolbox->add_tool(creation_group, 11, "T", "Create text field");
-  ptoolbox->add_tool(creation_group, 12, "P", "Create panel");
-  ptoolbox->add_tool(creation_group, 13, "I", "Create image");
+  ptoolbox->add_tool(creation_group, 10, "B", "Create button", 9);
+  ptoolbox->add_tool(creation_group, 11, "T", "Create text field", 0);
+  ptoolbox->add_tool(creation_group, 12, "P", "Create panel", 1);
+  ptoolbox->add_tool(creation_group, 13, "I", "Create image", 2);
   ptoolbox->select_tool(1);
   ptool_rebar->add_band(ptoolbox, 350.0f, 180.0f, true);
 
@@ -473,6 +478,12 @@ void example_widgets(rm_surface* gui)
     }
   } dbg_widget(gui);
 
+  rm_imagelist* picons = gui->create_imagelist(
+    "icons1.png", 16, NVG_IMAGE_NEAREST);
+  if (!picons || picons->get_num_images() != 10) {
+    printf("icons1.png must be a horizontal strip of ten 16x16 icons\n");
+  }
+
   rm_menu* pmenu = new rm_menu(gui,
     [](rm_menu*, uint32_t menuid, uint32_t itemid) {
       printf("Menu command: menu=%u item=%u\n", menuid, itemid);
@@ -560,7 +571,7 @@ void example_widgets(rm_surface* gui)
     shell_theme, RmTabVariant::segmented, RmTabPlacement::top);
   create_tabs_preview(ptab_tabs, 400, 280, 360, 230, "Tool tabs / left",
     shell_theme, RmTabVariant::tool, RmTabPlacement::left);
-  create_docking_preview(ptab_docking, shell_theme);
+  create_docking_preview(ptab_docking, shell_theme, picons);
 
   rm_flexbox_layout* pflexlayout = new rm_flexbox_layout();
   pflexlayout->set_dir(rm_flex_direction::Column);
@@ -651,21 +662,25 @@ void example_widgets(rm_surface* gui)
     [](rm_treeview*, rm_tree_node* p_node) {
       printf("Tree node selected: %s\n", p_node->name.c_str());
     }, controls_theme);
+  ptree->set_imagelist(picons);
   rm_tree_node* psource = ptree->add_root("Source");
+  psource->set_icons(0, 1);
   psource->expanded = true;
   rm_tree_node* pcontrols = psource->add_child("Controls");
+  pcontrols->set_icons(2, 3);
   pcontrols->expanded = true;
-  pcontrols->add_child("Button")->set_tooltip(
+  pcontrols->add_child("Button")->set_icons(4, 4).set_tooltip(
     "Command button control");
-  pcontrols->add_child("TreeView")->set_tooltip(
+  pcontrols->add_child("TreeView")->set_icons(5, 5).set_tooltip(
     "Hierarchy with independent branches and state icons");
-  pcontrols->add_child("TextInput")->set_tooltip(
+  pcontrols->add_child("TextInput")->set_icons(6, 6).set_tooltip(
     "Single-line and multiline text editor");
   rm_tree_node* pthemes = ptree->add_root("Themes");
+  pthemes->set_icons(7, 8);
   pthemes->expanded = true;
-  pthemes->add_child("Dark");
-  pthemes->add_child("Light");
-  ptree->add_root("Resources");
+  pthemes->add_child("Dark")->set_icons(7, 7);
+  pthemes->add_child("Light")->set_icons(8, 8);
+  ptree->add_root("Resources")->set_icons(9, 9);
 
   rm_theme_preview_panel* poutput_panel = new rm_theme_preview_panel(
     ptab11, 810, 10, 180, 510, controls_theme);

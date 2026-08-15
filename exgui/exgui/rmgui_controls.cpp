@@ -1258,7 +1258,8 @@ void rm_toolstrip::on_draw(NVGcontext* pctx)
 		const rm_tool_item& item = m_groups[layout.group].items[layout.item];
 		RmDefaultControlPainter::draw_toolstrip_button(*pctx,
 			{ { layout.bounds.x, layout.bounds.y, layout.bounds.width,
-			    layout.bounds.height }, m_font, item.icon, item.text.c_str(),
+			    layout.bounds.height }, m_font, get_imagelist(), item.icon,
+			  item.text.c_str(),
 			  is_enabled() && item.enabled,
 			  m_behaviour.hovered_index() == i,
 			  m_behaviour.pressed_index() == i,
@@ -1347,7 +1348,8 @@ size_t rm_toolstrip::add_group(const char* p_text,
 }
 
 rm_tool_item* rm_toolstrip::add_tool(size_t group, uint32_t id,
-	const char* p_text, const char* p_tooltip, rm_image icon, void* p_userdata)
+	const char* p_text, const char* p_tooltip, rm_image_index icon,
+	void* p_userdata)
 {
 	if (group >= m_groups.size())
 		return nullptr;
@@ -2176,6 +2178,7 @@ void rm_treeview::on_draw(NVGcontext* pctx)
 			m_size.x,
 			get_font(),
 			row.node->name.c_str(),
+			get_imagelist(),
 			row.node->current_icon(),
 			row.depth,
 			is_enabled(),
