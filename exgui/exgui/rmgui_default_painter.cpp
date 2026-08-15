@@ -1303,12 +1303,10 @@ void RmDefaultControlPainter::draw_toolstrip_button(NVGcontext& context,
     context.stroke();
   }
 
-  const float inset = 3.0f;
-  const float available_extent = std::max(0.0f,
-    std::min(visual.bounds.width, visual.bounds.height) - inset * 2.0f);
+  const float inset = 1.0f;
   const float icon_extent = visual.imagelist
-    ? std::min(available_extent,
-        static_cast<float>(visual.imagelist->get_icon_size()))
+    ? std::max(0.0f,
+        std::min(visual.bounds.width, visual.bounds.height) - inset * 2.0f)
     : 0.0f;
   const float icon_x = visual.bounds.x +
     (visual.bounds.width - icon_extent) * 0.5f;
