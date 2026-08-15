@@ -18,10 +18,12 @@
 
 #include "nanovg.h"
 #include <cstdint>
+#include <cstddef>
 #include <vector>
 #include <initializer_list>
 #include <cassert>
 #include <cstring>
+#include <string>
 
 // ─────────────────────────────────────────────────────────────
 //  I/O interface — abstract file access
@@ -224,10 +226,30 @@ enum NVGcmdVarType : uint16_t {
 	NVG_VAR_HANDLE,      // NVGhandle    (platform-sized)
 };
 
+static constexpr uint32_t NVG_CMD_MAX_NAME = 64;
+
+inline void nvgCmdCopyName(char* destination, size_t capacity,
+	const char* source) noexcept {
+	if (!destination || capacity == 0) return;
+	if (!source) source = "";
+	size_t length = 0;
+	while (length + 1 < capacity && source[length] != '\0') ++length;
+	if (length > 0) std::memcpy(destination, source, length);
+	destination[length] = '\0';
+}
+
+// Command cell (4 bytes, same width as a float / int32 / uint32).
+union NVGcmdCell {
+	float    f;
+	int32_t  i;
+	uint32_t u;
+};
+static_assert(sizeof(NVGcmdCell) == 4, "NVGcmdCell must be 4 bytes");
+
 // Single entry in a variable layout — maps a variable index
 // to a byte offset inside the element data block.
 struct NVGcmdVar {
-	uint16_t      offset;  // byte offset from the data pointer
+	uint32_t      offset;  // byte offset from the data pointer
 	NVGcmdVarType type;    // how to interpret bytes at that offset
 };
 
@@ -246,7 +268,7 @@ struct NVGcmdLayout {
 // Helper macro for defining layout entries.
 // Usage: NVG_VAR_ENTRY(MyWidget, x, NVG_VAR_FLOAT)
 #define NVG_VAR_ENTRY(cls, member, vtype) \
-	NVGcmdVar{ (uint16_t)offsetof(cls, member), vtype }
+	NVGcmdVar{ (uint32_t)offsetof(cls, member), vtype }
 
 // Variable type name for text serialization.
 const char*   nvgCmdVarTypeName(NVGcmdVarType type);
@@ -279,7 +301,6 @@ struct NVGcmdProperty {
 // ─────────────────────────────────────────────────────────────
 //  Metadata — widget schema descriptor
 // ─────────────────────────────────────────────────────────────
-#define NVG_CMD_MAX_NAME 64
 
 struct NVGcmdVarInfo {
 	char          name[NVG_CMD_MAX_NAME];
@@ -310,22 +331,11 @@ struct NVGcmdMeta {
 	}
 	void addVar(const char* name, NVGcmdVarType type) {
 		NVGcmdVarInfo vi{};
-		std::strncpy(vi.name, name, NVG_CMD_MAX_NAME - 1);
-		vi.name[NVG_CMD_MAX_NAME - 1] = '\0';
+		nvgCmdCopyName(vi.name, NVG_CMD_MAX_NAME, name);
 		vi.type = type;
 		vars.push_back(vi);
 	}
 };
-
-// ─────────────────────────────────────────────────────────────
-//  Command cell  (4 bytes, same width as a float / int32 / uint32)
-// ─────────────────────────────────────────────────────────────
-union NVGcmdCell {
-	float    f;
-	int32_t  i;
-	uint32_t u;
-};
-static_assert(sizeof(NVGcmdCell) == 4, "NVGcmdCell must be 4 bytes");
 
 // ─────────────────────────────────────────────────────────────
 //  Command argument — literal value or variable reference
@@ -382,8 +392,7 @@ struct NVGcmdBuf {
 	uint32_t addProperty(const char* name, NVGcmdVarType type,
 	                     NVGcmdCell value) {
 		NVGcmdProperty p{};
-		std::strncpy(p.name, name, NVG_CMD_MAX_NAME - 1);
-		p.name[NVG_CMD_MAX_NAME - 1] = '\0';
+		nvgCmdCopyName(p.name, NVG_CMD_MAX_NAME, name);
 		p.type = type;
 		p.stateVarIndex = ~0u;
 		p.values.push_back(value);
@@ -400,8 +409,7 @@ struct NVGcmdBuf {
 	                     std::initializer_list<NVGcmdCell> values) {
 		assert(values.size() > 0);
 		NVGcmdProperty p{};
-		std::strncpy(p.name, name, NVG_CMD_MAX_NAME - 1);
-		p.name[NVG_CMD_MAX_NAME - 1] = '\0';
+		nvgCmdCopyName(p.name, NVG_CMD_MAX_NAME, name);
 		p.type = type;
 		p.stateVarIndex = stateVarIndex;
 		p.values.assign(values);
@@ -424,10 +432,13 @@ struct NVGcmdBuf {
 	bool loadText(NVGio& io);
 
 	// ── Generic emitter ──────────────────────────────────────
-	void emit(NVGcmdOp op, std::initializer_list<NVGcmdArg> args) {
+	bool emit(NVGcmdOp op, std::initializer_list<NVGcmdArg> args) {
+		if ((uint32_t)op >= NVG_CMD__COUNT)
+			return false;
 		const uint8_t expected = nvgCmdArgCount()[(uint32_t)op];
 		assert(args.size() == expected && "arg count mismatch");
-		(void)expected;
+		if (args.size() != expected)
+			return false;
 
 		cells.reserve(cells.size() + 1 + (args.size() > 0 ? 1 + args.size() : 0));
 
@@ -447,6 +458,7 @@ struct NVGcmdBuf {
 			for (auto& a : args)
 				cells.push_back(a.cell);
 		}
+		return true;
 	}
 
 	// ── State ────────────────────────────────────────────────
@@ -679,6 +691,41 @@ struct NVGcmdBuf {
 	}
 };
 
+enum class NVGcmdValidationCode : uint32_t {
+	ok = 0,
+	invalid_opcode,
+	truncated_command,
+	invalid_variable_mask,
+	variable_out_of_range,
+	property_out_of_range,
+	invalid_variable_type,
+	invalid_property,
+	duplicate_name,
+	restore_without_save,
+	unbalanced_save_restore,
+	layout_mismatch
+};
+
+struct NVGcmdValidationResult {
+	NVGcmdValidationCode code = NVGcmdValidationCode::ok;
+	uint32_t cell_index = 0;
+	std::string message;
+
+	bool succeeded() const noexcept { return code == NVGcmdValidationCode::ok; }
+	explicit operator bool() const noexcept { return succeeded(); }
+};
+
+struct NVGcmdEvalResult {
+	NVGcmdValidationResult validation;
+	uint32_t commands_executed = 0;
+
+	bool succeeded() const noexcept { return validation.succeeded(); }
+	explicit operator bool() const noexcept { return succeeded(); }
+};
+
+NVGcmdValidationResult nvgCmdValidate(const NVGcmdBuf& buf,
+	const NVGcmdLayout* layout = nullptr);
+
 // ─────────────────────────────────────────────────────────────
 //  Evaluator — execute a command buffer against an NVGcontext
 // ─────────────────────────────────────────────────────────────
@@ -689,5 +736,9 @@ void nvgEval(NVGcontext& ctx,
              const NVGcmdBuf& buf,
              const void* data        = nullptr,
              const NVGcmdLayout* layout = nullptr);
+
+NVGcmdEvalResult nvgEvalChecked(NVGcontext& ctx,
+	const NVGcmdBuf& buf, const void* data = nullptr,
+	const NVGcmdLayout* layout = nullptr);
 
 #endif // NVG_CMD_H

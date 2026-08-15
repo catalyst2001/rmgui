@@ -1,4 +1,5 @@
 #include "nanovg.h"
+#include "nvg_cmd.h"
 #include "../exgui/exgui/rmgui_theme.h"
 
 #include <cmath>
@@ -6,6 +7,8 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <cstring>
+#include <iterator>
 
 namespace {
 
@@ -86,6 +89,144 @@ public:
     last_vertices.assign(vertices, vertices + vertex_count);
   }
 };
+
+class MemoryIo final : public NVGio {
+public:
+  std::vector<uint8_t> bytes;
+  size_t cursor = 0;
+
+  bool write(const void* data, size_t size) override
+  {
+    if (!data && size != 0) return false;
+    if (size == 0) return true;
+    const uint8_t* begin = static_cast<const uint8_t*>(data);
+    bytes.insert(bytes.end(), begin, begin + size);
+    return true;
+  }
+
+  size_t read(void* data, size_t size) override
+  {
+    const size_t available = cursor < bytes.size() ? bytes.size() - cursor : 0;
+    const size_t count = std::min(size, available);
+    if (count > 0) {
+      std::memcpy(data, bytes.data() + cursor, count);
+      cursor += count;
+    }
+    return count;
+  }
+};
+
+NVGcmdCell float_cell(float value)
+{
+  NVGcmdCell cell{};
+  cell.f = value;
+  return cell;
+}
+
+void test_command_buffer_runtime()
+{
+  struct DrawData {
+    float width;
+    float height;
+    uint32_t state;
+    int32_t z_index;
+  } data{ 84.0f, 32.0f, 1u, 23 };
+
+  const NVGcmdVar variables[] = {
+    NVG_VAR_ENTRY(DrawData, width, NVG_VAR_FLOAT),
+    NVG_VAR_ENTRY(DrawData, height, NVG_VAR_FLOAT),
+    NVG_VAR_ENTRY(DrawData, state, NVG_VAR_UINT32),
+    NVG_VAR_ENTRY(DrawData, z_index, NVG_VAR_INT32)
+  };
+  const NVGcmdLayout layout{ variables,
+    static_cast<uint32_t>(std::size(variables)) };
+
+  NVGcmdBuf commands;
+  nvgCmdCopyName(commands.meta.className, NVG_CMD_MAX_NAME, "rm_button");
+  nvgCmdCopyName(commands.meta.elementName, NVG_CMD_MAX_NAME, "strict_button");
+  commands.meta.version = 1;
+  commands.meta.addVar("width", NVG_VAR_FLOAT);
+  commands.meta.addVar("height", NVG_VAR_FLOAT);
+  commands.meta.addVar("state", NVG_VAR_UINT32);
+  commands.meta.addVar("z_index", NVG_VAR_INT32);
+  const uint32_t red = commands.addProperty("red", NVG_VAR_FLOAT, 2,
+    { float_cell(0.2f), float_cell(0.8f) });
+  const uint32_t green = commands.addProperty("green", NVG_VAR_FLOAT,
+    float_cell(0.35f));
+
+  commands.save();
+  commands.setZIndex(V(3));
+  commands.beginPath();
+  commands.roundedRect(0.0f, 0.0f, V(0), V(1), 3.0f);
+  commands.fillColor(P(red), P(green), 0.15f, 1.0f);
+  commands.fill();
+  commands.restore();
+
+  require(nvgCmdValidate(commands, &layout).succeeded(),
+    "a typed data-driven command buffer must validate");
+
+  MemoryIo text;
+  require(commands.saveText(text), "command buffer must serialize to text");
+  NVGcmdBuf text_roundtrip;
+  require(text_roundtrip.loadText(text) &&
+    nvgCmdValidate(text_roundtrip, &layout).succeeded(),
+    "text command format must round-trip with variables and properties");
+
+  MemoryIo binary;
+  require(commands.saveBinary(binary), "command buffer must serialize to binary");
+  NVGcmdBuf binary_roundtrip;
+  require(binary_roundtrip.loadBinary(binary) &&
+    nvgCmdValidate(binary_roundtrip, &layout).succeeded(),
+    "binary command format must round-trip with validation");
+
+  auto renderer = std::make_unique<RecordingRenderer>();
+  RecordingRenderer* recording = renderer.get();
+  NVGcontext context(std::move(renderer), NVGcontextConfig{});
+  context.beginFrame(200.0f, 100.0f, 1.0f);
+  const NVGcmdEvalResult evaluated = nvgEvalChecked(
+    context, binary_roundtrip, &data, &layout);
+  context.endFrame();
+  require(evaluated.succeeded() && evaluated.commands_executed == 7,
+    "checked command execution must report every executed command");
+  require(recording->fill_calls == 1 && recording->last_z_index == 23,
+    "validated commands must reach NanoVG with bound runtime values");
+
+  NVGcmdBuf truncated;
+  NVGcmdCell cell{};
+  cell.u = NVG_CMD_RECT;
+  truncated.cells.push_back(cell);
+  cell.u = 0;
+  truncated.cells.push_back(cell);
+  truncated.cells.push_back(float_cell(0.0f));
+  truncated.cells.push_back(float_cell(0.0f));
+  truncated.cells.push_back(float_cell(10.0f));
+  require(nvgCmdValidate(truncated).code ==
+    NVGcmdValidationCode::truncated_command,
+    "validator must reject a truncated command stream");
+
+  NVGcmdBuf unbalanced;
+  unbalanced.save();
+  require(nvgCmdValidate(unbalanced).code ==
+    NVGcmdValidationCode::unbalanced_save_restore,
+    "validator must reject unbalanced NanoVG state commands");
+
+  NVGcmdBuf bad_reference;
+  bad_reference.meta.addVar("width", NVG_VAR_FLOAT);
+  bad_reference.beginPath();
+  bad_reference.rect(0.0f, 0.0f, V(9), 10.0f);
+  require(nvgCmdValidate(bad_reference).code ==
+    NVGcmdValidationCode::variable_out_of_range,
+    "validator must reject references outside the declared schema");
+
+  NVGcmdBuf preserved = commands;
+  const uint32_t preserved_size = preserved.size();
+  MemoryIo malformed_text;
+  const char malformed[] = "begin_path\nrect 0 0 10\nfill\n";
+  malformed_text.bytes.assign(malformed, malformed + sizeof(malformed) - 1);
+  require(!preserved.loadText(malformed_text) &&
+    preserved.size() == preserved_size,
+    "failed text loads must be transactional and preserve the previous program");
+}
 
 void test_custom_triangle_forwarding()
 {
@@ -367,7 +508,8 @@ int main()
   test_custom_triangle_forwarding();
   test_nested_scissor_intersection();
   test_narrow_rounded_rectangle_geometry();
+  test_command_buffer_runtime();
   test_theme_document_compilation();
-  std::cout << "All NanoVG and theme tests passed\n";
+  std::cout << "All NanoVG, command, and theme tests passed\n";
   return 0;
 }

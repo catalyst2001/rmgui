@@ -134,6 +134,7 @@
     <ClCompile Include="..\exgui\vendor\nanovg\nanovg.cpp">
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <ClCompile Include="..\exgui\vendor\nanovg\nvg_cmd.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

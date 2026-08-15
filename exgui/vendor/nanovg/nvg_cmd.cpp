@@ -9,6 +9,9 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <algorithm>
+#include <unordered_set>
+#include <utility>
 
 // ─────────────────────────────────────────────────────────────
 //  Execution context passed to every handler
@@ -33,6 +36,16 @@ struct NVGcmdExecCtx {
 # define NVG_FINLINE inline
 #endif
 
+template<class T>
+static NVG_FINLINE T nvgCmdLoadValue(const void* data, uint32_t offset)
+{
+	T value{};
+	if (data)
+		std::memcpy(&value, static_cast<const uint8_t*>(data) + offset,
+			sizeof(T));
+	return value;
+}
+
 // ── Property-aware resolution helpers ────────────────────────
 
 // Resolve the state index for a given property.
@@ -49,12 +62,11 @@ static NVG_FINLINE uint32_t resolvePropState(
 	if (!data || !layout || si >= layout->count) return 0;
 
 	const NVGcmdVar& sv = (*layout)[si];
-	const uint8_t* base = (const uint8_t*)data;
 	uint32_t state;
 	switch (sv.type) {
-		case NVG_VAR_UINT32: state = *(const uint32_t*)(base + sv.offset); break;
-		case NVG_VAR_INT32:  state = (uint32_t)*(const int32_t*)(base + sv.offset); break;
-		case NVG_VAR_FLOAT:  state = (uint32_t)*(const float*)(base + sv.offset); break;
+		case NVG_VAR_UINT32: state = nvgCmdLoadValue<uint32_t>(data, sv.offset); break;
+		case NVG_VAR_INT32:  state = (uint32_t)nvgCmdLoadValue<int32_t>(data, sv.offset); break;
+		case NVG_VAR_FLOAT:  state = (uint32_t)nvgCmdLoadValue<float>(data, sv.offset); break;
 		default:             return 0;
 	}
 	if (state >= (uint32_t)prop.values.size()) return 0;
@@ -83,11 +95,10 @@ static NVG_FINLINE float resolveFloat(const NVGcmdExecCtx& e, uint32_t n)
 	if (idx >= layout->count) return 0.0f;
 
 	const NVGcmdVar& v = (*layout)[idx];
-	const uint8_t* base = (const uint8_t*)data;
 	switch (v.type) {
-		case NVG_VAR_FLOAT:  return *(const float*)(base + v.offset);
-		case NVG_VAR_INT32:  return (float)*(const int32_t*)(base + v.offset);
-		case NVG_VAR_UINT32: return (float)*(const uint32_t*)(base + v.offset);
+		case NVG_VAR_FLOAT:  return nvgCmdLoadValue<float>(data, v.offset);
+		case NVG_VAR_INT32:  return (float)nvgCmdLoadValue<int32_t>(data, v.offset);
+		case NVG_VAR_UINT32: return (float)nvgCmdLoadValue<uint32_t>(data, v.offset);
 		default:             return 0.0f;
 	}
 }
@@ -112,11 +123,10 @@ static NVG_FINLINE int32_t resolveInt(const NVGcmdExecCtx& e, uint32_t n)
 	if (idx >= layout->count) return 0;
 
 	const NVGcmdVar& v = (*layout)[idx];
-	const uint8_t* base = (const uint8_t*)data;
 	switch (v.type) {
-		case NVG_VAR_FLOAT:  return (int32_t)*(const float*)(base + v.offset);
-		case NVG_VAR_INT32:  return *(const int32_t*)(base + v.offset);
-		case NVG_VAR_UINT32: return (int32_t)*(const uint32_t*)(base + v.offset);
+		case NVG_VAR_FLOAT:  return (int32_t)nvgCmdLoadValue<float>(data, v.offset);
+		case NVG_VAR_INT32:  return nvgCmdLoadValue<int32_t>(data, v.offset);
+		case NVG_VAR_UINT32: return (int32_t)nvgCmdLoadValue<uint32_t>(data, v.offset);
 		default:             return 0;
 	}
 }
@@ -138,9 +148,8 @@ static NVG_FINLINE const char* resolveString(const NVGcmdExecCtx& e, uint32_t n)
 
 	const NVGcmdVar& v = (*layout)[idx];
 	if (v.type != NVG_VAR_STRING) return "";
-	const uint8_t* base = (const uint8_t*)data;
-	const char* const* pp = (const char* const*)(base + v.offset);
-	return *pp ? *pp : "";
+	const char* value = nvgCmdLoadValue<const char*>(data, v.offset);
+	return value ? value : "";
 }
 
 static NVG_FINLINE NVGhandle resolveHandle(const NVGcmdExecCtx& e, uint32_t n)
@@ -360,15 +369,183 @@ static const NVGcmdHandler g_cmdDispatch[NVG_CMD__COUNT] = {
 	/* 54 */ h_setZIndex,
 };
 
+namespace {
+
+enum class NVGcmdExpectedType {
+	number,
+	integer,
+	string,
+	handle
+};
+
+NVGcmdExpectedType expectedType(uint32_t op, uint32_t argument)
+{
+	if ((op == NVG_CMD_TEXT && argument == 2) ||
+		(op == NVG_CMD_TEXT_BOX && argument == 3))
+		return NVGcmdExpectedType::string;
+	if ((op == NVG_CMD_FILL_IMAGE_PATTERN ||
+		op == NVG_CMD_STROKE_IMAGE_PATTERN) && argument == 5)
+		return NVGcmdExpectedType::handle;
+	return ((nvgCmdArgIntMask()[op] >> argument) & 1u)
+		? NVGcmdExpectedType::integer : NVGcmdExpectedType::number;
+}
+
+bool compatibleType(NVGcmdExpectedType expected, NVGcmdVarType actual)
+{
+	switch (expected) {
+	case NVGcmdExpectedType::string: return actual == NVG_VAR_STRING;
+	case NVGcmdExpectedType::handle: return actual == NVG_VAR_HANDLE;
+	case NVGcmdExpectedType::integer:
+	case NVGcmdExpectedType::number:
+		return actual == NVG_VAR_FLOAT || actual == NVG_VAR_INT32 ||
+			actual == NVG_VAR_UINT32;
+	default: return false;
+	}
+}
+
+NVGcmdValidationResult validationError(NVGcmdValidationCode code,
+	uint32_t cell, const char* message)
+{
+	NVGcmdValidationResult result;
+	result.code = code;
+	result.cell_index = cell;
+	result.message = message;
+	return result;
+}
+
+bool validVarType(NVGcmdVarType type)
+{
+	return type >= NVG_VAR_FLOAT && type <= NVG_VAR_HANDLE;
+}
+
+} // namespace
+
+NVGcmdValidationResult nvgCmdValidate(const NVGcmdBuf& buf,
+	const NVGcmdLayout* layout)
+{
+	std::unordered_set<std::string> names;
+	for (size_t index = 0; index < buf.meta.vars.size(); ++index) {
+		const NVGcmdVarInfo& variable = buf.meta.vars[index];
+		if (variable.name[0] == '\0')
+			return validationError(NVGcmdValidationCode::duplicate_name, 0,
+				"metadata contains an unnamed variable");
+		if (!validVarType(variable.type))
+			return validationError(NVGcmdValidationCode::invalid_variable_type,
+				0, "metadata contains an invalid variable type");
+		if (!names.emplace(variable.name).second)
+			return validationError(NVGcmdValidationCode::duplicate_name, 0,
+				"metadata contains duplicate variable names");
+		if (layout) {
+			if (index >= layout->count)
+				return validationError(NVGcmdValidationCode::layout_mismatch, 0,
+					"runtime layout has fewer variables than the schema");
+			if ((*layout)[static_cast<uint32_t>(index)].type != variable.type)
+				return validationError(NVGcmdValidationCode::layout_mismatch, 0,
+					"runtime layout variable type differs from the schema");
+		}
+	}
+
+	names.clear();
+	for (const NVGcmdProperty& property : buf.props) {
+		if (property.name[0] == '\0')
+			return validationError(NVGcmdValidationCode::duplicate_name, 0,
+				"schema contains an unnamed property");
+		if (!names.emplace(property.name).second)
+			return validationError(NVGcmdValidationCode::duplicate_name, 0,
+				"schema contains duplicate property names");
+		if (!validVarType(property.type) || property.type == NVG_VAR_STRING ||
+			property.type == NVG_VAR_HANDLE || property.values.empty())
+			return validationError(NVGcmdValidationCode::invalid_property, 0,
+				"properties must contain at least one numeric value");
+		if (property.stateVarIndex != ~0u) {
+			if (property.stateVarIndex >= buf.meta.vars.size() ||
+				!compatibleType(NVGcmdExpectedType::integer,
+					buf.meta.vars[property.stateVarIndex].type))
+				return validationError(NVGcmdValidationCode::invalid_property, 0,
+					"property state selector is not a numeric schema variable");
+		}
+	}
+
+	const uint8_t* arg_count = nvgCmdArgCount();
+	uint32_t pc = 0;
+	int32_t save_depth = 0;
+	while (pc < buf.cells.size()) {
+		const uint32_t command_cell = pc;
+		const uint32_t op = buf.cells[pc++].u;
+		if (op >= NVG_CMD__COUNT)
+			return validationError(NVGcmdValidationCode::invalid_opcode,
+				command_cell, "command stream contains an invalid opcode");
+		if (op == NVG_CMD_SAVE)
+			++save_depth;
+		else if (op == NVG_CMD_RESTORE && --save_depth < 0)
+			return validationError(NVGcmdValidationCode::restore_without_save,
+				command_cell, "restore command has no matching save");
+
+		const uint32_t count = arg_count[op];
+		uint32_t mask = 0;
+		if (count > 0) {
+			if (pc >= buf.cells.size())
+				return validationError(NVGcmdValidationCode::truncated_command,
+					command_cell, "command is missing its variable mask");
+			mask = buf.cells[pc++].u;
+			const uint32_t allowed = count == 32 ? ~0u : ((1u << count) - 1u);
+			if ((mask & ~allowed) != 0)
+				return validationError(NVGcmdValidationCode::invalid_variable_mask,
+					command_cell, "variable mask references a missing argument");
+		}
+		if (pc + count > buf.cells.size())
+			return validationError(NVGcmdValidationCode::truncated_command,
+				command_cell, "command argument list is truncated");
+
+		for (uint32_t argument = 0; argument < count; ++argument) {
+			const NVGcmdExpectedType expected = expectedType(op, argument);
+			if (((mask >> argument) & 1u) == 0) {
+				if (expected == NVGcmdExpectedType::string ||
+					expected == NVGcmdExpectedType::handle)
+					return validationError(NVGcmdValidationCode::invalid_variable_type,
+						pc + argument,
+						"string and handle command arguments must be variable references");
+				continue;
+			}
+			const uint32_t reference = buf.cells[pc + argument].u;
+			if ((reference & NVG_CMD_PROP_BIT) != 0) {
+				const uint32_t property_index = reference & ~NVG_CMD_PROP_BIT;
+				if (property_index >= buf.props.size())
+					return validationError(NVGcmdValidationCode::property_out_of_range,
+						pc + argument, "property reference is outside the schema");
+				if (!compatibleType(expected, buf.props[property_index].type))
+					return validationError(NVGcmdValidationCode::invalid_variable_type,
+						pc + argument, "property type is incompatible with the command argument");
+			}
+			else {
+				if (reference >= buf.meta.vars.size())
+					return validationError(NVGcmdValidationCode::variable_out_of_range,
+						pc + argument, "variable reference is outside the schema");
+				if (!compatibleType(expected, buf.meta.vars[reference].type))
+					return validationError(NVGcmdValidationCode::invalid_variable_type,
+						pc + argument, "variable type is incompatible with the command argument");
+			}
+		}
+		pc += count;
+	}
+	if (save_depth != 0)
+		return validationError(NVGcmdValidationCode::unbalanced_save_restore,
+			static_cast<uint32_t>(buf.cells.size()),
+			"command stream leaves NanoVG save/restore state unbalanced");
+	return {};
+}
+
 // ─────────────────────────────────────────────────────────────
 //  Evaluator — hot loop: table lookup + indirect call, no branching
 // ─────────────────────────────────────────────────────────────
 
-void nvgEval(NVGcontext& ctx,
-             const NVGcmdBuf& buf,
-             const void* data,
-             const NVGcmdLayout* layout)
+NVGcmdEvalResult nvgEvalChecked(NVGcontext& ctx,
+	const NVGcmdBuf& buf, const void* data, const NVGcmdLayout* layout)
 {
+	NVGcmdEvalResult result;
+	result.validation = nvgCmdValidate(buf, layout);
+	if (!result.validation)
+		return result;
 	const NVGcmdCell* cells = buf.cells.data();
 	const uint32_t total    = (uint32_t)buf.cells.size();
 	const uint8_t* argTbl   = nvgCmdArgCount();
@@ -398,7 +575,15 @@ void nvgEval(NVGcontext& ctx,
 		e.args = cells + pc;
 		g_cmdDispatch[opVal](e);   // ← one indirect call, no branches
 		pc += nargs;
+		++result.commands_executed;
 	}
+	return result;
+}
+
+void nvgEval(NVGcontext& ctx,
+	const NVGcmdBuf& buf, const void* data, const NVGcmdLayout* layout)
+{
+	(void)nvgEvalChecked(ctx, buf, data, layout);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -481,6 +666,7 @@ const char* nvgCmdOpName(uint32_t op)
 
 uint32_t nvgCmdOpFromName(const char* name)
 {
+	if (!name) return NVG_CMD__COUNT;
 	for (uint32_t i = 0; i < NVG_CMD__COUNT; i++)
 		if (std::strcmp(g_opNames[i], name) == 0) return i;
 	return NVG_CMD__COUNT;
@@ -500,12 +686,25 @@ const char* nvgCmdVarTypeName(NVGcmdVarType type)
 
 NVGcmdVarType nvgCmdVarTypeFromName(const char* name)
 {
+	if (!name) return NVG_VAR_FLOAT;
 	if (std::strcmp(name, "float")  == 0) return NVG_VAR_FLOAT;
 	if (std::strcmp(name, "int")    == 0) return NVG_VAR_INT32;
 	if (std::strcmp(name, "uint")   == 0) return NVG_VAR_UINT32;
 	if (std::strcmp(name, "string") == 0) return NVG_VAR_STRING;
 	if (std::strcmp(name, "handle") == 0) return NVG_VAR_HANDLE;
 	return NVG_VAR_FLOAT;
+}
+
+static bool nvgCmdParseVarType(const char* name, NVGcmdVarType& type)
+{
+	if (!name) return false;
+	if (std::strcmp(name, "float") == 0) type = NVG_VAR_FLOAT;
+	else if (std::strcmp(name, "int") == 0) type = NVG_VAR_INT32;
+	else if (std::strcmp(name, "uint") == 0) type = NVG_VAR_UINT32;
+	else if (std::strcmp(name, "string") == 0) type = NVG_VAR_STRING;
+	else if (std::strcmp(name, "handle") == 0) type = NVG_VAR_HANDLE;
+	else return false;
+	return true;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -556,12 +755,28 @@ static bool ioReadStr(NVGio& io, char* buf, size_t bufSize) {
 	return true;
 }
 
+struct NVGcmdLoadGuard {
+	NVGcmdBuf& target;
+	NVGcmdBuf previous;
+	bool committed = false;
+
+	explicit NVGcmdLoadGuard(NVGcmdBuf& value)
+		: target(value), previous(std::move(value)) {
+		target.clear();
+	}
+	~NVGcmdLoadGuard() {
+		if (!committed)
+			target = std::move(previous);
+	}
+};
+
 // ─────────────────────────────────────────────────────────────
 //  Binary serialization
 // ─────────────────────────────────────────────────────────────
 
 bool NVGcmdBuf::saveBinary(NVGio& io) const
 {
+	if (!nvgCmdValidate(*this)) return false;
 	if (!ioWriteU32(io, NVG_BINARY_MAGIC))   return false;
 	if (!ioWriteU32(io, NVG_BINARY_VERSION)) return false;
 
@@ -603,12 +818,13 @@ bool NVGcmdBuf::saveBinary(NVGio& io) const
 
 bool NVGcmdBuf::loadBinary(NVGio& io)
 {
-	clear();
+	NVGcmdLoadGuard transaction(*this);
 
 	// Header
 	uint32_t magic, fmtVer;
 	if (!ioReadU32(io, magic)  || magic  != NVG_BINARY_MAGIC)   return false;
-	if (!ioReadU32(io, fmtVer) || fmtVer > NVG_BINARY_VERSION)  return false;
+	if (!ioReadU32(io, fmtVer) || fmtVer == 0 ||
+		fmtVer > NVG_BINARY_VERSION) return false;
 
 	// Meta
 	if (!ioReadU32(io, meta.version))                           return false;
@@ -657,6 +873,8 @@ bool NVGcmdBuf::loadBinary(NVGio& io)
 		}
 	}
 
+	if (!nvgCmdValidate(*this)) return false;
+	transaction.committed = true;
 	return true;
 }
 
@@ -678,6 +896,7 @@ bool NVGcmdBuf::loadBinary(NVGio& io)
 
 bool NVGcmdBuf::saveText(NVGio& io) const
 {
+	if (!nvgCmdValidate(*this)) return false;
 	std::vector<char> out;
 	out.reserve(cells.size() * 16);
 
@@ -799,7 +1018,7 @@ bool NVGcmdBuf::saveText(NVGio& io) const
 
 bool NVGcmdBuf::loadText(NVGio& io)
 {
-	clear();
+	NVGcmdLoadGuard transaction(*this);
 
 	// Read entire stream into memory
 	std::vector<char> buf;
@@ -839,6 +1058,7 @@ bool NVGcmdBuf::loadText(NVGio& io)
 	char token[256];
 	const uint8_t*  argTbl     = nvgCmdArgCount();
 	const uint16_t* intMaskTbl = nvgCmdArgIntMask();
+	bool parse_error = false;
 
 	while (p < end) {
 		skipWS();
@@ -851,35 +1071,39 @@ bool NVGcmdBuf::loadText(NVGio& io)
 		if (token[0] == '@') {
 			if (std::strcmp(token, "@class") == 0) {
 				if (readTok(token, sizeof(token))) {
-					std::strncpy(meta.className, token, NVG_CMD_MAX_NAME - 1);
-					meta.className[NVG_CMD_MAX_NAME - 1] = '\0';
+					nvgCmdCopyName(meta.className, NVG_CMD_MAX_NAME, token);
 				}
+				else parse_error = true;
 			} else if (std::strcmp(token, "@name") == 0) {
 				if (readTok(token, sizeof(token))) {
-					std::strncpy(meta.elementName, token, NVG_CMD_MAX_NAME - 1);
-					meta.elementName[NVG_CMD_MAX_NAME - 1] = '\0';
+					nvgCmdCopyName(meta.elementName, NVG_CMD_MAX_NAME, token);
 				}
+				else parse_error = true;
 			} else if (std::strcmp(token, "@version") == 0) {
 				if (readTok(token, sizeof(token)))
 					meta.version = (uint32_t)std::strtoul(token, nullptr, 10);
+				else parse_error = true;
 			} else if (std::strcmp(token, "@var") == 0) {
 				char varName[NVG_CMD_MAX_NAME] = {};
 				char varType[64] = {};
+				NVGcmdVarType parsed_type = NVG_VAR_FLOAT;
 				if (readTok(varName, sizeof(varName)) &&
-				    readTok(varType, sizeof(varType)))
-					meta.addVar(varName, nvgCmdVarTypeFromName(varType));
+					readTok(varType, sizeof(varType)) &&
+					nvgCmdParseVarType(varType, parsed_type))
+					meta.addVar(varName, parsed_type);
+				else parse_error = true;
 			} else if (std::strcmp(token, "@prop") == 0) {
 				// @prop name type [$stateVar] val0 [val1 val2 ...]
 				char propName[NVG_CMD_MAX_NAME] = {};
 				char propType[64] = {};
 				if (!readTok(propName, sizeof(propName)) ||
 				    !readTok(propType, sizeof(propType))) {
-					skipLine(); continue;
+					parse_error = true; skipLine(); continue;
 				}
 				NVGcmdProperty pr{};
-				std::strncpy(pr.name, propName, NVG_CMD_MAX_NAME - 1);
-				pr.name[NVG_CMD_MAX_NAME - 1] = '\0';
-				pr.type = nvgCmdVarTypeFromName(propType);
+				nvgCmdCopyName(pr.name, NVG_CMD_MAX_NAME, propName);
+				if (!nvgCmdParseVarType(propType, pr.type))
+					parse_error = true;
 				pr.stateVarIndex = ~0u;
 
 				// Remaining tokens: optional $stateVar + values
@@ -895,6 +1119,7 @@ bool NVGcmdBuf::loadText(NVGio& io)
 				if (!valBufs.empty() && valBufs[0][0] == '$') {
 					int si = meta.findVar(valBufs[0].data() + 1);
 					pr.stateVarIndex = (si >= 0) ? (uint32_t)si : ~0u;
+					if (si < 0) parse_error = true;
 					startIdx = 1;
 				}
 
@@ -915,13 +1140,18 @@ bool NVGcmdBuf::loadText(NVGio& io)
 				}
 				props.push_back(std::move(pr));
 			}
+			else {
+				parse_error = true;
+			}
 			skipLine();
 			continue;
 		}
 
 		// ── Command ─────────────────────────────────────────────
 		uint32_t op = nvgCmdOpFromName(token);
-		if (op >= NVG_CMD__COUNT) { skipLine(); continue; }
+		if (op >= NVG_CMD__COUNT) {
+			parse_error = true; skipLine(); continue;
+		}
 
 		NVGcmdCell c;
 		c.u = op;
@@ -935,16 +1165,20 @@ bool NVGcmdBuf::loadText(NVGio& io)
 
 			for (uint8_t k = 0; k < nargs; k++) {
 				char argTok[256] = {};
-				if (!readTok(argTok, sizeof(argTok))) break;
+				if (!readTok(argTok, sizeof(argTok))) {
+					parse_error = true; break;
+				}
 
 				if (argTok[0] == '$') {
 					varmask |= (1u << k);
 					int vi = meta.findVar(argTok + 1);
 					argCells[k].u = (vi >= 0) ? (uint32_t)vi : 0;
+					if (vi < 0) parse_error = true;
 				} else if (argTok[0] == '%') {
 					varmask |= (1u << k);
 					int pi = findProperty(argTok + 1);
 					argCells[k].u = ((pi >= 0) ? (uint32_t)pi : 0) | NVG_CMD_PROP_BIT;
+					if (pi < 0) parse_error = true;
 				} else if ((imask >> k) & 1) {
 					argCells[k].i = (int32_t)std::strtol(argTok, nullptr, 10);
 				} else {
@@ -957,9 +1191,13 @@ bool NVGcmdBuf::loadText(NVGio& io)
 			for (uint8_t k = 0; k < nargs; k++)
 				cells.push_back(argCells[k]);
 		}
+		skipWS();
+		if (!atEOL()) parse_error = true;
 
 		skipLine();
 	}
 
-	return !cells.empty();
+	if (parse_error || cells.empty() || !nvgCmdValidate(*this)) return false;
+	transaction.committed = true;
+	return true;
 }

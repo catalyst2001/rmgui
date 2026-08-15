@@ -162,6 +162,7 @@
       <ExcludedFromBuild Condition="'$(RmGuiBuildBlendishDemo)'!='true'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="vendor\nanovg\nanovg.cpp" />
+    <ClCompile Include="vendor\nanovg\nvg_cmd.cpp" />
     <ClCompile Include="vendor\nanovg\nanovg_gl.cpp" />
     <ClCompile Include="vendor\nanovg\nanovg_gl_utils.cpp" />
   </ItemGroup>
@@ -183,6 +184,7 @@
     <ClInclude Include="vendor\nanovg\blendish.h" />
     <ClInclude Include="vendor\nanovg\fontstash.h" />
     <ClInclude Include="vendor\nanovg\nanovg.h" />
+    <ClInclude Include="vendor\nanovg\nvg_cmd.h" />
     <ClInclude Include="vendor\nanovg\nanovg_gl.h" />
     <ClInclude Include="vendor\nanovg\nanovg_gl_utils.h" />
     <ClInclude Include="vendor\stb\stb_image.h" />

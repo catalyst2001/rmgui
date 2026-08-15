@@ -63,6 +63,9 @@
     <ClCompile Include="..\exgui\vendor\nanovg\nanovg.cpp">
       <Filter>vendor\nanovg</Filter>
     </ClCompile>
+    <ClCompile Include="..\exgui\vendor\nanovg\nvg_cmd.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
     <ClCompile Include="..\exgui\vendor\nanovg\nanovg_gl.cpp">
       <Filter>vendor\nanovg</Filter>
     </ClCompile>
@@ -103,6 +106,9 @@
     </ClInclude>
     <ClInclude Include="..\exgui\vendor\nanovg\nanovg.h">
       <Filter>vendor\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\exgui\vendor\nanovg\nvg_cmd.h">
+      <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="..\exgui\vendor\nanovg\nanovg_gl.h">
       <Filter>vendor\nanovg</Filter>

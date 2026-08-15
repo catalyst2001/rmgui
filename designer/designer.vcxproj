@@ -147,6 +147,7 @@
     <ClCompile Include="..\exgui\vendor\glad\src\glad.c" />
     <ClCompile Include="..\exgui\vendor\nanovg\blendish.cpp" />
     <ClCompile Include="..\exgui\vendor\nanovg\nanovg.cpp" />
+    <ClCompile Include="..\exgui\vendor\nanovg\nvg_cmd.cpp" />
     <ClCompile Include="..\exgui\vendor\nanovg\nanovg_gl.cpp" />
     <ClCompile Include="..\exgui\vendor\nanovg\nanovg_gl_utils.cpp" />
   </ItemGroup>
@@ -164,6 +165,7 @@
     <ClInclude Include="..\exgui\vendor\glad\include\glad\glad.h" />
     <ClInclude Include="..\exgui\vendor\nanovg\blendish.h" />
     <ClInclude Include="..\exgui\vendor\nanovg\nanovg.h" />
+    <ClInclude Include="..\exgui\vendor\nanovg\nvg_cmd.h" />
     <ClInclude Include="..\exgui\vendor\nanovg\nanovg_gl.h" />
     <ClInclude Include="..\exgui\vendor\nanovg\nanovg_gl_utils.h" />
     <ClInclude Include="..\exgui\vendor\nanovg\fontstash.h" />
