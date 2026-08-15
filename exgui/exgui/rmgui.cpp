@@ -518,6 +518,10 @@ void rm_surface::draw_recursive(rm_widget* pwidget, float dt)
 				draw_recursive(child, dt);
 		}
 	}
+	/* Overlays belong above both widget-owned content and descendants. This is
+	   the correct pass for focus rings, selection handles and similar chrome. */
+	m_pctx->setZIndex(pwidget->get_zindex());
+	pwidget->on_draw_overlay(m_pctx.get());
 	/* save()/restore() owns both transform and scissor state. Do not reset the
 	   scissor explicitly: that would make it possible for a descendant to
 	   destroy an ancestor's clipping contract. */

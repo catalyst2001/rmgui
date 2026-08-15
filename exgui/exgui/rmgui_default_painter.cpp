@@ -72,6 +72,33 @@ float text_x_at(const RmTextInputLineLayout& line, size_t global_offset)
 
 } // namespace
 
+void RmDefaultControlPainter::draw_rect_focus_ring(NVGcontext& context,
+  const RmVisualRect& bounds, float corner_radius, float width, NVGcolor color)
+{
+  if (width <= 0.0f || bounds.width <= 0.0f || bounds.height <= 0.0f)
+    return;
+  const float inset = width * 0.5f;
+  context.beginPath();
+  context.roundedRect(bounds.x + inset, bounds.y + inset,
+    std::max(0.0f, bounds.width - width),
+    std::max(0.0f, bounds.height - width), corner_radius);
+  context.StrokeWidth(width);
+  context.strokeColor(color);
+  context.stroke();
+}
+
+void RmDefaultControlPainter::draw_circle_focus_ring(NVGcontext& context,
+  float center_x, float center_y, float radius, float width, NVGcolor color)
+{
+  if (width <= 0.0f || radius <= 0.0f)
+    return;
+  context.beginPath();
+  context.circle(center_x, center_y, radius);
+  context.StrokeWidth(width);
+  context.strokeColor(color);
+  context.stroke();
+}
+
 void RmDefaultControlPainter::draw_button(NVGcontext& context, const RmButtonVisual& visual,
   const RmButtonStyle& style)
 {
@@ -87,16 +114,6 @@ void RmDefaultControlPainter::draw_button(NVGcontext& context, const RmButtonVis
   if (style.border_width > 0.0f) {
     context.StrokeWidth(style.border_width);
     context.strokeColor(style.border.resolve(state));
-    context.stroke();
-  }
-
-  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
-    context.beginPath();
-    context.roundedRect(style.focus_ring_width * 0.5f, style.focus_ring_width * 0.5f,
-      visual.width - style.focus_ring_width, visual.height - style.focus_ring_width,
-      style.corner_radius);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
     context.stroke();
   }
 
@@ -177,17 +194,6 @@ void RmDefaultControlPainter::draw_tab(NVGcontext& context,
     }
     context.fillColor(style.indicator);
     context.fill();
-  }
-
-  if (visual.focused && visual.selected && visual.enabled && style.focus_ring_width > 0.0f) {
-    context.beginPath();
-    context.roundedRect(visual.x + style.focus_ring_width * 0.5f,
-      visual.y + style.focus_ring_width * 0.5f,
-      std::max(0.0f, visual.width - style.focus_ring_width),
-      std::max(0.0f, visual.height - style.focus_ring_width), style.corner_radius);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
-    context.stroke();
   }
 
   const float close_region = visual.closable
@@ -419,16 +425,6 @@ void RmDefaultControlPainter::draw_text_input(NVGcontext& context,
     context.stroke();
   }
 
-  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
-    const float inset = style.focus_ring_width * 0.5f;
-    context.beginPath();
-    context.roundedRect(inset, inset, std::max(0.0f, width - inset * 2.0f),
-      std::max(0.0f, height - inset * 2.0f), style.corner_radius);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
-    context.stroke();
-  }
-
   context.save();
   context.intersectScissor(style.horizontal_padding, style.vertical_padding,
     std::max(0.0f, width - style.horizontal_padding * 2.0f),
@@ -465,7 +461,7 @@ void RmDefaultControlPainter::draw_text_input(NVGcontext& context,
   for (const RmTextInputLineLayout& line : layout.lines)
     context.text(origin_x, line.baseline, line.text.c_str(), nullptr);
 
-  if (visual.focused && visual.enabled && visual.caret_visible) {
+  if (visual.enabled && visual.caret_visible) {
     for (const RmTextInputLineLayout& line : layout.lines) {
       const size_t line_last = line.text_start + line.text.size();
       if (visual.cursor < line.text_start || visual.cursor > line_last)
@@ -564,15 +560,6 @@ void RmDefaultControlPainter::draw_number_input(NVGcontext& context,
     context.stroke();
   }
 
-  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
-    const float inset = style.focus_ring_width * 0.5f;
-    context.beginPath();
-    context.roundedRect(inset, inset, std::max(0.0f, width - inset * 2.0f),
-      std::max(0.0f, height - inset * 2.0f), style.corner_radius);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
-    context.stroke();
-  }
 }
 
 void RmDefaultControlPainter::draw_checkbox(NVGcontext& context,
@@ -602,18 +589,6 @@ void RmDefaultControlPainter::draw_checkbox(NVGcontext& context,
     context.lineTo(box_size * 0.79f, box_y + box_size * 0.29f);
     context.StrokeWidth(style.mark_width);
     context.strokeColor(style.mark.resolve(state));
-    context.stroke();
-  }
-
-  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
-    context.beginPath();
-    context.roundedRect(style.focus_ring_width * 0.5f,
-      box_y + style.focus_ring_width * 0.5f,
-      box_size - style.focus_ring_width,
-      box_size - style.focus_ring_width,
-      style.corner_radius);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
     context.stroke();
   }
 
@@ -668,14 +643,6 @@ void RmDefaultControlPainter::draw_radiobutton(NVGcontext& context,
     context.fillColor(style.mark.resolve(state));
     context.fill();
   }
-  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
-    context.beginPath();
-    context.circle(cx, cy, radius + style.focus_ring_width * 0.5f);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
-    context.stroke();
-  }
-
   context.setFontFaceId(static_cast<int>(visual.font.getValue()));
   context.setFontSize(style.font_size);
   context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
@@ -700,18 +667,6 @@ void RmDefaultControlPainter::draw_combobox(NVGcontext& context,
   if (style.border_width > 0.0f) {
     context.StrokeWidth(style.border_width);
     context.strokeColor(style.field_border.resolve(state));
-    context.stroke();
-  }
-
-  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
-    context.beginPath();
-    context.roundedRect(style.focus_ring_width * 0.5f,
-      style.focus_ring_width * 0.5f,
-      std::max(0.0f, visual.width - style.focus_ring_width),
-      std::max(0.0f, visual.height - style.focus_ring_width),
-      style.corner_radius);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
     context.stroke();
   }
 
@@ -823,17 +778,6 @@ void RmDefaultControlPainter::draw_listview_surface(NVGcontext& context,
     context.strokeColor(style.border);
     context.stroke();
   }
-  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
-    context.beginPath();
-    context.roundedRect(style.focus_ring_width * 0.5f,
-      style.focus_ring_width * 0.5f,
-      std::max(0.0f, visual.width - style.focus_ring_width),
-      std::max(0.0f, visual.height - style.focus_ring_width),
-      style.corner_radius);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
-    context.stroke();
-  }
 }
 
 void RmDefaultControlPainter::draw_listview_row(NVGcontext& context,
@@ -876,16 +820,6 @@ void RmDefaultControlPainter::draw_treeview_surface(NVGcontext& context,
   if (style.draw_border && style.border_width > 0.0f) {
     context.StrokeWidth(style.border_width);
     context.strokeColor(style.border);
-    context.stroke();
-  }
-  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
-    const float inset = style.focus_ring_width * 0.5f;
-    context.beginPath();
-    context.roundedRect(inset, inset,
-      std::max(0.0f, visual.width - inset * 2.0f),
-      std::max(0.0f, visual.height - inset * 2.0f), style.corner_radius);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
     context.stroke();
   }
 }
@@ -1045,16 +979,6 @@ void RmDefaultControlPainter::draw_propertyview_surface(NVGcontext& context,
   if (style.border_width > 0.0f) {
     context.StrokeWidth(style.border_width);
     context.strokeColor(style.border);
-    context.stroke();
-  }
-  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
-    const float inset = style.focus_ring_width * 0.5f;
-    context.beginPath();
-    context.roundedRect(inset, inset,
-      std::max(0.0f, visual.width - inset * 2.0f),
-      std::max(0.0f, visual.height - inset * 2.0f), style.corner_radius);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
     context.stroke();
   }
 }
@@ -1227,16 +1151,6 @@ void RmDefaultControlPainter::draw_output_text_surface(NVGcontext& context,
     context.strokeColor(style.border);
     context.stroke();
   }
-  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
-    const float inset = style.focus_ring_width * 0.5f;
-    context.beginPath();
-    context.roundedRect(inset, inset,
-      std::max(0.0f, visual.width - inset * 2.0f),
-      std::max(0.0f, visual.height - inset * 2.0f), style.corner_radius);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
-    context.stroke();
-  }
 }
 
 void RmDefaultControlPainter::draw_output_text_line(NVGcontext& context,
@@ -1287,13 +1201,6 @@ void RmDefaultControlPainter::draw_slider(NVGcontext& context,
     context.stroke();
   }
 
-  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
-    context.beginPath();
-    context.circle(thumb_x, thumb_y, style.thumb_radius + style.focus_ring_width);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
-    context.stroke();
-  }
 }
 
 void RmDefaultControlPainter::draw_scrollbar(NVGcontext& context,
@@ -1333,17 +1240,6 @@ void RmDefaultControlPainter::draw_scrollbar(NVGcontext& context,
     context.stroke();
   }
 
-  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
-    context.beginPath();
-    context.roundedRect(style.focus_ring_width * 0.5f,
-      style.focus_ring_width * 0.5f,
-      std::max(0.0f, visual.width - style.focus_ring_width),
-      std::max(0.0f, visual.height - style.focus_ring_width),
-      style.corner_radius);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
-    context.stroke();
-  }
 }
 
 void RmDefaultControlPainter::draw_toolstrip_surface(NVGcontext& context,
@@ -1498,16 +1394,6 @@ void RmDefaultControlPainter::draw_splitter(NVGcontext& context,
     context.stroke();
   }
 
-  if (visual.focused && style.focus_ring_width > 0.0f) {
-    context.beginPath();
-    context.rect(style.focus_ring_width * 0.5f,
-      style.focus_ring_width * 0.5f,
-      std::max(0.0f, visual.width - style.focus_ring_width),
-      std::max(0.0f, visual.height - style.focus_ring_width));
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
-    context.stroke();
-  }
 }
 
 void RmDefaultControlPainter::draw_progress(NVGcontext& context,
@@ -1581,14 +1467,4 @@ void RmDefaultControlPainter::draw_switch(NVGcontext& context,
   context.fillColor(style.knob.resolve(state));
   context.fill();
 
-  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
-    context.beginPath();
-    context.roundedRect(style.focus_ring_width * 0.5f,
-      style.focus_ring_width * 0.5f,
-      std::max(0.0f, width - style.focus_ring_width),
-      std::max(0.0f, height - style.focus_ring_width), style.corner_radius);
-    context.StrokeWidth(style.focus_ring_width);
-    context.strokeColor(style.focus_ring);
-    context.stroke();
-  }
 }

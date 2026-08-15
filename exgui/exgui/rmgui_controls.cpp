@@ -130,11 +130,20 @@ void rm_button::on_draw(NVGcontext* pctx) {
 		m_text.c_str(),
 		is_enabled(),
 		m_elem_flags.is_hovered(),
-		m_behaviour.is_pressed(),
-		m_elem_flags.is_focused()
+		m_behaviour.is_pressed()
 	};
 	RmDefaultControlPainter::draw_button(*pctx, visual, m_theme->buttons.resolve(m_variant));
 	rm_widget::on_draw(pctx);
+}
+
+void rm_button::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmButtonStyle& style = m_theme->buttons.resolve(m_variant);
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ 0.0f, 0.0f, m_size.x, m_size.y }, style.corner_radius,
+		style.focus_ring_width, style.focus_ring);
 }
 
 bool rm_button::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
@@ -235,7 +244,6 @@ void rm_text_input::on_draw(NVGcontext* pctx)
 		is_enabled(),
 		m_elem_flags.is_hovered(),
 		m_behaviour.is_dragging(),
-		m_elem_flags.is_focused(),
 		m_behaviour.is_active() && m_blink_state
 	};
 	m_layout = RmDefaultControlPainter::layout_text_input(
@@ -244,6 +252,16 @@ void rm_text_input::on_draw(NVGcontext* pctx)
 	RmDefaultControlPainter::draw_text_input(
 		*pctx, visual, m_layout, m_theme->text_input);
 	rm_widget::on_draw(pctx);
+}
+
+void rm_text_input::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmTextInputStyle& style = m_theme->text_input;
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ 0.0f, 0.0f, m_size.x, m_size.y }, style.corner_radius,
+		style.focus_ring_width, style.focus_ring);
 }
 
 void rm_text_input::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
@@ -447,11 +465,22 @@ void rm_checkbox::on_draw(NVGcontext* pctx) {
 		is_enabled(),
 		m_elem_flags.is_hovered(),
 		m_behaviour.is_pressed(),
-		m_elem_flags.is_focused(),
 		m_behaviour.is_checked()
 	};
 	RmDefaultControlPainter::draw_checkbox(*pctx, visual, m_theme->checkbox);
 	rm_widget::on_draw(pctx);
+}
+
+void rm_checkbox::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmCheckboxStyle& style = m_theme->checkbox;
+	const float box_size = std::min(style.box_size, m_size.y);
+	const float box_y = (m_size.y - box_size) * 0.5f;
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ 0.0f, box_y, box_size, box_size }, style.corner_radius,
+		style.focus_ring_width, style.focus_ring);
 }
 
 bool rm_checkbox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
@@ -613,7 +642,7 @@ void rm_combobox::on_draw(NVGcontext* pctx)
 		m_size.x, m_size.y, get_font(),
 		has_selection ? m_items[selected].get_name() : m_placeholder.c_str(),
 		!has_selection, is_enabled(), m_elem_flags.is_hovered(),
-		m_elem_flags.is_focused(), m_behaviour.is_expanded()
+		m_behaviour.is_expanded()
 	};
 	RmDefaultControlPainter::draw_combobox(*pctx, field_visual, combo_style());
 
@@ -635,6 +664,16 @@ void rm_combobox::on_draw(NVGcontext* pctx)
 		}
 	}
 	rm_widget::on_draw(pctx);
+}
+
+void rm_combobox::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmComboBoxStyle& style = combo_style();
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ 0.0f, 0.0f, m_size.x, m_size.y }, style.corner_radius,
+		style.focus_ring_width, style.focus_ring);
 }
 
 void rm_combobox::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
@@ -754,12 +793,23 @@ void rm_slider::on_draw(NVGcontext* pctx) {
 		m_behaviour.fraction(),
 		is_enabled(),
 		m_elem_flags.is_hovered(),
-		m_behaviour.is_dragging(),
-		m_elem_flags.is_focused()
+		m_behaviour.is_dragging()
 	};
 	RmDefaultControlPainter::draw_slider(*pctx, visual, m_theme->slider);
 
 	rm_widget::on_draw(pctx);
+}
+
+void rm_slider::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmSliderStyle& style = m_theme->slider;
+	const float track_width = std::max(0.0f, m_size.x - style.padding * 2.0f);
+	const float thumb_x = style.padding + track_width * m_behaviour.fraction();
+	RmDefaultControlPainter::draw_circle_focus_ring(*pctx, thumb_x,
+		m_size.y * 0.5f, style.thumb_radius + style.focus_ring_width,
+		style.focus_ring_width, style.focus_ring);
 }
 
 bool rm_slider::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
@@ -969,8 +1019,18 @@ void rm_scrollbar::on_draw(NVGcontext* pctx)
 		  m_behaviour.thumb_offset(length, style.minimum_thumb_length),
 		  m_behaviour.thumb_length(length, style.minimum_thumb_length),
 		  is_vertical(), is_enabled(), m_elem_flags.is_hovered(),
-		  m_behaviour.is_dragging(), m_elem_flags.is_focused() }, style);
+		  m_behaviour.is_dragging() }, style);
 	rm_widget::on_draw(pctx);
+}
+
+void rm_scrollbar::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmScrollbarStyle& style = m_theme->scrollbar;
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ 0.0f, 0.0f, m_size.x, m_size.y }, style.corner_radius,
+		style.focus_ring_width, style.focus_ring);
 }
 
 void rm_scrollbar::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
@@ -1533,9 +1593,19 @@ void rm_splitter::on_draw(NVGcontext* pctx)
 	apply_layout();
 	RmDefaultControlPainter::draw_splitter(*pctx,
 		{ m_size.x, m_size.y, m_orientation == RM_ORIENT_VERT,
-		  is_enabled(), m_elem_flags.is_hovered(), m_behaviour.is_dragging(),
-		  m_elem_flags.is_focused() }, m_theme->splitter);
+		  is_enabled(), m_elem_flags.is_hovered(), m_behaviour.is_dragging() },
+		m_theme->splitter);
 	rm_widget::on_draw(pctx);
+}
+
+void rm_splitter::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmSplitterStyle& style = m_theme->splitter;
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ 0.0f, 0.0f, m_size.x, m_size.y }, 0.0f,
+		style.focus_ring_width, style.focus_ring);
 }
 
 bool rm_splitter::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
@@ -1875,13 +1945,28 @@ void rm_tabcontrol::on_draw(NVGcontext* pctx)
 			m_behaviour.hovered_index() == i,
 			m_behaviour.pressed_index() == i,
 			m_behaviour.selected_index() == i,
-			m_elem_flags.is_focused(),
 			m_tabs[i].is_closable() && !m_tabs[i].is_pinned(),
 			m_close_hovered == i
 		};
 		RmDefaultControlPainter::draw_tab(*pctx, visual, style);
 	}
 	rm_widget::on_draw(pctx);
+}
+
+void rm_tabcontrol::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	if (m_tab_bounds.size() != m_tabs.size())
+		rebuild_tab_layout(pctx);
+	const size_t selected = m_behaviour.selected_index();
+	if (selected >= m_tab_bounds.size())
+		return;
+	const rm_rect& bounds = m_tab_bounds[selected];
+	const RmTabStyle& style = tab_style();
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ bounds.x, bounds.y, bounds.width, bounds.height },
+		style.corner_radius, style.focus_ring_width, style.focus_ring);
 }
 
 void rm_tabcontrol::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
@@ -2077,7 +2162,7 @@ void rm_treeview::on_draw(NVGcontext* pctx)
 	rebuild_visible_rows();
 	const RmTreeViewStyle& style = m_theme->treeview;
 	RmDefaultControlPainter::draw_treeview_surface(*pctx,
-		{ m_size.x, m_size.y, m_elem_flags.is_focused(), is_enabled() }, style);
+		{ m_size.x, m_size.y, is_enabled() }, style);
 
 	const size_t hovered = m_behaviour.hovered_index();
 	const size_t pressed = m_behaviour.pressed_index();
@@ -2115,6 +2200,16 @@ void rm_treeview::on_draw(NVGcontext* pctx)
 		}
 	}
 	rm_widget::on_draw(pctx);
+}
+
+void rm_treeview::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmTreeViewStyle& style = m_theme->treeview;
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ 0.0f, 0.0f, m_size.x, m_size.y }, style.corner_radius,
+		style.focus_ring_width, style.focus_ring);
 }
 
 void rm_treeview::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
@@ -2471,7 +2566,7 @@ void rm_propertyview::on_draw(NVGcontext* pctx)
 	rebuild_visible_rows();
 	const RmPropertyViewStyle& style = m_theme->propertyview;
 	RmDefaultControlPainter::draw_propertyview_surface(*pctx,
-		{ m_size.x, m_size.y, m_elem_flags.is_focused(), is_enabled() }, style);
+		{ m_size.x, m_size.y, is_enabled() }, style);
 	for (size_t index = 0; index < m_visible_rows.size(); ++index) {
 		const VisibleRow& row = m_visible_rows[index];
 		if (row.y >= m_size.y)
@@ -2512,6 +2607,16 @@ void rm_propertyview::on_draw(NVGcontext* pctx)
 		}
 	}
 	rm_widget::on_draw(pctx);
+}
+
+void rm_propertyview::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmPropertyViewStyle& style = m_theme->propertyview;
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ 0.0f, 0.0f, m_size.x, m_size.y }, style.corner_radius,
+		style.focus_ring_width, style.focus_ring);
 }
 
 void rm_propertyview::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
@@ -2642,7 +2747,7 @@ void rm_output_text::on_draw(NVGcontext* pctx)
 {
 	const RmOutputTextStyle& style = m_theme->output_text;
 	RmDefaultControlPainter::draw_output_text_surface(*pctx,
-		{ m_size.x, m_size.y, m_elem_flags.is_focused(), is_enabled() }, style);
+		{ m_size.x, m_size.y, is_enabled() }, style);
 	float y = style.vertical_padding;
 	for (const std::string& line : m_behaviour.lines()) {
 		if (y + style.line_height > m_size.y)
@@ -2652,6 +2757,16 @@ void rm_output_text::on_draw(NVGcontext* pctx)
 		y += style.line_height;
 	}
 	rm_widget::on_draw(pctx);
+}
+
+void rm_output_text::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmOutputTextStyle& style = m_theme->output_text;
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ 0.0f, 0.0f, m_size.x, m_size.y }, style.corner_radius,
+		style.focus_ring_width, style.focus_ring);
 }
 
 rm_output_text::rm_output_text(rm_widget* p_parent, float x, float y,
@@ -2698,7 +2813,6 @@ void rm_number_input::on_draw(NVGcontext* pctx)
 		text,
 		is_enabled(),
 		m_elem_flags.is_hovered(),
-		m_elem_flags.is_focused(),
 		hovered == RmNumberInputPart::increment,
 		pressed == RmNumberInputPart::increment,
 		hovered == RmNumberInputPart::decrement,
@@ -2707,6 +2821,16 @@ void rm_number_input::on_draw(NVGcontext* pctx)
 	RmDefaultControlPainter::draw_number_input(
 		*pctx, visual, m_theme->number_input);
 	rm_widget::on_draw(pctx);
+}
+
+void rm_number_input::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmNumberInputStyle& style = m_theme->number_input;
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ 0.0f, 0.0f, m_size.x, m_size.y }, style.corner_radius,
+		style.focus_ring_width, style.focus_ring);
 }
 
 RmNumberInputPart rm_number_input::hit_test_part(const rm_vec2& cursor_pos) const
@@ -3182,9 +3306,22 @@ void rm_radiobutton::on_draw(NVGcontext* pctx) {
 	RmDefaultControlPainter::draw_radiobutton(*pctx,
 		{ m_size.x, m_size.y, get_font(), m_label.c_str(), is_enabled(),
 		  m_behaviour.is_hovered(), m_behaviour.is_pressed(),
-		  m_elem_flags.is_focused(), m_behaviour.is_checked() },
+		  m_behaviour.is_checked() },
 		m_theme->radiobutton);
 	rm_widget::on_draw(pctx);
+}
+
+void rm_radiobutton::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmRadioButtonStyle& style = m_theme->radiobutton;
+	const float size = std::min(style.indicator_size, m_size.y);
+	const float radius = size * 0.5f;
+	RmDefaultControlPainter::draw_circle_focus_ring(*pctx,
+		style.horizontal_padding + radius, m_size.y * 0.5f,
+		radius + style.focus_ring_width * 0.5f,
+		style.focus_ring_width, style.focus_ring);
 }
 
 bool rm_radiobutton::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& pos, rm_vec2 delta)
@@ -3236,10 +3373,20 @@ void rm_switch::on_draw(NVGcontext* pctx)
 		m_behaviour.advance(m_proot->get_delta_time(), m_theme->switch_control.animation_duration);
 	RmDefaultControlPainter::draw_switch(*pctx,
 		{ m_size.x, m_size.y, m_behaviour.animation_progress(), is_enabled(),
-		  m_elem_flags.is_hovered(), m_behaviour.is_pressed(), m_elem_flags.is_focused() },
+		  m_elem_flags.is_hovered(), m_behaviour.is_pressed() },
 		m_theme->switch_control);
 
 	rm_widget::on_draw(pctx);
+}
+
+void rm_switch::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmSwitchStyle& style = m_theme->switch_control;
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ 0.0f, 0.0f, m_size.x, m_size.y }, style.corner_radius,
+		style.focus_ring_width, style.focus_ring);
 }
 
 bool rm_switch::on_mouse(RM_MOUSE_EVENT event, RM_KEY key, RM_KEY_STATE state, rm_vec2& pos, rm_vec2 delta)
@@ -3347,7 +3494,7 @@ void rm_listview::on_draw(NVGcontext* pctx)
 {
 	const RmListViewStyle& style = m_theme->listview;
 	RmDefaultControlPainter::draw_listview_surface(*pctx,
-		{ m_size.x, m_size.y, m_elem_flags.is_focused(), is_enabled() }, style);
+		{ m_size.x, m_size.y, is_enabled() }, style);
 	for (size_t i = 0; i < m_items.size(); ++i) {
 		const float y = style.vertical_padding + style.row_height * static_cast<float>(i);
 		if (y >= m_size.y)
@@ -3362,6 +3509,16 @@ void rm_listview::on_draw(NVGcontext* pctx)
 			  m_behaviour.selected_index() == i }, style);
 	}
 	rm_widget::on_draw(pctx);
+}
+
+void rm_listview::on_draw_overlay(NVGcontext* pctx)
+{
+	if (!is_enabled() || !m_elem_flags.is_focused())
+		return;
+	const RmListViewStyle& style = m_theme->listview;
+	RmDefaultControlPainter::draw_rect_focus_ring(*pctx,
+		{ 0.0f, 0.0f, m_size.x, m_size.y }, style.corner_radius,
+		style.focus_ring_width, style.focus_ring);
 }
 
 void rm_listview::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)

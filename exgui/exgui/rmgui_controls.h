@@ -47,6 +47,7 @@ public:
     RmThemeRef theme = {}, RmButtonVariant variant = RmButtonVariant::primary);
   virtual ~rm_button();
   virtual void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
   const RmButtonBehaviour& behaviour() const { return m_behaviour; }
@@ -103,6 +104,7 @@ public:
     float blink_cursor_interval = 0.5f);
   virtual ~rm_text_input();
   virtual void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   virtual void on_text_input(int sym) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
@@ -137,6 +139,7 @@ class rm_checkbox : public rm_widget, public rm_callback<rm_checkbox_cb> {
   void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
   void on_pointer_capture_lost() override { m_behaviour.cancel(); }
   virtual void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
@@ -188,6 +191,7 @@ class rm_combobox : public rm_widget, public rm_callback<rm_combobox_cb> {
   void sync_popup_layer();
   void on_enabled_changed(bool enabled) override;
   void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
     rm_vec2& cursor_pos, rm_vec2 delta) override;
@@ -243,6 +247,7 @@ class rm_slider : public rm_widget {
   void    on_pointer_capture_lost() override { m_behaviour.cancel(); }
 
   virtual void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta);
 
 public:
@@ -322,6 +327,7 @@ class rm_scrollbar : public rm_widget, public rm_callback<rm_scrollbar_cb>
   void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
   void on_pointer_capture_lost() override { m_behaviour.cancel(); }
   void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
     rm_vec2& cursor_pos, rm_vec2 delta) override;
@@ -484,6 +490,7 @@ class rm_splitter : public rm_widget, public rm_callback<rm_splitter_cb> {
   void on_pointer_capture_lost() override { m_behaviour.cancel(); }
 protected:
   void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
     rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
@@ -589,6 +596,7 @@ class rm_tabcontrol : public rm_widget, public rm_callback<rm_tabcontrol_cb> {
   }
 protected:
   virtual void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
@@ -712,6 +720,7 @@ class rm_treeview : public rm_widget, public rm_callback<rm_treeview_cb> {
   }
 protected:
   virtual void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 
@@ -867,6 +876,7 @@ protected:
   virtual std::string on_validate_property(const rm_property& property,
     const std::string& value) const;
   void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   void on_text_input(int sym) override;
   bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
@@ -907,6 +917,7 @@ class rm_output_text : public rm_widget
   RmThemeRef            m_theme;
 protected:
   virtual void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
 public:
   rm_output_text(rm_widget* p_parent, float x, float y, float width, float height,
     size_t num_lines = 16, RmThemeRef theme = {});
@@ -936,6 +947,7 @@ protected:
   void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
   void on_pointer_capture_lost() override { m_behaviour.cancel(); }
   void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
@@ -1050,6 +1062,7 @@ class rm_radiobutton : public rm_widget, public rm_callback<rm_radiobutton_cb>
   void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
   void on_pointer_capture_lost() override { m_behaviour.cancel(); }
   void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
     rm_vec2& pos, rm_vec2 delta) override;
@@ -1094,6 +1107,7 @@ public:
     bool initial = false, rm_switch_cb cb = nullptr, RmThemeRef theme = {});
 
   virtual void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   virtual void on_keybd(int sc, RM_KEY key, RM_KEY_STATE state) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY key, RM_KEY_STATE state, rm_vec2& pos, rm_vec2 delta) override;
   
@@ -1123,6 +1137,7 @@ class rm_listview : public rm_widget, public rm_callback<rm_listview_cb>
   void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
   void on_pointer_capture_lost() override { m_behaviour.cancel(); }
   void on_draw(NVGcontext* pctx) override;
+  void on_draw_overlay(NVGcontext* pctx) override;
   void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
     rm_vec2& cursor_pos, rm_vec2 delta) override;

@@ -870,6 +870,9 @@ protected:
     pctx->stroke();
 #endif
   }
+  /* Final widget-local pass. It is invoked after the widget contents and all
+     descendants, while the widget transform and ancestor scissor are active. */
+  virtual void on_draw_overlay(NVGcontext* pctx) { RM_UNUSED(pctx); }
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) {
     RM_UNUSED(sc);
     RM_UNUSED(vk);

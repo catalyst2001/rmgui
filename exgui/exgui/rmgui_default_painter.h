@@ -14,7 +14,6 @@ struct RmButtonVisual {
   bool enabled = true;
   bool hovered = false;
   bool pressed = false;
-  bool focused = false;
 };
 
 struct RmTabVisual {
@@ -29,7 +28,6 @@ struct RmTabVisual {
   bool hovered = false;
   bool pressed = false;
   bool selected = false;
-  bool focused = false;
   bool closable = false;
   bool close_hovered = false;
 };
@@ -77,7 +75,6 @@ struct RmTextInputVisual {
   bool enabled = true;
   bool hovered = false;
   bool dragging = false;
-  bool focused = false;
   bool caret_visible = false;
 };
 
@@ -104,7 +101,6 @@ struct RmNumberInputVisual {
   const char* text = nullptr;
   bool enabled = true;
   bool hovered = false;
-  bool focused = false;
   bool increment_hovered = false;
   bool increment_pressed = false;
   bool decrement_hovered = false;
@@ -119,7 +115,6 @@ struct RmCheckboxVisual {
   bool enabled = true;
   bool hovered = false;
   bool pressed = false;
-  bool focused = false;
   bool checked = false;
 };
 
@@ -131,7 +126,6 @@ struct RmRadioButtonVisual {
   bool enabled = true;
   bool hovered = false;
   bool pressed = false;
-  bool focused = false;
   bool checked = false;
 };
 
@@ -143,7 +137,6 @@ struct RmComboBoxVisual {
   bool placeholder = false;
   bool enabled = true;
   bool hovered = false;
-  bool focused = false;
   bool expanded = false;
 };
 
@@ -168,7 +161,6 @@ struct RmComboBoxItemVisual {
 struct RmListViewSurfaceVisual {
   float width = 0.0f;
   float height = 0.0f;
-  bool focused = false;
   bool enabled = true;
 };
 
@@ -188,7 +180,6 @@ struct RmListViewRowVisual {
 struct RmTreeViewSurfaceVisual {
   float width = 0.0f;
   float height = 0.0f;
-  bool focused = false;
   bool enabled = true;
 };
 
@@ -219,7 +210,6 @@ struct RmTreeViewTooltipVisual {
 struct RmPropertyViewSurfaceVisual {
   float width = 0.0f;
   float height = 0.0f;
-  bool focused = false;
   bool enabled = true;
 };
 
@@ -262,7 +252,6 @@ struct RmPropertyViewChoiceVisual {
 struct RmOutputTextSurfaceVisual {
   float width = 0.0f;
   float height = 0.0f;
-  bool focused = false;
   bool enabled = true;
 };
 
@@ -280,7 +269,6 @@ struct RmSliderVisual {
   bool enabled = true;
   bool hovered = false;
   bool dragging = false;
-  bool focused = false;
 };
 
 struct RmScrollbarVisual {
@@ -292,7 +280,6 @@ struct RmScrollbarVisual {
   bool enabled = true;
   bool hovered = false;
   bool dragging = false;
-  bool focused = false;
 };
 
 struct RmToolStripSurfaceVisual {
@@ -342,7 +329,6 @@ struct RmSplitterVisual {
   bool enabled = true;
   bool hovered = false;
   bool dragging = false;
-  bool focused = false;
 };
 
 struct RmProgressVisual {
@@ -359,11 +345,15 @@ struct RmSwitchVisual {
   bool enabled = true;
   bool hovered = false;
   bool pressed = false;
-  bool focused = false;
 };
 
 class RmDefaultControlPainter {
 public:
+  static void draw_rect_focus_ring(NVGcontext& context,
+    const RmVisualRect& bounds, float corner_radius, float width,
+    NVGcolor color);
+  static void draw_circle_focus_ring(NVGcontext& context, float center_x,
+    float center_y, float radius, float width, NVGcolor color);
   static void draw_button(NVGcontext& context, const RmButtonVisual& visual,
     const RmButtonStyle& style);
   static void draw_tab_bar(NVGcontext& context, float x, float y, float width,
