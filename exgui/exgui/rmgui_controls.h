@@ -198,37 +198,69 @@ public:
 * =============================================
 */
 class rm_combo_item {
-  std::string name;
-  void* pdata;
+  std::string m_name;
+  void* m_pdata;
 public:
-  rm_combo_item() : pdata(nullptr) {}
-  rm_combo_item(const char* pname, void* userptr = nullptr) : name(pname), pdata(userptr) {}
+  rm_combo_item() : m_pdata(nullptr) {}
+  rm_combo_item(const char* pname, void* p_userdata = nullptr) :
+    m_name(pname ? pname : ""), m_pdata(p_userdata) {}
 
-  inline const char* get_name() const { return name.c_str(); }
-  inline void* get_userdata() const { return pdata; }
+  inline const char* get_name() const { return m_name.c_str(); }
+  inline void* get_userdata() const { return m_pdata; }
 };
 
 class rm_combobox;
 using rm_combobox_cb = void(*)(rm_combobox *pcombo, rm_combo_item *pitem, size_t itemid);
 class rm_combobox : public rm_widget, public rm_callback<rm_combobox_cb> {
+  static constexpr int base_zindex = 900;
+  static constexpr int popup_zindex = 950;
   std::vector<rm_combo_item> m_items;
-  int  m_selected;
-  bool m_expanded;
-  rm_vec2 m_cursor;
+  RmComboBoxBehaviour m_behaviour;
+  RmThemeRef m_theme;
+  std::string m_placeholder;
 
-  virtual void on_draw(NVGcontext* pctx) override;
-  virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
+  const RmComboBoxStyle& combo_style() const { return m_theme->combobox; }
+  float popup_y() const;
+  float popup_height() const;
+  size_t hit_test_popup_item(const rm_vec2& local_cursor) const;
+  void notify_selection();
+  void sync_popup_layer();
+  void on_enabled_changed(bool enabled) override;
+  void on_draw(NVGcontext* pctx) override;
+  void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
+  bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
+    rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
-  const size_t kinvalid_index = ((size_t)-1);
-  rm_combobox(rm_widget* p_parent, int x, int y, int width, int height, rm_combobox_cb pcallback=nullptr);
+  static constexpr size_t kinvalid_index = RmComboBoxBehaviour::invalid_index;
+  rm_combobox(rm_widget* p_parent, int x, int y, int width, int height,
+    rm_combobox_cb pcallback = nullptr, RmThemeRef theme = {});
   virtual ~rm_combobox();
 
   inline size_t get_num_items() const { return m_items.size(); }
-  size_t add_item(const char *pitem, void *puserdata=nullptr);
+  size_t add_item(const char *pitem, void *puserdata = nullptr);
+  bool remove_item(size_t index);
+  void clear_items();
   size_t find_item(const char* pitem);
   inline rm_combo_item* get_item(size_t idx) {
     assert(idx < m_items.size() && "item index out of bounds");
     return &m_items[idx];
+  }
+  inline const rm_combo_item* get_item(size_t idx) const {
+    assert(idx < m_items.size() && "item index out of bounds");
+    return &m_items[idx];
+  }
+  size_t get_selected_index() const noexcept { return m_behaviour.selected_index(); }
+  rm_combo_item* get_selected_item() {
+    return get_selected_index() < m_items.size()
+      ? &m_items[get_selected_index()] : nullptr;
+  }
+  bool set_selected_index(size_t index, bool notify = false);
+  bool is_expanded() const noexcept { return m_behaviour.is_expanded(); }
+  const RmComboBoxBehaviour& behaviour() const noexcept { return m_behaviour; }
+  const char* get_placeholder() const noexcept { return m_placeholder.c_str(); }
+  void set_placeholder(const char* p_text) { m_placeholder = p_text ? p_text : ""; }
+  void set_theme(RmThemeRef theme) {
+    m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
   }
 };
 

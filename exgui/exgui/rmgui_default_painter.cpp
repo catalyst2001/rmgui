@@ -330,6 +330,132 @@ void RmDefaultControlPainter::draw_checkbox(NVGcontext& context,
     visual.text ? visual.text : "", nullptr);
 }
 
+void RmDefaultControlPainter::draw_combobox(NVGcontext& context,
+  const RmComboBoxVisual& visual, const RmComboBoxStyle& style)
+{
+  const RmVisualState state = resolve_state(
+    visual.enabled, visual.hovered, visual.expanded);
+  const float half_border = style.border_width * 0.5f;
+
+  context.beginPath();
+  context.roundedRect(half_border, half_border,
+    std::max(0.0f, visual.width - style.border_width),
+    std::max(0.0f, visual.height - style.border_width), style.corner_radius);
+  context.fillColor(style.field_background.resolve(state));
+  context.fill();
+  if (style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.field_border.resolve(state));
+    context.stroke();
+  }
+
+  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
+    context.beginPath();
+    context.roundedRect(style.focus_ring_width * 0.5f,
+      style.focus_ring_width * 0.5f,
+      std::max(0.0f, visual.width - style.focus_ring_width),
+      std::max(0.0f, visual.height - style.focus_ring_width),
+      style.corner_radius);
+    context.StrokeWidth(style.focus_ring_width);
+    context.strokeColor(style.focus_ring);
+    context.stroke();
+  }
+
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  context.fillColor(visual.placeholder && visual.enabled
+    ? style.placeholder_text : style.field_text.resolve(state));
+  context.text(style.horizontal_padding, visual.height * 0.5f,
+    visual.text ? visual.text : "", nullptr);
+
+  const float size = style.indicator_size;
+  const float cx = visual.width - style.horizontal_padding - size;
+  const float cy = visual.height * 0.5f;
+  context.beginPath();
+  if (visual.expanded) {
+    context.moveTo(cx - size, cy + size * 0.5f);
+    context.lineTo(cx, cy - size * 0.5f);
+    context.lineTo(cx + size, cy + size * 0.5f);
+  }
+  else {
+    context.moveTo(cx - size, cy - size * 0.5f);
+    context.lineTo(cx, cy + size * 0.5f);
+    context.lineTo(cx + size, cy - size * 0.5f);
+  }
+  context.StrokeWidth(std::max(1.0f, style.border_width));
+  context.strokeColor(style.indicator.resolve(state));
+  context.stroke();
+}
+
+void RmDefaultControlPainter::draw_combobox_popup(NVGcontext& context,
+  const RmComboBoxPopupVisual& visual, const RmComboBoxStyle& style)
+{
+  if (style.shadow_size > 0.0f) {
+    const NVGcolor transparent = NVGcolor::RGBA(0, 0, 0, 0);
+    const NVGpaint shadow = NVGpaint::boxGradient(0.0f, visual.y + 3.0f,
+      visual.width, visual.height, style.corner_radius * 2.0f,
+      style.shadow_size, style.shadow, transparent);
+    context.save();
+    context.resetScissor();
+    context.beginPath();
+    context.rect(-style.shadow_size, visual.y - style.shadow_size,
+      visual.width + style.shadow_size * 2.0f,
+      visual.height + style.shadow_size * 2.0f);
+    context.roundedRect(0.0f, visual.y, visual.width, visual.height,
+      style.corner_radius);
+    context.pathWinding(NVG_HOLE);
+    context.fillPaint(shadow);
+    context.fill();
+    context.restore();
+  }
+
+  context.beginPath();
+  context.roundedRect(0.0f, visual.y, visual.width, visual.height,
+    style.corner_radius);
+  context.fillColor(style.popup_background);
+  context.fill();
+  if (style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.popup_border);
+    context.stroke();
+  }
+}
+
+void RmDefaultControlPainter::draw_combobox_item(NVGcontext& context,
+  const RmComboBoxItemVisual& visual, const RmComboBoxStyle& style)
+{
+  const RmVisualState state = resolve_state(visual.enabled, visual.hovered, false);
+  const NVGcolor background = style.item_background.resolve(state);
+  if (background.a > 0.0f) {
+    context.beginPath();
+    context.roundedRect(visual.x, visual.y, visual.width, visual.height,
+      style.corner_radius * 0.65f);
+    context.fillColor(background);
+    context.fill();
+  }
+
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  context.fillColor(style.item_text.resolve(state));
+  context.text(visual.x + style.horizontal_padding,
+    visual.y + visual.height * 0.5f, visual.text ? visual.text : "", nullptr);
+
+  if (visual.selected) {
+    const float size = style.indicator_size;
+    const float cx = visual.x + visual.width - style.horizontal_padding - size;
+    const float cy = visual.y + visual.height * 0.5f;
+    context.beginPath();
+    context.moveTo(cx - size, cy);
+    context.lineTo(cx - size * 0.25f, cy + size * 0.7f);
+    context.lineTo(cx + size, cy - size * 0.7f);
+    context.StrokeWidth(style.selected_mark_width);
+    context.strokeColor(style.selected_mark);
+    context.stroke();
+  }
+}
+
 void RmDefaultControlPainter::draw_slider(NVGcontext& context,
   const RmSliderVisual& visual, const RmSliderStyle& style)
 {

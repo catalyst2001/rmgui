@@ -659,11 +659,16 @@ void rm_checkbox::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
 		get_callback()(this);
 }
 
-rm_combobox::rm_combobox(rm_widget* p_parent, int x, int y, int width, int height, rm_combobox_cb pcallback)
-	: rm_widget(x, y, width, height, p_parent, "ui_combobox", RM_FLAG_DEFAULT | RM_FLAG_GLOBAL | RM_FLAG_DISABLE_SCISSOR | RM_FLAG_HIGHEST_PRIORITY), m_selected(0), m_expanded(false)
+rm_combobox::rm_combobox(rm_widget* p_parent, int x, int y, int width, int height,
+	rm_combobox_cb pcallback, RmThemeRef theme)
+	: rm_widget(x, y, width, height, p_parent, "ui_combobox",
+		RM_FLAG_DEFAULT | RM_FLAG_GLOBAL | RM_FLAG_DISABLE_SCISSOR),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()),
+	m_placeholder("Select an item")
 {
 	set_callback(pcallback);
-	set_zindex(999); //topmost
+	set_zindex(base_zindex);
+	m_behaviour.set_count(0);
 }
 
 rm_combobox::~rm_combobox() {}
@@ -671,13 +676,39 @@ rm_combobox::~rm_combobox() {}
 size_t rm_combobox::add_item(const char* pitem, void* puserdata)
 {
 	m_items.push_back({ pitem, puserdata });
+	m_behaviour.set_count(m_items.size());
 	return m_items.size() - 1;
+}
+
+bool rm_combobox::remove_item(size_t index)
+{
+	if (index >= m_items.size())
+		return false;
+	const size_t selected = m_behaviour.selected_index();
+	m_items.erase(m_items.begin() + static_cast<std::ptrdiff_t>(index));
+	m_behaviour.set_count(m_items.size());
+	if (!m_items.empty() && selected != RmComboBoxBehaviour::invalid_index) {
+		const size_t replacement = selected > index
+			? selected - 1 : std::min(selected, m_items.size() - 1);
+		m_behaviour.select(replacement);
+	}
+	sync_popup_layer();
+	return true;
+}
+
+void rm_combobox::clear_items()
+{
+	m_items.clear();
+	m_behaviour.set_count(0);
+	sync_popup_layer();
 }
 
 size_t rm_combobox::find_item(const char* pitem)
 {
+	if (!pitem)
+		return kinvalid_index;
 	auto it = std::find_if(m_items.begin(), m_items.end(),
-		[pitem](rm_combo_item& item) {
+		[pitem](const rm_combo_item& item) {
 			return !strcmp(pitem, item.get_name());
 		}
 	);
@@ -685,96 +716,177 @@ size_t rm_combobox::find_item(const char* pitem)
 	if (it != m_items.end())
 		return it - m_items.begin();
 
-	return rm_combobox::kinvalid_index;
+	return kinvalid_index;
 }
 
-void rm_combobox::on_draw(NVGcontext* pctx) {
-	//m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
-	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
+float rm_combobox::popup_y() const
+{
+	return m_size.y + combo_style().popup_gap;
+}
 
-	//bgr
-	pctx->beginPath();
-	pctx->roundedRect(0.f, 0.f, m_size.x, m_size.y, 4.0f);
-	pctx->fillColor(NVGcolor::RGBA(180, 180, 180, 255));
-	pctx->fill();
-	pctx->strokeColor(NVGcolor::RGBA(0, 0, 0, 255));
-	pctx->stroke();
+float rm_combobox::popup_height() const
+{
+	return combo_style().popup_padding * 2.f +
+		combo_style().item_height * static_cast<float>(m_items.size());
+}
 
-	pctx->setFontSize(18.0f);
-	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-	pctx->fillColor(NVGcolor::RGBA(0, 0, 0, 255));
-	if (!m_items.empty() && m_selected >= 0 && m_selected < (int)m_items.size())
-		pctx->text(5.f, m_size.y / 2.0f, m_items[m_selected].get_name(), nullptr);
+size_t rm_combobox::hit_test_popup_item(const rm_vec2& local_cursor) const
+{
+	const RmComboBoxStyle& style = combo_style();
+	if (local_cursor.x < 0.f || local_cursor.x > m_size.x)
+		return RmComboBoxBehaviour::invalid_index;
+	const float item_y = local_cursor.y - popup_y() - style.popup_padding;
+	if (item_y < 0.f || style.item_height <= 0.f)
+		return RmComboBoxBehaviour::invalid_index;
+	const size_t index = static_cast<size_t>(item_y / style.item_height);
+	return index < m_items.size() ? index : RmComboBoxBehaviour::invalid_index;
+}
 
-	// arrow
-	float x = 0, y = 0, w = m_size.x, h = m_size.y;
-	float r = 4.0f;
-	float ax = x + w - h * 0.5f, ay = y + h * 0.5f, sz = 5.f;
-	pctx->beginPath();
-	if (!m_expanded) {
-		pctx->moveTo(ax - sz, ay - sz * 0.5f);
-		pctx->lineTo(ax + sz, ay - sz * 0.5f);
-		pctx->lineTo(ax, ay + sz * 0.5f);
-	}
-	else {
-		pctx->moveTo(ax - sz, ay + sz * 0.5f);
-		pctx->lineTo(ax + sz, ay + sz * 0.5f);
-		pctx->lineTo(ax, ay - sz * 0.5f);
-	}
-	pctx->closePath();
-	pctx->fillColor(NVGcolor::RGBA(50, 50, 50, 255));
-	pctx->fill();
+void rm_combobox::notify_selection()
+{
+	const size_t selected = m_behaviour.selected_index();
+	if (selected < m_items.size() && is_valid_callback())
+		get_callback()(this, &m_items[selected], selected);
+}
 
-	if (m_expanded) {
-		for (size_t i = 0; i < m_items.size(); i++) {
-			rm_combo_item& item = m_items[i];
-			float itemY = m_size.y * (1.f + i);
-			rm_bbox bbox;
-			rm_vec2 item_pos(m_pos_of_parent.x, m_pos_of_parent.y + itemY);
-			bbox.init(item_pos, m_size);
-			pctx->beginPath();
-			pctx->rect(0.f, itemY, m_size.x, m_size.y);
-			pctx->fillColor(bbox.inside(m_cursor) ? NVGcolor::RGBA(80, 80, 80, 255) : NVGcolor::RGBA(200, 200, 200, 255));
-			pctx->fill();
-			pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-			pctx->fillColor(NVGcolor::RGBA(0, 0, 0, 255));
-			pctx->text(5.f, itemY + m_size.y / 2.0f, item.get_name(), nullptr);
+void rm_combobox::sync_popup_layer()
+{
+	set_zindex(m_behaviour.is_expanded() ? popup_zindex : base_zindex);
+}
+
+void rm_combobox::on_enabled_changed(bool enabled)
+{
+	m_behaviour.set_enabled(enabled);
+	sync_popup_layer();
+}
+
+bool rm_combobox::set_selected_index(size_t index, bool notify)
+{
+	const RmBehaviourUpdate update = m_behaviour.select(index);
+	if (!update.handled)
+		return false;
+	if (notify && update.state_changed)
+		notify_selection();
+	return true;
+}
+
+void rm_combobox::on_draw(NVGcontext* pctx)
+{
+	const size_t selected = m_behaviour.selected_index();
+	const bool has_selection = selected < m_items.size();
+	const RmComboBoxVisual field_visual{
+		m_size.x, m_size.y, get_font(),
+		has_selection ? m_items[selected].get_name() : m_placeholder.c_str(),
+		!has_selection, is_enabled(), m_elem_flags.is_hovered(),
+		m_elem_flags.is_focused(), m_behaviour.is_expanded()
+	};
+	RmDefaultControlPainter::draw_combobox(*pctx, field_visual, combo_style());
+
+	if (m_behaviour.is_expanded()) {
+		const RmComboBoxStyle& style = combo_style();
+		const float y = popup_y();
+		RmDefaultControlPainter::draw_combobox_popup(*pctx,
+			{ y, m_size.x, popup_height() }, style);
+		for (size_t i = 0; i < m_items.size(); ++i) {
+			const RmComboBoxItemVisual item_visual{
+				style.popup_padding,
+				y + style.popup_padding + style.item_height * static_cast<float>(i),
+				std::max(0.f, m_size.x - style.popup_padding * 2.f),
+				style.item_height, get_font(), m_items[i].get_name(), is_enabled(),
+				m_behaviour.highlighted_index() == i,
+				m_behaviour.selected_index() == i
+			};
+			RmDefaultControlPainter::draw_combobox_item(*pctx, item_visual, style);
 		}
 	}
 	rm_widget::on_draw(pctx);
 }
 
-bool rm_combobox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) {
-	m_cursor = cursor_pos;
-	if (event == RM_MOUSE_EVENT_CLICK && state == DOWN) {
-		if (m_bbox.inside(cursor_pos)) {
-			if (m_expanded) {
-				m_expanded = false;
-				return false;
-			}
-			m_expanded = true;
+void rm_combobox::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
+{
+	RM_UNUSED(sc);
+	if (state != DOWN)
+		return;
+	if (vk == RM_KEY_ESCAPE) {
+		m_behaviour.close();
+		sync_popup_layer();
+		return;
+	}
+	if (vk == RM_KEY_F4) {
+		m_behaviour.toggle();
+		sync_popup_layer();
+		return;
+	}
+	if (vk == RM_KEY_ENTER || vk == RM_KEY_SPACE) {
+		if (m_behaviour.is_expanded()) {
+			if (m_behaviour.commit_highlighted().activated)
+				notify_selection();
+		}
+		else {
+			m_behaviour.open();
+		}
+		sync_popup_layer();
+		return;
+	}
+	if (vk == RM_KEY_UP || vk == RM_KEY_DOWN) {
+		const int delta = vk == RM_KEY_DOWN ? 1 : -1;
+		const RmBehaviourUpdate update = m_behaviour.is_expanded()
+			? m_behaviour.highlight_relative(delta)
+			: m_behaviour.select_relative(delta);
+		if (update.activated)
+			notify_selection();
+		return;
+	}
+	if (vk == RM_KEY_HOME || vk == RM_KEY_END) {
+		if (m_items.empty())
+			return;
+		const size_t index = vk == RM_KEY_HOME ? 0 : m_items.size() - 1;
+		const RmBehaviourUpdate update = m_behaviour.is_expanded()
+			? m_behaviour.highlight(index) : m_behaviour.select(index);
+		if (!m_behaviour.is_expanded() && update.state_changed)
+			notify_selection();
+	}
+}
+
+bool rm_combobox::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+	RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+{
+	RM_UNUSED(delta);
+	if (vk != RM_KEY_NONE && vk != RM_KEY_LMOUSE)
+		return true;
+	const rm_vec2 local_cursor = cursor_to_local(cursor_pos);
+	const bool inside_field = local_cursor.x >= 0.f && local_cursor.x <= m_size.x &&
+		local_cursor.y >= 0.f && local_cursor.y <= m_size.y;
+	if (event == RM_MOUSE_EVENT_MOVE) {
+		if (m_behaviour.is_expanded()) {
+			m_behaviour.highlight(hit_test_popup_item(local_cursor));
 			return false;
 		}
-
-		if (m_expanded) {
-			float itemYStart = m_pos_of_parent.y + m_size.y;
-			float itemHeight = m_size.y;
-			int index = (int)((cursor_pos.y - itemYStart) / itemHeight);
-			if (index >= 0 && index < (int)m_items.size()) {
-				m_selected = index;
-				if (is_valid_callback()) {
-					get_callback()(this, &m_items[m_selected], (size_t)m_selected);
-				}
+		return true;
+	}
+	if (event != RM_MOUSE_EVENT_CLICK)
+		return !m_behaviour.is_expanded();
+	if (state == DOWN) {
+		if (inside_field) {
+			m_behaviour.toggle();
+			sync_popup_layer();
+			return false;
+		}
+		if (m_behaviour.is_expanded()) {
+			const size_t index = hit_test_popup_item(local_cursor);
+			if (index < m_items.size()) {
+				m_behaviour.highlight(index);
+				if (m_behaviour.commit_highlighted().activated)
+					notify_selection();
 			}
-			m_expanded = false;
+			else {
+				m_behaviour.close();
+			}
+			sync_popup_layer();
 			return false;
 		}
 	}
-
-	if (m_expanded) {
-		return false; //absorb the event
-	}
-	return true;
+	return !m_behaviour.is_expanded();
 }
 
 void rm_slider::update_value_from_pointer(const rm_vec2& local_cursor)

@@ -516,8 +516,35 @@ void example_widgets(rm_surface* gui)
   controls_theme_document.tokens.controls.slider_padding = 9.8f;
   controls_theme_document.tokens.controls.slider_thumb_radius = 7.f;
   controls_theme_document.tokens.controls.slider_thumb_border_width = 3.5f;
+  controls_theme_document.tokens.controls.combobox_item_height = 32.f;
+  controls_theme_document.tokens.controls.combobox_popup_gap = 5.f;
+  controls_theme_document.tokens.controls.combobox_indicator_size = 5.f;
   controls_theme_document.tokens.animation.normal = 0.25f;
   const RmThemeRef controls_theme = RmThemeCompiler::compile(controls_theme_document).theme;
+
+  rm_theme_preview_panel* pcombo_panel = new rm_theme_preview_panel(
+    ptab11, 240, 10, 360, 260, controls_theme);
+  new rm_label(pcombo_panel, 20, 18, "ComboBox states", controls_theme);
+  rm_combobox* pcombo = new rm_combobox(pcombo_panel, 20, 54, 320, 36,
+    [](rm_combobox*, rm_combo_item* pitem, size_t index) {
+      printf("Combobox item #%zu selected: %s\n", index, pitem->get_name());
+    }, controls_theme);
+  pcombo->add_item("C++ desktop application");
+  pcombo->add_item("GUI designer project");
+  pcombo->add_item("NanoVG render graph");
+  pcombo->add_item("Theme package");
+  pcombo->set_selected_index(1);
+
+  rm_combobox* pempty_combo = new rm_combobox(
+    pcombo_panel, 20, 112, 320, 36, nullptr, controls_theme);
+  pempty_combo->set_placeholder("Choose a workspace preset");
+
+  rm_combobox* pdisabled_combo = new rm_combobox(
+    pcombo_panel, 20, 170, 320, 36, nullptr, controls_theme);
+  pdisabled_combo->add_item("Unavailable configuration");
+  pdisabled_combo->set_enabled(false);
+  new rm_label(pcombo_panel, 20, 222,
+    "Mouse, arrows, Home/End, Enter, Esc and F4", controls_theme);
 
   rm_checkbox *pcb = new rm_checkbox(pdiv, 10, 100, 200, "This is checkbox",
     [](rm_checkbox* pcheckbox) {
@@ -525,7 +552,7 @@ void example_widgets(rm_surface* gui)
       return true;
     }, controls_theme);
 
-  ptabctl->set_selected_index(4);
+  ptabctl->set_selected_index(1);
 
   static rm_radiobutton_style style_rb;
   style_rb.set_all_corners_radius(8.f);

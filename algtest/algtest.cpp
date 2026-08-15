@@ -46,6 +46,29 @@ void test_toggle_behaviour()
   expect(!toggle.is_checked(), "toggle supports keyboard activation");
 }
 
+void test_combobox_behaviour()
+{
+  RmComboBoxBehaviour combo;
+  expect(!combo.open().handled, "an empty combobox does not open");
+
+  combo.set_count(3);
+  expect(combo.selected_index() == 0, "combobox selects its first item when populated");
+  expect(combo.open().handled && combo.is_expanded(), "combobox opens when populated");
+  combo.highlight_relative(1);
+  expect(combo.highlighted_index() == 1, "combobox navigates its popup highlight");
+  expect(combo.commit_highlighted().activated,
+    "combobox commits a changed highlighted item");
+  expect(combo.selected_index() == 1 && !combo.is_expanded(),
+    "committing a combobox item updates selection and closes the popup");
+
+  expect(combo.select_relative(-1).activated && combo.selected_index() == 0,
+    "closed combobox supports keyboard selection");
+  combo.open();
+  combo.set_enabled(false);
+  expect(!combo.is_expanded() && !combo.open().handled,
+    "disabled combobox closes and ignores open requests");
+}
+
 void test_slider_behaviour()
 {
   RmSliderBehaviour slider(0.0f, 100.0f, 50.0f);
@@ -155,6 +178,7 @@ int main()
 {
   test_button_behaviour();
   test_toggle_behaviour();
+  test_combobox_behaviour();
   test_slider_behaviour();
   test_progress_behaviour();
   test_switch_behaviour();

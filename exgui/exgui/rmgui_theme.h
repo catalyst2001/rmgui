@@ -180,6 +180,32 @@ struct RmCheckboxStyle {
   float focus_ring_width = 0.0f;
 };
 
+struct RmComboBoxStyle {
+  RmStateColors field_background;
+  RmStateColors field_border;
+  RmStateColors field_text;
+  RmStateColors indicator;
+  RmStateColors item_background;
+  RmStateColors item_text;
+  NVGcolor placeholder_text;
+  NVGcolor selected_mark;
+  NVGcolor popup_background;
+  NVGcolor popup_border;
+  NVGcolor focus_ring;
+  NVGcolor shadow;
+  float corner_radius = 0.0f;
+  float border_width = 0.0f;
+  float focus_ring_width = 0.0f;
+  float horizontal_padding = 0.0f;
+  float popup_padding = 0.0f;
+  float popup_gap = 0.0f;
+  float item_height = 0.0f;
+  float indicator_size = 0.0f;
+  float selected_mark_width = 0.0f;
+  float shadow_size = 0.0f;
+  float font_size = 0.0f;
+};
+
 struct RmSliderStyle {
   RmStateColors track;
   RmStateColors fill;
@@ -277,6 +303,13 @@ struct RmControlMetricsTokens {
   float focus_ring_width = 2.0f;
   float checkbox_size = 20.0f;
   float checkbox_mark_width = 2.25f;
+  float combobox_horizontal_padding = 10.0f;
+  float combobox_popup_padding = 5.0f;
+  float combobox_popup_gap = 4.0f;
+  float combobox_item_height = 30.0f;
+  float combobox_indicator_size = 5.0f;
+  float combobox_selected_mark_width = 2.0f;
+  float combobox_shadow_size = 10.0f;
   float slider_track_height = 4.0f;
   float slider_padding = 8.0f;
   float slider_thumb_radius = 10.0f;
@@ -333,6 +366,7 @@ struct RmThemeSnapshot {
   RmMenuStyle menu;
   RmLabelStyle label;
   RmCheckboxStyle checkbox;
+  RmComboBoxStyle combobox;
   RmSliderStyle slider;
   RmProgressStyle progress;
   RmSwitchStyle switch_control;
@@ -436,6 +470,13 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.focus_ring_width, 0.0f, 32.0f, "tokens.controls.focus_ring_width", diagnostics);
     sanitize_metric(tokens.controls.checkbox_size, 1.0f, 256.0f, "tokens.controls.checkbox_size", diagnostics);
     sanitize_metric(tokens.controls.checkbox_mark_width, 0.0f, 32.0f, "tokens.controls.checkbox_mark_width", diagnostics);
+    sanitize_metric(tokens.controls.combobox_horizontal_padding, 0.0f, 256.0f, "tokens.controls.combobox_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.combobox_popup_padding, 0.0f, 256.0f, "tokens.controls.combobox_popup_padding", diagnostics);
+    sanitize_metric(tokens.controls.combobox_popup_gap, 0.0f, 256.0f, "tokens.controls.combobox_popup_gap", diagnostics);
+    sanitize_metric(tokens.controls.combobox_item_height, 16.0f, 256.0f, "tokens.controls.combobox_item_height", diagnostics);
+    sanitize_metric(tokens.controls.combobox_indicator_size, 1.0f, 64.0f, "tokens.controls.combobox_indicator_size", diagnostics);
+    sanitize_metric(tokens.controls.combobox_selected_mark_width, 0.0f, 32.0f, "tokens.controls.combobox_selected_mark_width", diagnostics);
+    sanitize_metric(tokens.controls.combobox_shadow_size, 0.0f, 256.0f, "tokens.controls.combobox_shadow_size", diagnostics);
     sanitize_metric(tokens.controls.slider_track_height, 1.0f, 256.0f, "tokens.controls.slider_track_height", diagnostics);
     sanitize_metric(tokens.controls.slider_padding, 0.0f, 256.0f, "tokens.controls.slider_padding", diagnostics);
     sanitize_metric(tokens.controls.slider_thumb_radius, 1.0f, 256.0f, "tokens.controls.slider_thumb_radius", diagnostics);
@@ -643,6 +684,36 @@ public:
     p_theme->checkbox.text_gap = tokens.spacing.small;
     p_theme->checkbox.font_size = tokens.typography.control;
     p_theme->checkbox.focus_ring_width = controls.focus_ring_width;
+
+    p_theme->combobox.field_background = { colors.control, colors.control_hovered,
+      colors.control_pressed, colors.control_disabled };
+    p_theme->combobox.field_border = { colors.border, colors.border_hovered,
+      colors.border_pressed, colors.border_disabled };
+    p_theme->combobox.field_text = { colors.text, colors.text, colors.text,
+      colors.text_disabled };
+    p_theme->combobox.indicator = { colors.text_muted, colors.text,
+      colors.text, colors.text_disabled };
+    p_theme->combobox.item_background = { transparent, colors.control_hovered,
+      colors.control_pressed, transparent };
+    p_theme->combobox.item_text = { colors.text, colors.text, colors.text,
+      colors.text_disabled };
+    p_theme->combobox.placeholder_text = colors.text_muted;
+    p_theme->combobox.selected_mark = colors.accent;
+    p_theme->combobox.popup_background = colors.surface_elevated;
+    p_theme->combobox.popup_border = colors.border;
+    p_theme->combobox.focus_ring = colors.focus_ring;
+    p_theme->combobox.shadow = colors.shadow;
+    p_theme->combobox.corner_radius = tokens.radius.medium;
+    p_theme->combobox.border_width = controls.border_width;
+    p_theme->combobox.focus_ring_width = controls.focus_ring_width;
+    p_theme->combobox.horizontal_padding = controls.combobox_horizontal_padding;
+    p_theme->combobox.popup_padding = controls.combobox_popup_padding;
+    p_theme->combobox.popup_gap = controls.combobox_popup_gap;
+    p_theme->combobox.item_height = controls.combobox_item_height;
+    p_theme->combobox.indicator_size = controls.combobox_indicator_size;
+    p_theme->combobox.selected_mark_width = controls.combobox_selected_mark_width;
+    p_theme->combobox.shadow_size = controls.combobox_shadow_size;
+    p_theme->combobox.font_size = tokens.typography.control;
 
     p_theme->slider.track = { colors.control, colors.control_hovered,
       colors.control_pressed, colors.control_disabled };

@@ -148,6 +148,15 @@ void test_theme_document_compilation()
   require(same_color(result.theme->menu.popup_background,
     document.tokens.colors.surface_elevated),
     "popup menus must use the elevated surface token");
+  require(result.theme->combobox.item_height ==
+    document.tokens.controls.combobox_item_height,
+    "combobox recipes must use editable item metrics");
+  require(same_color(result.theme->combobox.popup_background,
+    document.tokens.colors.surface_elevated),
+    "combobox popup must use the elevated surface token");
+  require(same_color(result.theme->combobox.selected_mark,
+    document.tokens.colors.accent),
+    "combobox selected mark must use the accent token");
   require(result.theme->switch_control.track_height == 30.0f,
     "component metric token must drive switch geometry");
   require(result.theme->switch_control.corner_radius == 15.0f,

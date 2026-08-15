@@ -122,6 +122,142 @@ public:
   RmBehaviourUpdate cancel() noexcept { return button_.cancel(); }
 };
 
+class RmComboBoxBehaviour {
+public:
+  static constexpr size_t invalid_index = std::numeric_limits<size_t>::max();
+
+private:
+  size_t m_count = 0;
+  size_t m_selected = invalid_index;
+  size_t m_highlighted = invalid_index;
+  bool m_expanded = false;
+  bool m_enabled = true;
+
+  bool is_valid(size_t index) const noexcept { return index < m_count; }
+
+public:
+  size_t count() const noexcept { return m_count; }
+  size_t selected_index() const noexcept { return m_selected; }
+  size_t highlighted_index() const noexcept { return m_highlighted; }
+  bool is_expanded() const noexcept { return m_expanded; }
+
+  RmBehaviourUpdate set_enabled(bool enabled) noexcept {
+    const bool changed = m_enabled != enabled || (!enabled && m_expanded);
+    m_enabled = enabled;
+    if (!m_enabled) {
+      m_expanded = false;
+      m_highlighted = invalid_index;
+    }
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate set_count(size_t count) noexcept {
+    const size_t previous_selected = m_selected;
+    const size_t previous_highlighted = m_highlighted;
+    const bool previous_expanded = m_expanded;
+    m_count = count;
+    if (m_count == 0) {
+      m_selected = invalid_index;
+      m_highlighted = invalid_index;
+      m_expanded = false;
+    }
+    else {
+      if (!is_valid(m_selected))
+        m_selected = 0;
+      if (!is_valid(m_highlighted))
+        m_highlighted = m_selected;
+    }
+    const bool changed = previous_selected != m_selected ||
+      previous_highlighted != m_highlighted || previous_expanded != m_expanded;
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate select(size_t index) noexcept {
+    if (!is_valid(index))
+      return {};
+    const bool changed = m_selected != index || m_highlighted != index;
+    m_selected = index;
+    m_highlighted = index;
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate open() noexcept {
+    if (!m_enabled || m_count == 0)
+      return {};
+    const bool changed = !m_expanded || m_highlighted != m_selected;
+    m_expanded = true;
+    m_highlighted = m_selected;
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate close() noexcept {
+    const bool changed = m_expanded;
+    m_expanded = false;
+    m_highlighted = m_selected;
+    return { changed, changed, false };
+  }
+
+  RmBehaviourUpdate toggle() noexcept {
+    return m_expanded ? close() : open();
+  }
+
+  RmBehaviourUpdate highlight(size_t index) noexcept {
+    if (!m_enabled || !m_expanded)
+      return {};
+    if (!is_valid(index))
+      index = invalid_index;
+    const bool changed = m_highlighted != index;
+    m_highlighted = index;
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate highlight_relative(int delta, bool wrap = true) noexcept {
+    if (!m_enabled || !m_expanded || m_count == 0 || delta == 0)
+      return {};
+    int next = is_valid(m_highlighted)
+      ? static_cast<int>(m_highlighted) + delta
+      : (delta > 0 ? 0 : static_cast<int>(m_count) - 1);
+    const int count = static_cast<int>(m_count);
+    if (wrap) {
+      next %= count;
+      if (next < 0)
+        next += count;
+    }
+    else {
+      next = std::clamp(next, 0, count - 1);
+    }
+    return highlight(static_cast<size_t>(next));
+  }
+
+  RmBehaviourUpdate select_relative(int delta, bool wrap = true) noexcept {
+    if (!m_enabled || m_count == 0 || delta == 0)
+      return {};
+    int next = is_valid(m_selected)
+      ? static_cast<int>(m_selected) + delta
+      : (delta > 0 ? 0 : static_cast<int>(m_count) - 1);
+    const int count = static_cast<int>(m_count);
+    if (wrap) {
+      next %= count;
+      if (next < 0)
+        next += count;
+    }
+    else {
+      next = std::clamp(next, 0, count - 1);
+    }
+    const RmBehaviourUpdate update = select(static_cast<size_t>(next));
+    return { update.handled, update.state_changed, update.state_changed };
+  }
+
+  RmBehaviourUpdate commit_highlighted() noexcept {
+    if (!m_enabled || !m_expanded || !is_valid(m_highlighted))
+      return {};
+    const bool changed = m_selected != m_highlighted;
+    m_selected = m_highlighted;
+    m_expanded = false;
+    return { true, true, changed };
+  }
+};
+
 class RmSliderBehaviour {
   float minimum_ = 0.0f;
   float maximum_ = 1.0f;
