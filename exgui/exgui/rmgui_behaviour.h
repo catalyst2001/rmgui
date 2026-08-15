@@ -400,6 +400,72 @@ enum class RmNumberInputPart {
   increment
 };
 
+enum class RmNumberInputButtonPlacement {
+  vertical_right,
+  vertical_left,
+  horizontal_sides
+};
+
+struct RmNumberInputPartBounds {
+  float x = 0.0f;
+  float y = 0.0f;
+  float width = 0.0f;
+  float height = 0.0f;
+
+  bool contains(float px, float py) const noexcept {
+    return px >= x && py >= y && px <= x + width && py <= y + height;
+  }
+};
+
+struct RmNumberInputGeometry {
+  RmNumberInputPartBounds field;
+  RmNumberInputPartBounds increment;
+  RmNumberInputPartBounds decrement;
+  bool buttons_are_vertical = true;
+
+  RmNumberInputPart hit_test(float x, float y) const noexcept {
+    if (increment.contains(x, y))
+      return RmNumberInputPart::increment;
+    if (decrement.contains(x, y))
+      return RmNumberInputPart::decrement;
+    return field.contains(x, y)
+      ? RmNumberInputPart::field : RmNumberInputPart::none;
+  }
+};
+
+inline RmNumberInputGeometry rm_number_input_geometry(float width, float height,
+  float button_extent, RmNumberInputButtonPlacement placement) noexcept
+{
+  width = std::max(0.0f, width);
+  height = std::max(0.0f, height);
+  button_extent = std::clamp(button_extent, 0.0f, width);
+
+  RmNumberInputGeometry geometry;
+  if (placement == RmNumberInputButtonPlacement::horizontal_sides) {
+    button_extent = std::min(button_extent, width * 0.5f);
+    geometry.buttons_are_vertical = false;
+    geometry.decrement = { 0.0f, 0.0f, button_extent, height };
+    geometry.increment = { width - button_extent, 0.0f,
+      button_extent, height };
+    geometry.field = { button_extent, 0.0f,
+      std::max(0.0f, width - button_extent * 2.0f), height };
+    return geometry;
+  }
+
+  const float half_height = height * 0.5f;
+  const bool left = placement == RmNumberInputButtonPlacement::vertical_left;
+  const float button_x = left ? 0.0f : width - button_extent;
+  geometry.increment = { button_x, 0.0f, button_extent, half_height };
+  geometry.decrement = { button_x, half_height, button_extent,
+    height - half_height };
+  geometry.field = left
+    ? RmNumberInputPartBounds{ button_extent, 0.0f,
+        std::max(0.0f, width - button_extent), height }
+    : RmNumberInputPartBounds{ 0.0f, 0.0f,
+        std::max(0.0f, width - button_extent), height };
+  return geometry;
+}
+
 class RmNumberInputBehaviour {
   RmNumberInputType m_type = RmNumberInputType::floating_point;
   RmNumberInputPart m_hovered = RmNumberInputPart::none;

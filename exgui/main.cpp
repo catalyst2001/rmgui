@@ -643,17 +643,20 @@ void example_widgets(rm_surface* gui)
     ptab11, 240, 290, 360, 230, controls_theme);
   new rm_label(pinput_panel, 20, 18, "Text and numeric input", controls_theme);
   rm_text_input* psingle_input = new rm_text_input(pinput_panel,
-    20, 50, 320, 38, RMGUI_TEXT_INPUT_SINGLELINE, controls_theme);
+    20, 50, 210, 38, RMGUI_TEXT_INPUT_SINGLELINE, controls_theme);
   psingle_input->set_text("Editable project name");
+  new rm_number_input(pinput_panel, 246, 50, 94, 38,
+    RmNumberInputType::integer, 24.0f, 1.0f, 0.0f, 100.0f,
+    controls_theme, RmNumberInputButtonPlacement::vertical_right);
   rm_text_input* pmultiline_input = new rm_text_input(pinput_panel,
     20, 104, 210, 96, RMGUI_TEXT_INPUT_MULTILINE, controls_theme);
   pmultiline_input->set_text("Multiline notes\nwith selection and undo");
   new rm_number_input(pinput_panel, 246, 104, 94, 42,
     RmNumberInputType::integer, 12.0f, 1.0f, 0.0f, 100.0f,
-    controls_theme);
+    controls_theme, RmNumberInputButtonPlacement::vertical_left);
   new rm_number_input(pinput_panel, 246, 158, 94, 42,
     RmNumberInputType::floating_point, 0.75f, 0.05f, 0.0f, 1.0f,
-    controls_theme);
+    controls_theme, RmNumberInputButtonPlacement::horizontal_sides);
 
   rm_theme_preview_panel* ptree_panel = new rm_theme_preview_panel(
     ptab11, 620, 10, 170, 510, controls_theme);

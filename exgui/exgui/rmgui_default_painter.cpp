@@ -485,9 +485,8 @@ void RmDefaultControlPainter::draw_number_input(NVGcontext& context,
   const RmVisualState state = resolve_state(visual.enabled, visual.hovered, false);
   const float width = std::max(0.0f, visual.width);
   const float height = std::max(0.0f, visual.height);
-  const float button_width = std::min(style.button_width, width);
-  const float button_x = width - button_width;
-  const float half_height = height * 0.5f;
+  const RmNumberInputGeometry geometry = rm_number_input_geometry(width,
+    height, style.button_width, visual.button_placement);
 
   context.beginPath();
   context.roundedRect(0.5f, 0.5f, std::max(0.0f, width - 1.0f),
@@ -497,57 +496,120 @@ void RmDefaultControlPainter::draw_number_input(NVGcontext& context,
 
   const RmVisualState increment_state = resolve_state(visual.enabled,
     visual.increment_hovered, visual.increment_pressed);
-  context.beginPath();
-  context.roundedRectVarying(button_x, 0.5f, button_width - 0.5f,
-    std::max(0.0f, half_height - 0.5f), 0.0f, style.corner_radius,
-    0.0f, 0.0f);
-  context.fillColor(style.button_background.resolve(increment_state));
-  context.fill();
-
   const RmVisualState decrement_state = resolve_state(visual.enabled,
     visual.decrement_hovered, visual.decrement_pressed);
-  context.beginPath();
-  context.roundedRectVarying(button_x, half_height, button_width - 0.5f,
-    std::max(0.0f, half_height - 0.5f), 0.0f, 0.0f,
-    style.corner_radius, 0.0f);
-  context.fillColor(style.button_background.resolve(decrement_state));
-  context.fill();
+
+  const auto draw_button = [&](const RmNumberInputPartBounds& bounds,
+    RmVisualState button_state, float top_left, float top_right,
+    float bottom_right, float bottom_left) {
+    if (bounds.width <= 0.0f || bounds.height <= 0.0f)
+      return;
+    context.beginPath();
+    context.roundedRectVarying(bounds.x, bounds.y, bounds.width,
+      bounds.height, top_left, top_right, bottom_right, bottom_left);
+    context.fillColor(style.button_background.resolve(button_state));
+    context.fill();
+  };
+
+  if (visual.button_placement ==
+    RmNumberInputButtonPlacement::vertical_left) {
+    draw_button(geometry.increment, increment_state,
+      style.corner_radius, 0.0f, 0.0f, 0.0f);
+    draw_button(geometry.decrement, decrement_state,
+      0.0f, 0.0f, 0.0f, style.corner_radius);
+  } else if (visual.button_placement ==
+    RmNumberInputButtonPlacement::horizontal_sides) {
+    draw_button(geometry.decrement, decrement_state,
+      style.corner_radius, 0.0f, 0.0f, style.corner_radius);
+    draw_button(geometry.increment, increment_state,
+      0.0f, style.corner_radius, style.corner_radius, 0.0f);
+  } else {
+    draw_button(geometry.increment, increment_state,
+      0.0f, style.corner_radius, 0.0f, 0.0f);
+    draw_button(geometry.decrement, decrement_state,
+      0.0f, 0.0f, style.corner_radius, 0.0f);
+  }
 
   if (style.separator_width > 0.0f) {
     context.beginPath();
-    context.moveTo(button_x, 1.0f);
-    context.lineTo(button_x, height - 1.0f);
-    context.moveTo(button_x, half_height);
-    context.lineTo(width - 1.0f, half_height);
+    if (geometry.buttons_are_vertical) {
+      const float separator_x = visual.button_placement ==
+        RmNumberInputButtonPlacement::vertical_left
+        ? geometry.field.x : geometry.increment.x;
+      context.moveTo(separator_x, 1.0f);
+      context.lineTo(separator_x, height - 1.0f);
+      context.moveTo(geometry.increment.x,
+        geometry.increment.y + geometry.increment.height);
+      context.lineTo(geometry.increment.x + geometry.increment.width,
+        geometry.increment.y + geometry.increment.height);
+    } else {
+      context.moveTo(geometry.field.x, 1.0f);
+      context.lineTo(geometry.field.x, height - 1.0f);
+      context.moveTo(geometry.field.x + geometry.field.width, 1.0f);
+      context.lineTo(geometry.field.x + geometry.field.width, height - 1.0f);
+    }
     context.StrokeWidth(style.separator_width);
     context.strokeColor(style.separator);
     context.stroke();
   }
 
   const float icon_half = style.icon_size * 0.5f;
-  const float icon_x = button_x + button_width * 0.5f;
-  const auto draw_chevron = [&](float center_y, bool upward,
+  const auto draw_chevron = [&](const RmNumberInputPartBounds& bounds,
+    bool upward,
     RmVisualState icon_state) {
     const float direction = upward ? -1.0f : 1.0f;
+    const float center_x = bounds.x + bounds.width * 0.5f;
+    const float center_y = bounds.y + bounds.height * 0.5f;
     context.beginPath();
-    context.moveTo(icon_x - icon_half, center_y - direction * icon_half * 0.4f);
-    context.lineTo(icon_x, center_y + direction * icon_half * 0.6f);
-    context.lineTo(icon_x + icon_half, center_y - direction * icon_half * 0.4f);
+    context.moveTo(center_x - icon_half,
+      center_y - direction * icon_half * 0.4f);
+    context.lineTo(center_x,
+      center_y + direction * icon_half * 0.6f);
+    context.lineTo(center_x + icon_half,
+      center_y - direction * icon_half * 0.4f);
     context.StrokeWidth(std::max(1.0f, style.separator_width * 1.5f));
     context.strokeColor(style.button_icon.resolve(icon_state));
     context.stroke();
   };
-  draw_chevron(half_height * 0.5f, true, increment_state);
-  draw_chevron(half_height + half_height * 0.5f, false, decrement_state);
+
+  if (geometry.buttons_are_vertical) {
+    draw_chevron(geometry.increment, true, increment_state);
+    draw_chevron(geometry.decrement, false, decrement_state);
+  } else {
+    const auto draw_sign = [&](const RmNumberInputPartBounds& bounds,
+      bool plus, RmVisualState icon_state) {
+      const float center_x = bounds.x + bounds.width * 0.5f;
+      const float center_y = bounds.y + bounds.height * 0.5f;
+      context.beginPath();
+      context.moveTo(center_x - icon_half, center_y);
+      context.lineTo(center_x + icon_half, center_y);
+      if (plus) {
+        context.moveTo(center_x, center_y - icon_half);
+        context.lineTo(center_x, center_y + icon_half);
+      }
+      context.StrokeWidth(std::max(1.0f, style.separator_width * 1.5f));
+      context.strokeColor(style.button_icon.resolve(icon_state));
+      context.stroke();
+    };
+    draw_sign(geometry.decrement, false, decrement_state);
+    draw_sign(geometry.increment, true, increment_state);
+  }
 
   context.setFontFaceId(static_cast<int>(visual.font.getValue()));
   context.setFontSize(style.font_size);
-  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  const bool centered = visual.button_placement ==
+    RmNumberInputButtonPlacement::horizontal_sides;
+  context.setTextAlign((centered ? NVG_ALIGN_CENTER : NVG_ALIGN_LEFT) |
+    NVG_ALIGN_MIDDLE);
   context.fillColor(style.text.resolve(state));
   context.save();
-  context.intersectScissor(style.horizontal_padding, 0.0f,
-    std::max(0.0f, button_x - style.horizontal_padding * 2.0f), height);
-  context.text(style.horizontal_padding, height * 0.5f,
+  context.intersectScissor(geometry.field.x + style.horizontal_padding, 0.0f,
+    std::max(0.0f, geometry.field.width - style.horizontal_padding * 2.0f),
+    height);
+  const float text_x = centered
+    ? geometry.field.x + geometry.field.width * 0.5f
+    : geometry.field.x + style.horizontal_padding;
+  context.text(text_x, height * 0.5f,
     visual.text ? visual.text : "", nullptr);
   context.restore();
 

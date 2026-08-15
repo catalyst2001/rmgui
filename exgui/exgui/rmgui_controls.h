@@ -950,6 +950,7 @@ class rm_number_input : public rm_widget
 protected:
   RmNumberInputBehaviour m_behaviour;
   RmThemeRef              m_theme;
+  RmNumberInputButtonPlacement m_button_placement;
 
   RmNumberInputPart hit_test_part(const rm_vec2& cursor_pos) const;
   void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
@@ -963,7 +964,9 @@ public:
   rm_number_input(rm_widget* p_parent, int x, int y, int width, int height, 
     RmNumberInputType type = RmNumberInputType::floating_point,
     float value = 0.f, float step = 0.1f, float minval = 0.f,
-    float maxval = 100.f, RmThemeRef theme = {});
+    float maxval = 100.f, RmThemeRef theme = {},
+    RmNumberInputButtonPlacement button_placement =
+      RmNumberInputButtonPlacement::vertical_right);
 
   RmNumberInputType get_type() const noexcept { return m_behaviour.type(); }
   template<class _type> _type get_value() const { return static_cast<_type>(m_behaviour.value()); }
@@ -973,6 +976,13 @@ public:
   void set_value(float value) { m_behaviour.set_value(value); }
   void set_range(float minimum, float maximum) { m_behaviour.set_range(minimum, maximum); }
   void set_step(float step) { m_behaviour.set_step(step); }
+  RmNumberInputButtonPlacement get_button_placement() const noexcept {
+    return m_button_placement;
+  }
+  void set_button_placement(
+    RmNumberInputButtonPlacement button_placement) noexcept {
+    m_button_placement = button_placement;
+  }
   const RmNumberInputBehaviour& behaviour() const noexcept { return m_behaviour; }
   void set_theme(RmThemeRef theme) {
     m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();

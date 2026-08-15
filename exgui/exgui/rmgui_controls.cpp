@@ -2814,6 +2814,7 @@ void rm_number_input::on_draw(NVGcontext* pctx)
 		m_size.y,
 		get_font(),
 		text,
+		m_button_placement,
 		is_enabled(),
 		m_elem_flags.is_hovered(),
 		hovered == RmNumberInputPart::increment,
@@ -2842,12 +2843,10 @@ RmNumberInputPart rm_number_input::hit_test_part(const rm_vec2& cursor_pos) cons
 		return RmNumberInputPart::none;
 	const float local_x = cursor_pos.x - m_pos_of_parent.x;
 	const float local_y = cursor_pos.y - m_pos_of_parent.y;
-	const float button_x = m_size.x -
-		std::min(m_theme->number_input.button_width, m_size.x);
-	if (local_x < button_x)
-		return RmNumberInputPart::field;
-	return local_y < m_size.y * 0.5f
-		? RmNumberInputPart::increment : RmNumberInputPart::decrement;
+	const RmNumberInputGeometry geometry = rm_number_input_geometry(
+		m_size.x, m_size.y, m_theme->number_input.button_width,
+		m_button_placement);
+	return geometry.hit_test(local_x, local_y);
 }
 
 void rm_number_input::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
@@ -2897,11 +2896,12 @@ bool rm_number_input::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE sta
 
 rm_number_input::rm_number_input(rm_widget* p_parent, int x, int y, int width, int height,
 	RmNumberInputType type, float value, float step, float minval, float maxval,
-	RmThemeRef theme) :
+	RmThemeRef theme, RmNumberInputButtonPlacement button_placement) :
 	rm_widget(x, y, width, height, p_parent, "ui_number_input",
 		RM_FLAG_DEFAULT | RM_FLAG_OPAQUE),
 	m_behaviour(type, value, step, minval, maxval),
-	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()),
+	m_button_placement(button_placement)
 {
 }
 

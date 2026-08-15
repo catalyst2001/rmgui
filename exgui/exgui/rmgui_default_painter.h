@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rmgui.h"
+#include "rmgui_behaviour.h"
 #include "rmgui_theme.h"
 
 #include <cstddef>
@@ -100,6 +101,8 @@ struct RmNumberInputVisual {
   float height = 0.0f;
   NVGhandle font;
   const char* text = nullptr;
+  RmNumberInputButtonPlacement button_placement =
+    RmNumberInputButtonPlacement::vertical_right;
   bool enabled = true;
   bool hovered = false;
   bool increment_hovered = false;

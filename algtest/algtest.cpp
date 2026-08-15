@@ -98,6 +98,27 @@ void test_number_input_behaviour()
   number.set_type(RmNumberInputType::integer);
   number.set_value(3.6f);
   expect(number.value() == 4.0f, "integer number input rounds assigned values");
+
+  const RmNumberInputGeometry right = rm_number_input_geometry(100.0f,
+    40.0f, 24.0f, RmNumberInputButtonPlacement::vertical_right);
+  expect(right.hit_test(90.0f, 8.0f) == RmNumberInputPart::increment &&
+    right.hit_test(90.0f, 32.0f) == RmNumberInputPart::decrement &&
+    right.hit_test(20.0f, 20.0f) == RmNumberInputPart::field,
+    "number input lays vertical spinner buttons out on the right");
+
+  const RmNumberInputGeometry left = rm_number_input_geometry(100.0f,
+    40.0f, 24.0f, RmNumberInputButtonPlacement::vertical_left);
+  expect(left.hit_test(10.0f, 8.0f) == RmNumberInputPart::increment &&
+    left.hit_test(10.0f, 32.0f) == RmNumberInputPart::decrement &&
+    left.hit_test(70.0f, 20.0f) == RmNumberInputPart::field,
+    "number input lays vertical spinner buttons out on the left");
+
+  const RmNumberInputGeometry sides = rm_number_input_geometry(100.0f,
+    40.0f, 24.0f, RmNumberInputButtonPlacement::horizontal_sides);
+  expect(sides.hit_test(10.0f, 20.0f) == RmNumberInputPart::decrement &&
+    sides.hit_test(90.0f, 20.0f) == RmNumberInputPart::increment &&
+    sides.hit_test(50.0f, 20.0f) == RmNumberInputPart::field,
+    "number input places decrement and increment around a centered field");
 }
 
 void test_treeview_behaviour()
