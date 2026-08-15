@@ -3,11 +3,13 @@
 #include "rmgui_behaviour.h"
 #include "rmgui_default_painter.h"
 #include "rmgui_theme.h"
+#include "smalldelegate.h"
 #include <string>
 #include <vector>
-#include <functional>
 #include <type_traits>
 #include <map>
+#include <memory>
+#include <string_view>
 #include <utility>
 
 class rmgui_image {
@@ -125,7 +127,7 @@ public:
 * =============================================
 */
 class rm_checkbox;
-using rm_checkbox_cb = bool (*)(rm_checkbox *pcheckbox);
+using rm_checkbox_cb = Delegate<bool, rm_checkbox*>;
 class rm_checkbox : public rm_widget, public rm_callback<rm_checkbox_cb> {
   RmToggleBehaviour m_behaviour;
   std::string    m_label;
@@ -169,7 +171,7 @@ public:
 };
 
 class rm_combobox;
-using rm_combobox_cb = void(*)(rm_combobox *pcombo, rm_combo_item *pitem, size_t itemid);
+using rm_combobox_cb = Delegate<void, rm_combobox*, rm_combo_item*, size_t>;
 class rm_combobox : public rm_widget, public rm_callback<rm_combobox_cb> {
   static constexpr int base_zindex = 900;
   static constexpr int popup_zindex = 950;
@@ -231,7 +233,7 @@ public:
 * =============================================
 */
 class rm_slider;
-using rm_slider_callback = void(*)(rm_slider *pslider);
+using rm_slider_callback = Delegate<void, rm_slider*>;
 class rm_slider : public rm_widget {
   RmSliderBehaviour m_behaviour;
   rm_slider_callback m_pcallback;
@@ -300,7 +302,7 @@ public:
 
 
 class rm_scrollbar;
-using rm_scrollbar_cb = void(*)(rm_scrollbar *pscrollbar, float value);
+using rm_scrollbar_cb = Delegate<void, rm_scrollbar*, float>;
 class rm_scrollbar : public rm_widget, public rm_callback<rm_scrollbar_cb>
 {
   RM_ORIENT m_orientation;
@@ -394,8 +396,8 @@ public:
 };
 
 class rm_tabcontrol;
-using rm_tabcontrol_cb = void(*)(rm_tabcontrol* ptabs, rm_tab_item* pitem, size_t tabid);
-using rm_tabcontrol_close_cb = bool(*)(rm_tabcontrol* ptabs, rm_tab_item* pitem, size_t tabid);
+using rm_tabcontrol_cb = Delegate<void, rm_tabcontrol*, rm_tab_item*, size_t>;
+using rm_tabcontrol_close_cb = Delegate<bool, rm_tabcontrol*, rm_tab_item*, size_t>;
 class rm_tabcontrol : public rm_widget, public rm_callback<rm_tabcontrol_cb> {
   std::vector<rm_tab_item> m_tabs;
   std::vector<rm_rect> m_tab_bounds;
@@ -476,8 +478,11 @@ public:
 class rm_tree_node {
 public:
   std::string            name;
+  std::string            tooltip;
   void* userdata;
   bool                   expanded;
+  rm_image               collapsed_icon;
+  rm_image               expanded_icon;
   std::vector<rm_tree_node*> children;
   rm_tree_node* parent;
 
@@ -496,10 +501,27 @@ public:
     children.push_back(node);
     return node;
   }
+
+  rm_tree_node& set_tooltip(std::string text) {
+    tooltip = std::move(text);
+    return *this;
+  }
+
+  rm_tree_node& set_icons(rm_image collapsed, rm_image expanded) {
+    collapsed_icon = collapsed;
+    expanded_icon = expanded;
+    return *this;
+  }
+
+  rm_image current_icon() const noexcept {
+    if (expanded)
+      return expanded_icon.isValid() ? expanded_icon : collapsed_icon;
+    return collapsed_icon.isValid() ? collapsed_icon : expanded_icon;
+  }
 };
 
 class rm_treeview;
-using rm_treeview_cb = std::function<void(rm_treeview*, rm_tree_node*)>;
+using rm_treeview_cb = Delegate<void, rm_treeview*, rm_tree_node*>;
 
 class rm_treeview : public rm_widget, public rm_callback<rm_treeview_cb> {
   struct VisibleRow {
@@ -520,6 +542,7 @@ class rm_treeview : public rm_widget, public rm_callback<rm_treeview_cb> {
   bool hit_test_expander(const rm_vec2& cursor_pos, size_t index) const;
   void select_index(size_t index, bool notify);
   void toggle_index(size_t index);
+  bool contains_node(const rm_tree_node* p_node) const;
   void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
   void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
   void on_pointer_capture_lost() override {
@@ -555,7 +578,163 @@ public:
   }
 
   inline rm_tree_node* get_selected() const { return m_selected; }
+  bool set_expanded(rm_tree_node* p_node, bool expanded);
+  bool expand(rm_tree_node* p_node) { return set_expanded(p_node, true); }
+  bool collapse(rm_tree_node* p_node) { return set_expanded(p_node, false); }
+  bool toggle(rm_tree_node* p_node) {
+    return p_node ? set_expanded(p_node, !p_node->expanded) : false;
+  }
   const RmTreeViewBehaviour& behaviour() const noexcept { return m_behaviour; }
+  void set_theme(RmThemeRef theme) {
+    m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+  }
+};
+
+enum class RmPropertyType {
+  text,
+  integer,
+  real,
+  boolean,
+  choice
+};
+
+class rm_property_group;
+
+class rm_property {
+  friend class rm_propertyview;
+
+  uint32_t m_id = 0;
+  std::string m_name;
+  std::string m_value;
+  std::string m_error;
+  RmPropertyType m_type = RmPropertyType::text;
+  std::vector<std::string> m_choices;
+  rm_property_group* m_pgroup = nullptr;
+  void* m_puserdata = nullptr;
+
+public:
+  rm_property(uint32_t id, std::string name, std::string value,
+    RmPropertyType type, rm_property_group* p_group, void* p_userdata)
+    : m_id(id), m_name(std::move(name)), m_value(std::move(value)),
+    m_type(type), m_pgroup(p_group), m_puserdata(p_userdata) {}
+
+  uint32_t get_id() const noexcept { return m_id; }
+  const std::string& get_name() const noexcept { return m_name; }
+  const std::string& get_value() const noexcept { return m_value; }
+  const std::string& get_error() const noexcept { return m_error; }
+  RmPropertyType get_type() const noexcept { return m_type; }
+  const std::vector<std::string>& get_choices() const noexcept { return m_choices; }
+  rm_property_group* get_group() const noexcept { return m_pgroup; }
+  void* get_userdata() const noexcept { return m_puserdata; }
+  bool is_valid() const noexcept { return m_error.empty(); }
+
+  rm_property& set_choices(std::vector<std::string> choices) {
+    m_choices = std::move(choices);
+    m_type = RmPropertyType::choice;
+    return *this;
+  }
+};
+
+class rm_property_group {
+  friend class rm_propertyview;
+
+  uint32_t m_id = 0;
+  std::string m_name;
+  bool m_expanded = true;
+  std::vector<std::unique_ptr<rm_property>> m_properties;
+
+public:
+  rm_property_group(uint32_t id, std::string name)
+    : m_id(id), m_name(std::move(name)) {}
+
+  uint32_t get_id() const noexcept { return m_id; }
+  const std::string& get_name() const noexcept { return m_name; }
+  bool is_expanded() const noexcept { return m_expanded; }
+  size_t get_num_properties() const noexcept { return m_properties.size(); }
+  rm_property* get_property(size_t index) const noexcept {
+    return index < m_properties.size() ? m_properties[index].get() : nullptr;
+  }
+};
+
+class rm_propertyview;
+using rm_property_changed_cb = Delegate<void, rm_propertyview*, rm_property*>;
+using rm_property_validation_cb = Delegate<std::string, rm_propertyview*,
+  const rm_property*, const char*>;
+
+class rm_propertyview : public rm_widget,
+  public rm_callback<rm_property_changed_cb> {
+  struct VisibleRow {
+    rm_property_group* group = nullptr;
+    rm_property* property = nullptr;
+    float y = 0.0f;
+    float height = 0.0f;
+  };
+
+  std::vector<std::unique_ptr<rm_property_group>> m_groups;
+  std::vector<std::unique_ptr<rm_property>> m_properties;
+  std::vector<VisibleRow> m_visible_rows;
+  RmPropertyViewBehaviour m_behaviour;
+  RmThemeRef m_theme;
+  rm_property_validation_cb m_validation_callback;
+  rm_property* m_pediting = nullptr;
+  std::string m_edit_buffer;
+  bool m_choice_open = false;
+  size_t m_choice_hovered = RmPropertyViewBehaviour::invalid_index;
+  uint32_t m_next_item_id = 0;
+
+  void rebuild_visible_rows();
+  size_t hit_test_row(const rm_vec2& cursor_pos) const;
+  size_t hit_test_choice(const rm_vec2& cursor_pos) const;
+  float value_column_x() const;
+  void begin_edit(rm_property* p_property);
+  bool commit_edit();
+  void cancel_edit();
+  void choose_value(size_t index);
+  std::string validate_builtin(const rm_property& property,
+    std::string_view value) const;
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_focus_changed(bool focused) override {
+    if (!focused) {
+      m_behaviour.cancel();
+      if (m_pediting)
+        commit_edit();
+    }
+  }
+  void on_pointer_capture_lost() override { m_behaviour.cancel(); }
+
+protected:
+  virtual std::string on_validate_property(const rm_property& property,
+    const std::string& value) const;
+  void on_draw(NVGcontext* pctx) override;
+  void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
+  void on_text_input(int sym) override;
+  bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state,
+    rm_vec2& cursor_pos, rm_vec2 delta) override;
+
+public:
+  rm_propertyview(rm_widget* p_parent, int x, int y, int width, int height,
+    rm_property_changed_cb changed = nullptr, RmThemeRef theme = {});
+
+  rm_property_group* add_group(const char* p_name,
+    uint32_t id = std::numeric_limits<uint32_t>::max());
+  rm_property* add_property(const char* p_name, const char* p_value,
+    RmPropertyType type = RmPropertyType::text,
+    rm_property_group* p_group = nullptr,
+    uint32_t id = std::numeric_limits<uint32_t>::max(),
+    void* p_userdata = nullptr);
+  rm_property* add_choice_property(const char* p_name, const char* p_value,
+    std::vector<std::string> choices,
+    rm_property_group* p_group = nullptr,
+    uint32_t id = std::numeric_limits<uint32_t>::max(),
+    void* p_userdata = nullptr);
+  bool set_group_expanded(rm_property_group* p_group, bool expanded);
+  bool set_property_value(rm_property* p_property, std::string value,
+    bool notify = false);
+  rm_property* get_selected_property() const noexcept;
+  const RmPropertyViewBehaviour& behaviour() const noexcept { return m_behaviour; }
+  void set_validation_callback(rm_property_validation_cb callback) {
+    m_validation_callback = callback;
+  }
   void set_theme(RmThemeRef theme) {
     m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
   }
@@ -623,7 +802,7 @@ public:
 * rm_menu
 */
 class rm_menu;
-using rm_menu_fn = void (*)(rm_menu *pmenu, uint32_t menuid, uint32_t id);
+using rm_menu_fn = Delegate<void, rm_menu*, uint32_t, uint32_t>;
 
 class rm_menu : public rm_widget, public rm_callback<rm_menu_fn>
 {
@@ -693,7 +872,7 @@ public:
 };
 
 class rm_radiobutton;
-using rm_radiobutton_cb = bool(*)(rm_radiobutton*);
+using rm_radiobutton_cb = Delegate<bool, rm_radiobutton*>;
 /**
  * RADIOBUTTON
  */
@@ -737,7 +916,7 @@ public:
 };
 
 class rm_switch;
-using rm_switch_cb = void(*)(rm_switch*);
+using rm_switch_cb = Delegate<void, rm_switch*>;
 /**
  * SWITCH
 */
@@ -770,7 +949,7 @@ public:
  * LISTVIEW
 */
 class rm_listview;
-using rm_listview_cb = void(*)(rm_listview* lv, size_t index);
+using rm_listview_cb = Delegate<void, rm_listview*, size_t>;
 class rm_listview : public rm_widget, public rm_callback<rm_listview_cb>
 {
   std::vector<std::string> m_items;

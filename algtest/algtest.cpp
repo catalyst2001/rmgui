@@ -1,4 +1,5 @@
 #include "../exgui/exgui/rmgui_behaviour.h"
+#include "../exgui/exgui/smalldelegate.h"
 
 #include <cmath>
 #include <cstdio>
@@ -118,6 +119,57 @@ void test_treeview_behaviour()
   tree.set_enabled(false);
   expect(!tree.pointer_down(0).handled,
     "disabled tree view ignores pointer selection");
+}
+
+void test_propertyview_behaviour()
+{
+  RmPropertyViewBehaviour propertyview;
+  propertyview.set_count(4);
+  propertyview.pointer_move(1);
+  propertyview.pointer_down(1);
+  expect(propertyview.pointer_up(1).activated &&
+    propertyview.selected_index() == 1,
+    "property view selects a table row after a matched click");
+  propertyview.select_relative(1);
+  expect(propertyview.selected_index() == 2,
+    "property view supports keyboard row navigation");
+  propertyview.set_enabled(false);
+  expect(!propertyview.pointer_down(0).handled,
+    "disabled property view ignores pointer input");
+}
+
+int delegate_free_result = 0;
+
+void delegate_free_function(int value)
+{
+  delegate_free_result = value;
+}
+
+struct DelegateReceiver {
+  int result = 0;
+
+  void receive(int value) { result = value; }
+  int offset(int value) const { return result + value; }
+};
+
+void test_small_delegate()
+{
+  Delegate<void, int> free_delegate(delegate_free_function);
+  free_delegate(7);
+  expect(delegate_free_result == 7,
+    "small delegate invokes a free function without allocation");
+
+  DelegateReceiver receiver;
+  Delegate<void, int> method_delegate;
+  method_delegate.Bind<DelegateReceiver, &DelegateReceiver::receive>(&receiver);
+  method_delegate(11);
+  expect(receiver.result == 11,
+    "small delegate invokes a bound member function");
+
+  Delegate<int, int> const_delegate;
+  const_delegate.Bind<DelegateReceiver, &DelegateReceiver::offset>(&receiver);
+  expect(const_delegate(4) == 15,
+    "small delegate invokes a bound const member function");
 }
 
 void test_output_text_behaviour()
@@ -334,6 +386,8 @@ int main()
   test_text_input_behaviour();
   test_number_input_behaviour();
   test_treeview_behaviour();
+  test_propertyview_behaviour();
+  test_small_delegate();
   test_output_text_behaviour();
   test_toggle_behaviour();
   test_combobox_behaviour();

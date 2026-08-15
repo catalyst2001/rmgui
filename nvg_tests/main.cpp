@@ -167,6 +167,8 @@ void test_theme_document_compilation()
   document.tokens.controls.number_input_button_width = 31.0f;
   document.tokens.controls.treeview_indent = 23.0f;
   document.tokens.controls.treeview_selection_horizontal_padding = 7.0f;
+  document.tokens.controls.treeview_draw_background = false;
+  document.tokens.controls.propertyview_name_column_ratio = 0.42f;
   document.tokens.controls.output_text_line_height = 19.0f;
 
   const RmThemeCompileResult result = RmThemeCompiler::compile(document);
@@ -195,9 +197,17 @@ void test_theme_document_compilation()
     "tree view recipes must use editable hierarchy metrics");
   require(result.theme->treeview.selection_horizontal_padding == 7.0f,
     "tree view recipes must use editable selection metrics");
-  require(same_color(result.theme->treeview.selected_background.normal,
-    document.tokens.colors.accent),
-    "tree view selection must use the accent token");
+  require(!result.theme->treeview.draw_background,
+    "tree view recipes must support a transparent surface");
+  require(same_color(result.theme->treeview.selection_border,
+    document.tokens.colors.focus_ring) &&
+    result.theme->treeview.selection_border_width == 1.0f,
+    "tree view selection must use a compact one-pixel focus border");
+  require(result.theme->propertyview.name_column_ratio == 0.42f,
+    "property view recipes must use editable table metrics");
+  require(result.theme->buttons.primary.focus_ring_width == 1.0f &&
+    result.theme->buttons.primary.corner_radius <= 5.0f,
+    "default controls must use strict one-pixel focus and compact corners");
   require(result.theme->output_text.line_height == 19.0f,
     "output text recipes must use editable line metrics");
   require(same_color(result.theme->output_text.background,

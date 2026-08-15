@@ -639,6 +639,103 @@ public:
   }
 };
 
+class RmPropertyViewBehaviour {
+public:
+  static constexpr size_t invalid_index = std::numeric_limits<size_t>::max();
+
+private:
+  size_t m_count = 0;
+  size_t m_selected = invalid_index;
+  size_t m_hovered = invalid_index;
+  size_t m_pressed = invalid_index;
+  bool m_enabled = true;
+
+public:
+  size_t count() const noexcept { return m_count; }
+  size_t selected_index() const noexcept { return m_selected; }
+  size_t hovered_index() const noexcept { return m_hovered; }
+  size_t pressed_index() const noexcept { return m_pressed; }
+  bool is_enabled() const noexcept { return m_enabled; }
+
+  RmBehaviourUpdate set_enabled(bool enabled) noexcept {
+    const bool changed = m_enabled != enabled || (!enabled &&
+      (m_hovered != invalid_index || m_pressed != invalid_index));
+    m_enabled = enabled;
+    if (!enabled) {
+      m_hovered = invalid_index;
+      m_pressed = invalid_index;
+    }
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate set_count(size_t count) noexcept {
+    const bool changed = m_count != count;
+    m_count = count;
+    if (m_selected >= count)
+      m_selected = invalid_index;
+    if (m_hovered >= count)
+      m_hovered = invalid_index;
+    if (m_pressed >= count)
+      m_pressed = invalid_index;
+    return { false, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_move(size_t index) noexcept {
+    if (!m_enabled || index >= m_count)
+      index = invalid_index;
+    const bool changed = m_hovered != index;
+    m_hovered = index;
+    return { m_pressed != invalid_index, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_down(size_t index) noexcept {
+    if (!m_enabled || index >= m_count)
+      return {};
+    const bool changed = m_pressed != index || m_hovered != index;
+    m_pressed = index;
+    m_hovered = index;
+    return { true, changed, false };
+  }
+
+  RmBehaviourUpdate pointer_up(size_t index) noexcept {
+    if (m_pressed == invalid_index)
+      return {};
+    const bool activated = m_enabled && index < m_count && m_pressed == index;
+    m_pressed = invalid_index;
+    m_hovered = index < m_count ? index : invalid_index;
+    if (!activated)
+      return { true, true, false };
+    const bool changed = m_selected != index;
+    m_selected = index;
+    return { true, true, changed || activated };
+  }
+
+  RmBehaviourUpdate select(size_t index) noexcept {
+    if (!m_enabled || index >= m_count)
+      return {};
+    const bool changed = m_selected != index;
+    m_selected = index;
+    return { true, changed, changed };
+  }
+
+  RmBehaviourUpdate select_relative(int delta) noexcept {
+    if (!m_enabled || m_count == 0 || delta == 0)
+      return {};
+    const int current = m_selected == invalid_index
+      ? (delta > 0 ? -1 : static_cast<int>(m_count))
+      : static_cast<int>(m_selected);
+    return select(static_cast<size_t>(std::clamp(current + delta, 0,
+      static_cast<int>(m_count) - 1)));
+  }
+
+  RmBehaviourUpdate cancel() noexcept {
+    if (m_pressed == invalid_index)
+      return {};
+    m_pressed = invalid_index;
+    return { false, true, false };
+  }
+};
+
 class RmOutputTextBehaviour {
   std::vector<std::string> m_lines;
   size_t m_capacity = 16;

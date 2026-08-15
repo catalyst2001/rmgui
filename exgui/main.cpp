@@ -468,21 +468,20 @@ void example_widgets(rm_surface* gui)
 
   RmThemeDocument controls_theme_document = RmThemeDocument::dark_theme();
   controls_theme_document.name = "ExGUI control gallery";
-  controls_theme_document.tokens.colors.accent = NVGcolor::RGB(53, 77, 230);
-  controls_theme_document.tokens.colors.accent_hovered = NVGcolor::RGB(73, 99, 245);
-  controls_theme_document.tokens.colors.accent_pressed = NVGcolor::RGB(42, 61, 190);
-  controls_theme_document.tokens.colors.control = NVGcolor::RGB(38, 46, 83);
-  controls_theme_document.tokens.colors.control_hovered = NVGcolor::RGB(49, 59, 102);
-  controls_theme_document.tokens.colors.control_pressed = NVGcolor::RGB(28, 35, 68);
+  controls_theme_document.tokens.colors.accent = NVGcolor::RGB(24, 126, 188);
+  controls_theme_document.tokens.colors.accent_hovered = NVGcolor::RGB(39, 145, 207);
+  controls_theme_document.tokens.colors.accent_pressed = NVGcolor::RGB(17, 99, 153);
   controls_theme_document.tokens.controls.switch_track_height = 30.f;
   controls_theme_document.tokens.controls.switch_padding = 4.f;
   controls_theme_document.tokens.controls.slider_track_height = 7.f;
   controls_theme_document.tokens.controls.slider_padding = 9.8f;
   controls_theme_document.tokens.controls.slider_thumb_radius = 7.f;
-  controls_theme_document.tokens.controls.slider_thumb_border_width = 3.5f;
+  controls_theme_document.tokens.controls.slider_thumb_border_width = 1.f;
   controls_theme_document.tokens.controls.combobox_item_height = 32.f;
   controls_theme_document.tokens.controls.combobox_popup_gap = 5.f;
   controls_theme_document.tokens.controls.combobox_indicator_size = 5.f;
+  controls_theme_document.tokens.controls.treeview_draw_background = false;
+  controls_theme_document.tokens.controls.treeview_draw_border = false;
   controls_theme_document.tokens.animation.normal = 0.25f;
   const RmThemeRef controls_theme = RmThemeCompiler::compile(controls_theme_document).theme;
 
@@ -543,9 +542,12 @@ void example_widgets(rm_surface* gui)
   psource->expanded = true;
   rm_tree_node* pcontrols = psource->add_child("Controls");
   pcontrols->expanded = true;
-  pcontrols->add_child("Button");
-  pcontrols->add_child("TreeView");
-  pcontrols->add_child("TextInput");
+  pcontrols->add_child("Button")->set_tooltip(
+    "Command button control");
+  pcontrols->add_child("TreeView")->set_tooltip(
+    "Hierarchy with independent branches and state icons");
+  pcontrols->add_child("TextInput")->set_tooltip(
+    "Single-line and multiline text editor");
   rm_tree_node* pthemes = ptree->add_root("Themes");
   pthemes->expanded = true;
   pthemes->add_child("Dark");
@@ -554,9 +556,25 @@ void example_widgets(rm_surface* gui)
 
   rm_theme_preview_panel* poutput_panel = new rm_theme_preview_panel(
     ptab11, 810, 10, 180, 510, controls_theme);
-  new rm_label(poutput_panel, 12, 18, "Activity log", controls_theme);
+  new rm_label(poutput_panel, 12, 18, "Properties", controls_theme);
+  rm_propertyview* pproperties = new rm_propertyview(
+    poutput_panel, 12, 48, 156, 292,
+    [](rm_propertyview*, rm_property* p_property) {
+      printf("Property %s changed to %s\n", p_property->get_name().c_str(),
+        p_property->get_value().c_str());
+    }, controls_theme);
+  pproperties->add_property("Name", "Bracket", RmPropertyType::text);
+  rm_property_group* pgeometry = pproperties->add_group("Geometry");
+  pproperties->add_property("Length", "120.5", RmPropertyType::real, pgeometry);
+  pproperties->add_property("Segments", "invalid", RmPropertyType::integer,
+    pgeometry);
+  pproperties->add_property("Solid", "true", RmPropertyType::boolean, pgeometry);
+  rm_property_group* pappearance_group = pproperties->add_group("Appearance");
+  pproperties->add_choice_property("Material", "Steel",
+    { "Steel", "Aluminium", "Plastic" }, pappearance_group);
+  new rm_label(poutput_panel, 12, 356, "Activity log", controls_theme);
   rm_output_text* poutput = new rm_output_text(
-    poutput_panel, 12, 50, 156, 444, 18, controls_theme);
+    poutput_panel, 12, 384, 156, 110, 5, controls_theme);
   poutput->print("Theme compiled");
   poutput->print("Controls loaded");
   poutput->print("Tree model ready");

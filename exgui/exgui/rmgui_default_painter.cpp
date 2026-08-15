@@ -864,12 +864,16 @@ void RmDefaultControlPainter::draw_listview_row(NVGcontext& context,
 void RmDefaultControlPainter::draw_treeview_surface(NVGcontext& context,
   const RmTreeViewSurfaceVisual& visual, const RmTreeViewStyle& style)
 {
-  context.beginPath();
-  context.roundedRect(0.5f, 0.5f, std::max(0.0f, visual.width - 1.0f),
-    std::max(0.0f, visual.height - 1.0f), style.corner_radius);
-  context.fillColor(style.background);
-  context.fill();
-  if (style.border_width > 0.0f) {
+  if (style.draw_background || (style.draw_border && style.border_width > 0.0f)) {
+    context.beginPath();
+    context.roundedRect(0.5f, 0.5f, std::max(0.0f, visual.width - 1.0f),
+      std::max(0.0f, visual.height - 1.0f), style.corner_radius);
+  }
+  if (style.draw_background) {
+    context.fillColor(style.background);
+    context.fill();
+  }
+  if (style.draw_border && style.border_width > 0.0f) {
     context.StrokeWidth(style.border_width);
     context.strokeColor(style.border);
     context.stroke();
@@ -897,9 +901,12 @@ void RmDefaultControlPainter::draw_treeview_row(NVGcontext& context,
     ? style.selected_text : style.row_text;
   const float branch_x = style.horizontal_padding +
     static_cast<float>(visual.depth) * style.indent;
-  const float text_x = branch_x + style.indent;
+  float text_x = branch_x + style.indent;
   const float center_y = visual.y + style.row_height * 0.5f;
   const char* text = visual.text ? visual.text : "";
+
+  if (visual.icon.isValid())
+    text_x += style.icon_size + style.icon_text_gap;
 
   context.setFontFaceId(static_cast<int>(visual.font.getValue()));
   context.setFontSize(style.font_size);
@@ -932,6 +939,11 @@ void RmDefaultControlPainter::draw_treeview_row(NVGcontext& context,
       background_height, style.row_corner_radius);
     context.fillColor(background);
     context.fill();
+    if (visual.selected && style.selection_border_width > 0.0f) {
+      context.StrokeWidth(style.selection_border_width);
+      context.strokeColor(style.selection_border);
+      context.stroke();
+    }
   }
 
   if (style.show_guides && visual.depth > 0) {
@@ -942,6 +954,12 @@ void RmDefaultControlPainter::draw_treeview_row(NVGcontext& context,
       context.moveTo(guide_x, visual.y);
       context.lineTo(guide_x, visual.y + style.row_height);
     }
+    const float parent_guide_x = branch_x - style.indent * 0.5f;
+    const float branch_end_x = visual.expandable
+      ? branch_x + style.indent * 0.5f - style.expander_size * 0.5f
+      : branch_x + style.indent;
+    context.moveTo(parent_guide_x, center_y);
+    context.lineTo(branch_end_x, center_y);
     context.StrokeWidth(1.0f);
     context.strokeColor(style.guide);
     context.stroke();
@@ -966,8 +984,234 @@ void RmDefaultControlPainter::draw_treeview_row(NVGcontext& context,
     context.stroke();
   }
 
+  if (visual.icon.isValid()) {
+    const float icon_x = branch_x + style.indent;
+    const float icon_y = center_y - style.icon_size * 0.5f;
+    context.beginPath();
+    context.rect(icon_x, icon_y, style.icon_size, style.icon_size);
+    context.fillPaint(NVGpaint::imagePattern(icon_x, icon_y, style.icon_size,
+      style.icon_size, 0.0f, visual.icon, visual.enabled ? 1.0f : 0.5f));
+    context.fill();
+  }
+
   context.fillColor(text_colors.resolve(state));
   context.text(text_x, center_y, text, nullptr);
+}
+
+void RmDefaultControlPainter::draw_treeview_tooltip(NVGcontext& context,
+  const RmTreeViewTooltipVisual& visual, const RmTreeViewStyle& style)
+{
+  const char* text = visual.text ? visual.text : "";
+  if (*text == '\0' || visual.available_width <= 0.0f ||
+    visual.available_height <= 0.0f)
+    return;
+
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  const float text_width = context.textBounds(0.0f, 0.0f, text, nullptr, nullptr);
+  const float width = std::min(visual.available_width,
+    text_width + style.tooltip_horizontal_padding * 2.0f);
+  const float height = std::min(visual.available_height,
+    style.font_size + style.tooltip_vertical_padding * 2.0f);
+  const float x = std::clamp(visual.anchor_x, 0.0f,
+    std::max(0.0f, visual.available_width - width));
+  const float preferred_y = visual.anchor_y + style.tooltip_offset;
+  const float y = std::clamp(preferred_y, 0.0f,
+    std::max(0.0f, visual.available_height - height));
+
+  context.beginPath();
+  context.roundedRect(x, y, width, height, style.tooltip_corner_radius);
+  context.fillColor(style.tooltip_background);
+  context.fill();
+  if (style.tooltip_border_width > 0.0f) {
+    context.StrokeWidth(style.tooltip_border_width);
+    context.strokeColor(style.tooltip_border);
+    context.stroke();
+  }
+  context.fillColor(style.tooltip_text);
+  context.text(x + style.tooltip_horizontal_padding, y + height * 0.5f,
+    text, nullptr);
+}
+
+void RmDefaultControlPainter::draw_propertyview_surface(NVGcontext& context,
+  const RmPropertyViewSurfaceVisual& visual, const RmPropertyViewStyle& style)
+{
+  context.beginPath();
+  context.roundedRect(0.5f, 0.5f, std::max(0.0f, visual.width - 1.0f),
+    std::max(0.0f, visual.height - 1.0f), style.corner_radius);
+  context.fillColor(style.background);
+  context.fill();
+  if (style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.border);
+    context.stroke();
+  }
+  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
+    const float inset = style.focus_ring_width * 0.5f;
+    context.beginPath();
+    context.roundedRect(inset, inset,
+      std::max(0.0f, visual.width - inset * 2.0f),
+      std::max(0.0f, visual.height - inset * 2.0f), style.corner_radius);
+    context.StrokeWidth(style.focus_ring_width);
+    context.strokeColor(style.focus_ring);
+    context.stroke();
+  }
+}
+
+void RmDefaultControlPainter::draw_propertyview_group(NVGcontext& context,
+  const RmPropertyViewGroupVisual& visual, const RmPropertyViewStyle& style)
+{
+  context.beginPath();
+  context.rect(0.5f, visual.y, std::max(0.0f, visual.width - 1.0f),
+    style.group_height);
+  context.fillColor(style.group_background);
+  context.fill();
+
+  const float center_y = visual.y + style.group_height * 0.5f;
+  const float indicator_x = style.horizontal_padding;
+  const float half = style.choice_indicator_size;
+  context.beginPath();
+  if (visual.expanded) {
+    context.moveTo(indicator_x, center_y - half * 0.5f);
+    context.lineTo(indicator_x + half, center_y + half * 0.5f);
+    context.lineTo(indicator_x + half * 2.0f, center_y - half * 0.5f);
+  }
+  else {
+    context.moveTo(indicator_x + half * 0.5f, center_y - half);
+    context.lineTo(indicator_x + half * 1.5f, center_y);
+    context.lineTo(indicator_x + half * 0.5f, center_y + half);
+  }
+  context.StrokeWidth(1.0f);
+  context.strokeColor(style.group_text);
+  context.stroke();
+
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.group_font_size);
+  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  context.fillColor(style.group_text);
+  context.text(indicator_x + half * 2.0f + style.editor_padding, center_y,
+    visual.text ? visual.text : "", nullptr);
+
+  if (style.grid_width > 0.0f) {
+    context.beginPath();
+    context.moveTo(0.0f, visual.y + style.group_height);
+    context.lineTo(visual.width, visual.y + style.group_height);
+    context.StrokeWidth(style.grid_width);
+    context.strokeColor(style.grid);
+    context.stroke();
+  }
+}
+
+void RmDefaultControlPainter::draw_propertyview_row(NVGcontext& context,
+  const RmPropertyViewRowVisual& visual, const RmPropertyViewStyle& style)
+{
+  const RmVisualState state = resolve_state(visual.enabled, visual.hovered,
+    visual.pressed);
+  const float split_x = std::clamp(visual.width * style.name_column_ratio,
+    0.0f, visual.width);
+  const float height = style.row_height;
+  const float center_y = visual.y + height * 0.5f;
+  const bool invalid = visual.error && *visual.error;
+
+  context.beginPath();
+  context.rect(0.5f, visual.y, std::max(0.0f, visual.width - 1.0f), height);
+  context.fillColor(style.row_background.resolve(state));
+  context.fill();
+
+  context.beginPath();
+  context.rect(split_x, visual.y, std::max(0.0f, visual.width - split_x),
+    height);
+  context.fillColor(invalid ? style.invalid_background :
+    style.value_background.resolve(state));
+  context.fill();
+
+  if (invalid && style.border_width > 0.0f) {
+    const float inset = style.border_width * 0.5f;
+    context.beginPath();
+    context.rect(split_x + inset, visual.y + inset,
+      std::max(0.0f, visual.width - split_x - inset * 2.0f),
+      std::max(0.0f, height - inset * 2.0f));
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.invalid_border);
+    context.stroke();
+  }
+  else if (visual.selected && style.focus_ring_width > 0.0f) {
+    const float inset = style.focus_ring_width * 0.5f;
+    context.beginPath();
+    context.rect(split_x + inset, visual.y + inset,
+      std::max(0.0f, visual.width - split_x - inset * 2.0f),
+      std::max(0.0f, height - inset * 2.0f));
+    context.StrokeWidth(style.focus_ring_width);
+    context.strokeColor(style.focus_ring);
+    context.stroke();
+  }
+
+  if (style.grid_width > 0.0f) {
+    context.beginPath();
+    context.moveTo(split_x, visual.y);
+    context.lineTo(split_x, visual.y + height);
+    context.moveTo(0.0f, visual.y + height);
+    context.lineTo(visual.width, visual.y + height);
+    context.StrokeWidth(style.grid_width);
+    context.strokeColor(style.grid);
+    context.stroke();
+  }
+
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  context.fillColor(style.name_text);
+  context.text(style.horizontal_padding, center_y,
+    visual.name ? visual.name : "", nullptr);
+
+  const float value_x = split_x + style.editor_padding;
+  const char* value = visual.value ? visual.value : "";
+  context.fillColor(invalid ? style.invalid_text : style.value_text);
+  context.text(value_x, center_y, value, nullptr);
+  if (visual.editing) {
+    const float caret_x = value_x + context.textBounds(0.0f, 0.0f, value,
+      nullptr, nullptr) + 1.0f;
+    context.beginPath();
+    context.moveTo(caret_x, visual.y + style.editor_padding);
+    context.lineTo(caret_x, visual.y + height - style.editor_padding);
+    context.StrokeWidth(1.0f);
+    context.strokeColor(invalid ? style.invalid_border : style.focus_ring);
+    context.stroke();
+  }
+
+  if (visual.choice) {
+    const float x = visual.width - style.horizontal_padding -
+      style.choice_indicator_size;
+    const float half = style.choice_indicator_size;
+    context.beginPath();
+    context.moveTo(x - half, center_y - half * 0.5f);
+    context.lineTo(x, center_y + half * 0.5f);
+    context.lineTo(x + half, center_y - half * 0.5f);
+    context.StrokeWidth(1.0f);
+    context.strokeColor(style.choice_indicator);
+    context.stroke();
+  }
+}
+
+void RmDefaultControlPainter::draw_propertyview_choice(NVGcontext& context,
+  const RmPropertyViewChoiceVisual& visual, const RmPropertyViewStyle& style)
+{
+  const NVGcolor background = visual.hovered || visual.selected
+    ? style.value_background.hovered : style.value_background.normal;
+  context.beginPath();
+  context.rect(visual.x, visual.y, visual.width, visual.height);
+  context.fillColor(background);
+  context.fill();
+  context.StrokeWidth(style.grid_width);
+  context.strokeColor(style.grid);
+  context.stroke();
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  context.fillColor(style.value_text);
+  context.text(visual.x + style.editor_padding,
+    visual.y + visual.height * 0.5f, visual.text ? visual.text : "", nullptr);
 }
 
 void RmDefaultControlPainter::draw_output_text_surface(NVGcontext& context,

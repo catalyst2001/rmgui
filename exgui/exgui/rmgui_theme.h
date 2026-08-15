@@ -289,19 +289,62 @@ struct RmTreeViewStyle {
   NVGcolor border;
   NVGcolor guide;
   NVGcolor focus_ring;
+  NVGcolor selection_border;
+  NVGcolor tooltip_background;
+  NVGcolor tooltip_border;
+  NVGcolor tooltip_text;
   float row_height = 0.0f;
   float indent = 0.0f;
   float horizontal_padding = 0.0f;
   float selection_horizontal_padding = 0.0f;
   float selection_vertical_padding = 0.0f;
+  float icon_size = 0.0f;
+  float icon_text_gap = 0.0f;
   float expander_size = 0.0f;
   float expander_stroke_width = 0.0f;
   float corner_radius = 0.0f;
   float row_corner_radius = 0.0f;
   float border_width = 0.0f;
   float focus_ring_width = 0.0f;
+  float selection_border_width = 0.0f;
   float font_size = 0.0f;
+  float tooltip_horizontal_padding = 0.0f;
+  float tooltip_vertical_padding = 0.0f;
+  float tooltip_offset = 0.0f;
+  float tooltip_corner_radius = 0.0f;
+  float tooltip_border_width = 0.0f;
+  bool draw_background = true;
+  bool draw_border = true;
   bool show_guides = true;
+};
+
+struct RmPropertyViewStyle {
+  RmStateColors row_background;
+  RmStateColors value_background;
+  NVGcolor background;
+  NVGcolor border;
+  NVGcolor grid;
+  NVGcolor name_text;
+  NVGcolor value_text;
+  NVGcolor group_background;
+  NVGcolor group_text;
+  NVGcolor invalid_background;
+  NVGcolor invalid_border;
+  NVGcolor invalid_text;
+  NVGcolor focus_ring;
+  NVGcolor choice_indicator;
+  float row_height = 0.0f;
+  float group_height = 0.0f;
+  float name_column_ratio = 0.0f;
+  float horizontal_padding = 0.0f;
+  float editor_padding = 0.0f;
+  float border_width = 0.0f;
+  float grid_width = 0.0f;
+  float focus_ring_width = 0.0f;
+  float corner_radius = 0.0f;
+  float font_size = 0.0f;
+  float group_font_size = 0.0f;
+  float choice_indicator_size = 0.0f;
 };
 
 struct RmOutputTextStyle {
@@ -406,9 +449,9 @@ struct RmSpacingTokens {
 };
 
 struct RmRadiusTokens {
-  float small = 3.0f;
-  float medium = 6.0f;
-  float large = 10.0f;
+  float small = 2.0f;
+  float medium = 4.0f;
+  float large = 5.0f;
   float pill = 999.0f;
 };
 
@@ -427,7 +470,7 @@ struct RmAnimationTokens {
 
 struct RmControlMetricsTokens {
   float border_width = 1.0f;
-  float focus_ring_width = 2.0f;
+  float focus_ring_width = 1.0f;
   float text_input_horizontal_padding = 10.0f;
   float text_input_vertical_padding = 7.0f;
   float text_input_caret_width = 1.5f;
@@ -448,7 +491,7 @@ struct RmControlMetricsTokens {
   float combobox_popup_gap = 4.0f;
   float combobox_item_height = 30.0f;
   float combobox_indicator_size = 5.0f;
-  float combobox_selected_mark_width = 2.0f;
+  float combobox_selected_mark_width = 1.0f;
   float combobox_shadow_size = 10.0f;
   float listview_row_height = 32.0f;
   float listview_horizontal_padding = 10.0f;
@@ -458,15 +501,29 @@ struct RmControlMetricsTokens {
   float treeview_horizontal_padding = 8.0f;
   float treeview_selection_horizontal_padding = 6.0f;
   float treeview_selection_vertical_padding = 3.0f;
+  float treeview_icon_size = 16.0f;
+  float treeview_icon_text_gap = 4.0f;
   float treeview_expander_size = 7.0f;
-  float treeview_expander_stroke_width = 1.5f;
+  float treeview_expander_stroke_width = 1.0f;
+  float treeview_tooltip_horizontal_padding = 7.0f;
+  float treeview_tooltip_vertical_padding = 5.0f;
+  float treeview_tooltip_offset = 6.0f;
+  bool treeview_draw_background = true;
+  bool treeview_draw_border = true;
+  float propertyview_row_height = 27.0f;
+  float propertyview_group_height = 25.0f;
+  float propertyview_name_column_ratio = 0.46f;
+  float propertyview_horizontal_padding = 7.0f;
+  float propertyview_editor_padding = 5.0f;
+  float propertyview_grid_width = 1.0f;
+  float propertyview_choice_indicator_size = 4.0f;
   float output_text_line_height = 20.0f;
   float output_text_horizontal_padding = 10.0f;
   float output_text_vertical_padding = 8.0f;
   float slider_track_height = 4.0f;
   float slider_padding = 8.0f;
   float slider_thumb_radius = 10.0f;
-  float slider_thumb_border_width = 2.0f;
+  float slider_thumb_border_width = 1.0f;
   float scrollbar_thickness = 12.0f;
   float scrollbar_minimum_thumb_length = 28.0f;
   float scrollbar_padding = 2.0f;
@@ -529,6 +586,7 @@ struct RmThemeSnapshot {
   RmComboBoxStyle combobox;
   RmListViewStyle listview;
   RmTreeViewStyle treeview;
+  RmPropertyViewStyle propertyview;
   RmOutputTextStyle output_text;
   RmSliderStyle slider;
   RmScrollbarStyle scrollbar;
@@ -662,8 +720,20 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.treeview_horizontal_padding, 0.0f, 256.0f, "tokens.controls.treeview_horizontal_padding", diagnostics);
     sanitize_metric(tokens.controls.treeview_selection_horizontal_padding, 0.0f, 256.0f, "tokens.controls.treeview_selection_horizontal_padding", diagnostics);
     sanitize_metric(tokens.controls.treeview_selection_vertical_padding, 0.0f, 256.0f, "tokens.controls.treeview_selection_vertical_padding", diagnostics);
+    sanitize_metric(tokens.controls.treeview_icon_size, 1.0f, 256.0f, "tokens.controls.treeview_icon_size", diagnostics);
+    sanitize_metric(tokens.controls.treeview_icon_text_gap, 0.0f, 256.0f, "tokens.controls.treeview_icon_text_gap", diagnostics);
     sanitize_metric(tokens.controls.treeview_expander_size, 1.0f, 64.0f, "tokens.controls.treeview_expander_size", diagnostics);
     sanitize_metric(tokens.controls.treeview_expander_stroke_width, 0.0f, 32.0f, "tokens.controls.treeview_expander_stroke_width", diagnostics);
+    sanitize_metric(tokens.controls.treeview_tooltip_horizontal_padding, 0.0f, 256.0f, "tokens.controls.treeview_tooltip_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.treeview_tooltip_vertical_padding, 0.0f, 256.0f, "tokens.controls.treeview_tooltip_vertical_padding", diagnostics);
+    sanitize_metric(tokens.controls.treeview_tooltip_offset, 0.0f, 256.0f, "tokens.controls.treeview_tooltip_offset", diagnostics);
+    sanitize_metric(tokens.controls.propertyview_row_height, 16.0f, 256.0f, "tokens.controls.propertyview_row_height", diagnostics);
+    sanitize_metric(tokens.controls.propertyview_group_height, 16.0f, 256.0f, "tokens.controls.propertyview_group_height", diagnostics);
+    sanitize_metric(tokens.controls.propertyview_name_column_ratio, 0.1f, 0.9f, "tokens.controls.propertyview_name_column_ratio", diagnostics);
+    sanitize_metric(tokens.controls.propertyview_horizontal_padding, 0.0f, 256.0f, "tokens.controls.propertyview_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.propertyview_editor_padding, 0.0f, 256.0f, "tokens.controls.propertyview_editor_padding", diagnostics);
+    sanitize_metric(tokens.controls.propertyview_grid_width, 0.0f, 32.0f, "tokens.controls.propertyview_grid_width", diagnostics);
+    sanitize_metric(tokens.controls.propertyview_choice_indicator_size, 1.0f, 64.0f, "tokens.controls.propertyview_choice_indicator_size", diagnostics);
     sanitize_metric(tokens.controls.output_text_line_height, 1.0f, 256.0f, "tokens.controls.output_text_line_height", diagnostics);
     sanitize_metric(tokens.controls.output_text_horizontal_padding, 0.0f, 256.0f, "tokens.controls.output_text_horizontal_padding", diagnostics);
     sanitize_metric(tokens.controls.output_text_vertical_padding, 0.0f, 256.0f, "tokens.controls.output_text_vertical_padding", diagnostics);
@@ -997,14 +1067,18 @@ public:
       colors.text_disabled };
     p_theme->treeview.expander = { colors.text_muted, colors.text,
       colors.text, colors.text_disabled };
-    p_theme->treeview.selected_background = { colors.accent,
-      colors.accent_hovered, colors.accent_pressed, colors.accent_disabled };
-    p_theme->treeview.selected_text = { colors.text_on_accent,
-      colors.text_on_accent, colors.text_on_accent, colors.text_disabled };
+    p_theme->treeview.selected_background = { colors.control_pressed,
+      colors.control_hovered, colors.control_pressed, colors.control_disabled };
+    p_theme->treeview.selected_text = { colors.text, colors.text,
+      colors.text, colors.text_disabled };
     p_theme->treeview.background = colors.surface_elevated;
     p_theme->treeview.border = colors.border;
     p_theme->treeview.guide = colors.border;
     p_theme->treeview.focus_ring = colors.focus_ring;
+    p_theme->treeview.selection_border = colors.focus_ring;
+    p_theme->treeview.tooltip_background = colors.control;
+    p_theme->treeview.tooltip_border = colors.border_hovered;
+    p_theme->treeview.tooltip_text = colors.text;
     p_theme->treeview.row_height = controls.treeview_row_height;
     p_theme->treeview.indent = controls.treeview_indent;
     p_theme->treeview.horizontal_padding = controls.treeview_horizontal_padding;
@@ -1012,6 +1086,8 @@ public:
       controls.treeview_selection_horizontal_padding;
     p_theme->treeview.selection_vertical_padding =
       controls.treeview_selection_vertical_padding;
+    p_theme->treeview.icon_size = controls.treeview_icon_size;
+    p_theme->treeview.icon_text_gap = controls.treeview_icon_text_gap;
     p_theme->treeview.expander_size = controls.treeview_expander_size;
     p_theme->treeview.expander_stroke_width =
       controls.treeview_expander_stroke_width;
@@ -1019,7 +1095,50 @@ public:
     p_theme->treeview.row_corner_radius = tokens.radius.small;
     p_theme->treeview.border_width = controls.border_width;
     p_theme->treeview.focus_ring_width = controls.focus_ring_width;
+    p_theme->treeview.selection_border_width = controls.focus_ring_width;
     p_theme->treeview.font_size = tokens.typography.control;
+    p_theme->treeview.tooltip_horizontal_padding =
+      controls.treeview_tooltip_horizontal_padding;
+    p_theme->treeview.tooltip_vertical_padding =
+      controls.treeview_tooltip_vertical_padding;
+    p_theme->treeview.tooltip_offset = controls.treeview_tooltip_offset;
+    p_theme->treeview.tooltip_corner_radius = tokens.radius.small;
+    p_theme->treeview.tooltip_border_width = controls.border_width;
+    p_theme->treeview.draw_background = controls.treeview_draw_background;
+    p_theme->treeview.draw_border = controls.treeview_draw_border;
+
+    p_theme->propertyview.row_background = { colors.surface_elevated,
+      colors.control_hovered, colors.control_pressed, colors.control_disabled };
+    p_theme->propertyview.value_background = { colors.control,
+      colors.control_hovered, colors.control_pressed, colors.control_disabled };
+    p_theme->propertyview.background = colors.surface_elevated;
+    p_theme->propertyview.border = colors.border;
+    p_theme->propertyview.grid = colors.border;
+    p_theme->propertyview.name_text = colors.text_muted;
+    p_theme->propertyview.value_text = colors.text;
+    p_theme->propertyview.group_background = colors.control_pressed;
+    p_theme->propertyview.group_text = colors.text;
+    p_theme->propertyview.invalid_background = NVGcolor::RGBAf(
+      colors.danger.r, colors.danger.g, colors.danger.b, 0.16f);
+    p_theme->propertyview.invalid_border = colors.danger;
+    p_theme->propertyview.invalid_text = colors.danger_hovered;
+    p_theme->propertyview.focus_ring = colors.focus_ring;
+    p_theme->propertyview.choice_indicator = colors.text_muted;
+    p_theme->propertyview.row_height = controls.propertyview_row_height;
+    p_theme->propertyview.group_height = controls.propertyview_group_height;
+    p_theme->propertyview.name_column_ratio =
+      controls.propertyview_name_column_ratio;
+    p_theme->propertyview.horizontal_padding =
+      controls.propertyview_horizontal_padding;
+    p_theme->propertyview.editor_padding = controls.propertyview_editor_padding;
+    p_theme->propertyview.border_width = controls.border_width;
+    p_theme->propertyview.grid_width = controls.propertyview_grid_width;
+    p_theme->propertyview.focus_ring_width = controls.focus_ring_width;
+    p_theme->propertyview.corner_radius = tokens.radius.small;
+    p_theme->propertyview.font_size = tokens.typography.caption;
+    p_theme->propertyview.group_font_size = tokens.typography.caption;
+    p_theme->propertyview.choice_indicator_size =
+      controls.propertyview_choice_indicator_size;
 
     p_theme->output_text.background = colors.surface_elevated;
     p_theme->output_text.border = colors.border;
@@ -1099,33 +1218,33 @@ public:
 inline RmThemeDocument RmThemeDocument::dark_theme()
 {
   RmThemeDocument document;
-  document.name = "RmGUI Dark";
+  document.name = "RmGUI CAD Dark";
   document.mode = RmThemeMode::dark;
   RmColorTokens& colors = document.tokens.colors;
-  colors.accent = NVGcolor::RGBA(76, 103, 235, 255);
-  colors.accent_hovered = NVGcolor::RGBA(96, 125, 249, 255);
-  colors.accent_pressed = NVGcolor::RGBA(55, 76, 196, 255);
-  colors.accent_disabled = NVGcolor::RGBA(82, 91, 135, 255);
+  colors.accent = NVGcolor::RGBA(24, 126, 188, 255);
+  colors.accent_hovered = NVGcolor::RGBA(39, 145, 207, 255);
+  colors.accent_pressed = NVGcolor::RGBA(17, 99, 153, 255);
+  colors.accent_disabled = NVGcolor::RGBA(73, 102, 119, 255);
   colors.accent_secondary = NVGcolor::RGBA(151, 89, 232, 255);
   colors.danger = NVGcolor::RGBA(196, 54, 75, 255);
   colors.danger_hovered = NVGcolor::RGBA(220, 68, 89, 255);
   colors.danger_pressed = NVGcolor::RGBA(161, 41, 60, 255);
   colors.danger_disabled = NVGcolor::RGBA(111, 67, 75, 255);
-  colors.surface = NVGcolor::RGBA(21, 23, 29, 255);
-  colors.surface_elevated = NVGcolor::RGBA(31, 34, 42, 255);
-  colors.control = NVGcolor::RGBA(47, 50, 61, 255);
-  colors.control_hovered = NVGcolor::RGBA(58, 62, 76, 255);
-  colors.control_pressed = NVGcolor::RGBA(38, 41, 51, 255);
-  colors.control_disabled = NVGcolor::RGBA(43, 45, 52, 255);
-  colors.border = NVGcolor::RGBA(83, 88, 105, 255);
-  colors.border_hovered = NVGcolor::RGBA(112, 126, 190, 255);
-  colors.border_pressed = NVGcolor::RGBA(76, 93, 180, 255);
-  colors.border_disabled = NVGcolor::RGBA(68, 70, 78, 255);
-  colors.text = NVGcolor::RGBA(241, 243, 248, 255);
-  colors.text_muted = NVGcolor::RGBA(177, 181, 193, 255);
-  colors.text_disabled = NVGcolor::RGBA(124, 127, 137, 255);
+  colors.surface = NVGcolor::RGBA(37, 38, 40, 255);
+  colors.surface_elevated = NVGcolor::RGBA(51, 52, 54, 255);
+  colors.control = NVGcolor::RGBA(63, 64, 66, 255);
+  colors.control_hovered = NVGcolor::RGBA(75, 76, 79, 255);
+  colors.control_pressed = NVGcolor::RGBA(54, 55, 57, 255);
+  colors.control_disabled = NVGcolor::RGBA(57, 58, 60, 255);
+  colors.border = NVGcolor::RGBA(91, 93, 96, 255);
+  colors.border_hovered = NVGcolor::RGBA(121, 151, 169, 255);
+  colors.border_pressed = NVGcolor::RGBA(39, 129, 183, 255);
+  colors.border_disabled = NVGcolor::RGBA(73, 74, 77, 255);
+  colors.text = NVGcolor::RGBA(232, 233, 235, 255);
+  colors.text_muted = NVGcolor::RGBA(178, 180, 183, 255);
+  colors.text_disabled = NVGcolor::RGBA(126, 128, 131, 255);
   colors.text_on_accent = NVGcolor::RGBA(255, 255, 255, 255);
-  colors.focus_ring = NVGcolor::RGBA(143, 184, 255, 235);
+  colors.focus_ring = NVGcolor::RGBA(82, 181, 230, 255);
   colors.shadow = NVGcolor::RGBA(0, 0, 0, 90);
   return document;
 }

@@ -197,6 +197,7 @@ struct RmTreeViewRowVisual {
   float width = 0.0f;
   NVGhandle font;
   const char* text = nullptr;
+  NVGhandle icon;
   size_t depth = 0;
   bool enabled = true;
   bool hovered = false;
@@ -204,6 +205,58 @@ struct RmTreeViewRowVisual {
   bool selected = false;
   bool expandable = false;
   bool expanded = false;
+};
+
+struct RmTreeViewTooltipVisual {
+  float anchor_x = 0.0f;
+  float anchor_y = 0.0f;
+  float available_width = 0.0f;
+  float available_height = 0.0f;
+  NVGhandle font;
+  const char* text = nullptr;
+};
+
+struct RmPropertyViewSurfaceVisual {
+  float width = 0.0f;
+  float height = 0.0f;
+  bool focused = false;
+  bool enabled = true;
+};
+
+struct RmPropertyViewGroupVisual {
+  float y = 0.0f;
+  float width = 0.0f;
+  NVGhandle font;
+  const char* text = nullptr;
+  bool expanded = true;
+  bool enabled = true;
+  bool hovered = false;
+};
+
+struct RmPropertyViewRowVisual {
+  float y = 0.0f;
+  float width = 0.0f;
+  NVGhandle font;
+  const char* name = nullptr;
+  const char* value = nullptr;
+  const char* error = nullptr;
+  bool enabled = true;
+  bool hovered = false;
+  bool pressed = false;
+  bool selected = false;
+  bool editing = false;
+  bool choice = false;
+};
+
+struct RmPropertyViewChoiceVisual {
+  float x = 0.0f;
+  float y = 0.0f;
+  float width = 0.0f;
+  float height = 0.0f;
+  NVGhandle font;
+  const char* text = nullptr;
+  bool hovered = false;
+  bool selected = false;
 };
 
 struct RmOutputTextSurfaceVisual {
@@ -302,6 +355,16 @@ public:
     const RmTreeViewSurfaceVisual& visual, const RmTreeViewStyle& style);
   static void draw_treeview_row(NVGcontext& context,
     const RmTreeViewRowVisual& visual, const RmTreeViewStyle& style);
+  static void draw_treeview_tooltip(NVGcontext& context,
+    const RmTreeViewTooltipVisual& visual, const RmTreeViewStyle& style);
+  static void draw_propertyview_surface(NVGcontext& context,
+    const RmPropertyViewSurfaceVisual& visual, const RmPropertyViewStyle& style);
+  static void draw_propertyview_group(NVGcontext& context,
+    const RmPropertyViewGroupVisual& visual, const RmPropertyViewStyle& style);
+  static void draw_propertyview_row(NVGcontext& context,
+    const RmPropertyViewRowVisual& visual, const RmPropertyViewStyle& style);
+  static void draw_propertyview_choice(NVGcontext& context,
+    const RmPropertyViewChoiceVisual& visual, const RmPropertyViewStyle& style);
   static void draw_output_text_surface(NVGcontext& context,
     const RmOutputTextSurfaceVisual& visual, const RmOutputTextStyle& style);
   static void draw_output_text_line(NVGcontext& context,

@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdarg>
+#include <cerrno>
+#include <cctype>
 #include <cmath>
 
 #include "stb_image.h"
@@ -1419,9 +1421,28 @@ void rm_treeview::toggle_index(size_t index)
 	rm_tree_node* p_node = m_visible_rows[index].node;
 	if (p_node->children.empty())
 		return;
-	p_node->expanded = !p_node->expanded;
+	set_expanded(p_node, !p_node->expanded);
+}
+
+bool rm_treeview::contains_node(const rm_tree_node* p_node) const
+{
+	if (!p_node)
+		return false;
+	const rm_tree_node* p_root = p_node;
+	while (p_root->parent)
+		p_root = p_root->parent;
+	return std::find(m_roots.begin(), m_roots.end(), p_root) != m_roots.end();
+}
+
+bool rm_treeview::set_expanded(rm_tree_node* p_node, bool expanded)
+{
+	if (!contains_node(p_node) || p_node->children.empty() ||
+		p_node->expanded == expanded)
+		return false;
+	p_node->expanded = expanded;
 	rebuild_visible_rows();
 	root_update();
+	return true;
 }
 
 void rm_treeview::on_draw(NVGcontext* pctx)
@@ -1443,6 +1464,7 @@ void rm_treeview::on_draw(NVGcontext* pctx)
 			m_size.x,
 			get_font(),
 			row.node->name.c_str(),
+			row.node->current_icon(),
 			row.depth,
 			is_enabled(),
 			hovered == index,
@@ -1452,6 +1474,18 @@ void rm_treeview::on_draw(NVGcontext* pctx)
 			row.node->expanded
 		};
 		RmDefaultControlPainter::draw_treeview_row(*pctx, visual, style);
+	}
+	if (hovered < m_visible_rows.size()) {
+		const VisibleRow& row = m_visible_rows[hovered];
+		if (!row.node->tooltip.empty()) {
+			const float anchor_x = style.horizontal_padding +
+				(static_cast<float>(row.depth) + 1.0f) * style.indent;
+			const float anchor_y = (static_cast<float>(hovered) + 1.0f) *
+				style.row_height;
+			RmDefaultControlPainter::draw_treeview_tooltip(*pctx,
+				{ anchor_x, anchor_y, m_size.x, m_size.y, get_font(),
+					row.node->tooltip.c_str() }, style);
+		}
 	}
 	rm_widget::on_draw(pctx);
 }
@@ -1552,6 +1586,427 @@ bool rm_treeview::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
 				get_callback()(this, m_selected);
 		}
 		return !update.handled;
+	}
+	return true;
+}
+
+rm_propertyview::rm_propertyview(rm_widget* p_parent, int x, int y,
+	int width, int height, rm_property_changed_cb changed, RmThemeRef theme)
+	: rm_widget(x, y, width, height, p_parent, "ui_propertyview",
+		RM_FLAG_DEFAULT | RM_FLAG_GLOBAL | RM_FLAG_OPAQUE),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
+{
+	set_callback(changed);
+}
+
+void rm_propertyview::rebuild_visible_rows()
+{
+	m_visible_rows.clear();
+	float y = 0.0f;
+	const RmPropertyViewStyle& style = m_theme->propertyview;
+	for (const auto& p_property : m_properties) {
+		m_visible_rows.push_back({ nullptr, p_property.get(), y, style.row_height });
+		y += style.row_height;
+	}
+	for (const auto& p_group : m_groups) {
+		m_visible_rows.push_back({ p_group.get(), nullptr, y, style.group_height });
+		y += style.group_height;
+		if (!p_group->m_expanded)
+			continue;
+		for (const auto& p_property : p_group->m_properties) {
+			m_visible_rows.push_back({ nullptr, p_property.get(), y, style.row_height });
+			y += style.row_height;
+		}
+	}
+	m_behaviour.set_count(m_visible_rows.size());
+}
+
+size_t rm_propertyview::hit_test_row(const rm_vec2& cursor_pos) const
+{
+	if (!m_bbox.inside(cursor_pos))
+		return RmPropertyViewBehaviour::invalid_index;
+	const float local_y = cursor_pos.y - m_pos_of_parent.y;
+	for (size_t index = 0; index < m_visible_rows.size(); ++index) {
+		const VisibleRow& row = m_visible_rows[index];
+		if (local_y >= row.y && local_y < row.y + row.height)
+			return index;
+	}
+	return RmPropertyViewBehaviour::invalid_index;
+}
+
+float rm_propertyview::value_column_x() const
+{
+	return m_size.x * m_theme->propertyview.name_column_ratio;
+}
+
+size_t rm_propertyview::hit_test_choice(const rm_vec2& cursor_pos) const
+{
+	if (!m_choice_open || !m_pediting ||
+		m_pediting->m_type != RmPropertyType::choice)
+		return RmPropertyViewBehaviour::invalid_index;
+	const auto row = std::find_if(m_visible_rows.begin(), m_visible_rows.end(),
+		[this](const VisibleRow& item) { return item.property == m_pediting; });
+	if (row == m_visible_rows.end())
+		return RmPropertyViewBehaviour::invalid_index;
+	const float local_x = cursor_pos.x - m_pos_of_parent.x;
+	const float local_y = cursor_pos.y - m_pos_of_parent.y;
+	const float popup_y = row->y + row->height;
+	const float item_height = m_theme->propertyview.row_height;
+	if (local_x < value_column_x() || local_x >= m_size.x || local_y < popup_y)
+		return RmPropertyViewBehaviour::invalid_index;
+	const size_t index = static_cast<size_t>((local_y - popup_y) / item_height);
+	return index < m_pediting->m_choices.size()
+		? index : RmPropertyViewBehaviour::invalid_index;
+}
+
+void rm_propertyview::begin_edit(rm_property* p_property)
+{
+	if (!p_property)
+		return;
+	m_pediting = p_property;
+	m_edit_buffer = p_property->m_value;
+	m_choice_open = p_property->m_type == RmPropertyType::choice;
+	m_choice_hovered = RmPropertyViewBehaviour::invalid_index;
+	if (m_choice_open) {
+		const auto selected = std::find(p_property->m_choices.begin(),
+			p_property->m_choices.end(), p_property->m_value);
+		if (selected != p_property->m_choices.end())
+			m_choice_hovered = static_cast<size_t>(
+				selected - p_property->m_choices.begin());
+	}
+}
+
+bool rm_propertyview::commit_edit()
+{
+	if (!m_pediting)
+		return false;
+	rm_property* p_property = m_pediting;
+	const std::string previous = p_property->m_value;
+	p_property->m_value = m_edit_buffer;
+	p_property->m_error = on_validate_property(*p_property, p_property->m_value);
+	m_pediting = nullptr;
+	m_choice_open = false;
+	m_choice_hovered = RmPropertyViewBehaviour::invalid_index;
+	const bool changed = previous != p_property->m_value;
+	if (changed && p_property->m_error.empty() && is_valid_callback())
+		get_callback()(this, p_property);
+	return p_property->m_error.empty();
+}
+
+void rm_propertyview::cancel_edit()
+{
+	m_pediting = nullptr;
+	m_edit_buffer.clear();
+	m_choice_open = false;
+	m_choice_hovered = RmPropertyViewBehaviour::invalid_index;
+}
+
+void rm_propertyview::choose_value(size_t index)
+{
+	if (!m_pediting || index >= m_pediting->m_choices.size())
+		return;
+	m_edit_buffer = m_pediting->m_choices[index];
+	commit_edit();
+}
+
+std::string rm_propertyview::validate_builtin(const rm_property& property,
+	std::string_view value) const
+{
+	if (property.m_type == RmPropertyType::text)
+		return {};
+	const std::string text(value);
+	if (property.m_type == RmPropertyType::integer) {
+		char* p_end = nullptr;
+		errno = 0;
+		std::strtoll(text.c_str(), &p_end, 10);
+		if (text.empty() || errno == ERANGE || !p_end || *p_end != '\0')
+			return "Expected an integer value";
+		return {};
+	}
+	if (property.m_type == RmPropertyType::real) {
+		char* p_end = nullptr;
+		errno = 0;
+		std::strtod(text.c_str(), &p_end);
+		if (text.empty() || errno == ERANGE || !p_end || *p_end != '\0')
+			return "Expected a real value";
+		return {};
+	}
+	if (property.m_type == RmPropertyType::boolean) {
+		std::string normalized = text;
+		std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+			[](unsigned char value) { return static_cast<char>(std::tolower(value)); });
+		if (normalized != "true" && normalized != "false" &&
+			normalized != "0" && normalized != "1")
+			return "Expected true, false, 0 or 1";
+		return {};
+	}
+	if (property.m_type == RmPropertyType::choice &&
+		std::find(property.m_choices.begin(), property.m_choices.end(), text) ==
+		property.m_choices.end())
+		return "Value is not in the allowed list";
+	return {};
+}
+
+std::string rm_propertyview::on_validate_property(
+	const rm_property& property, const std::string& value) const
+{
+	std::string error = validate_builtin(property, value);
+	if (error.empty() && m_validation_callback)
+		error = m_validation_callback(const_cast<rm_propertyview*>(this),
+			&property, value.c_str());
+	return error;
+}
+
+rm_property_group* rm_propertyview::add_group(const char* p_name, uint32_t id)
+{
+	if (id == std::numeric_limits<uint32_t>::max())
+		id = m_next_item_id++;
+	else if (id >= m_next_item_id)
+		m_next_item_id = id + 1;
+	auto p_group = std::make_unique<rm_property_group>(id,
+		p_name ? p_name : "");
+	rm_property_group* p_result = p_group.get();
+	m_groups.push_back(std::move(p_group));
+	rebuild_visible_rows();
+	return p_result;
+}
+
+rm_property* rm_propertyview::add_property(const char* p_name,
+	const char* p_value, RmPropertyType type, rm_property_group* p_group,
+	uint32_t id, void* p_userdata)
+{
+	if (p_group && std::find_if(m_groups.begin(), m_groups.end(),
+		[p_group](const auto& item) { return item.get() == p_group; }) == m_groups.end())
+		return nullptr;
+	if (id == std::numeric_limits<uint32_t>::max())
+		id = m_next_item_id++;
+	else if (id >= m_next_item_id)
+		m_next_item_id = id + 1;
+	auto p_property = std::make_unique<rm_property>(id, p_name ? p_name : "",
+		p_value ? p_value : "", type, p_group, p_userdata);
+	rm_property* p_result = p_property.get();
+	if (p_group)
+		p_group->m_properties.push_back(std::move(p_property));
+	else
+		m_properties.push_back(std::move(p_property));
+	p_result->m_error = on_validate_property(*p_result, p_result->m_value);
+	rebuild_visible_rows();
+	return p_result;
+}
+
+rm_property* rm_propertyview::add_choice_property(const char* p_name,
+	const char* p_value, std::vector<std::string> choices,
+	rm_property_group* p_group, uint32_t id, void* p_userdata)
+{
+	rm_property* p_property = add_property(p_name, p_value,
+		RmPropertyType::choice, p_group, id, p_userdata);
+	if (!p_property)
+		return nullptr;
+	p_property->m_choices = std::move(choices);
+	p_property->m_error = on_validate_property(*p_property, p_property->m_value);
+	return p_property;
+}
+
+bool rm_propertyview::set_group_expanded(rm_property_group* p_group,
+	bool expanded)
+{
+	const auto found = std::find_if(m_groups.begin(), m_groups.end(),
+		[p_group](const auto& item) { return item.get() == p_group; });
+	if (found == m_groups.end() || p_group->m_expanded == expanded)
+		return false;
+	p_group->m_expanded = expanded;
+	rebuild_visible_rows();
+	return true;
+}
+
+bool rm_propertyview::set_property_value(rm_property* p_property,
+	std::string value, bool notify)
+{
+	if (!p_property)
+		return false;
+	const std::string previous = p_property->m_value;
+	p_property->m_value = std::move(value);
+	p_property->m_error = on_validate_property(*p_property, p_property->m_value);
+	if (notify && previous != p_property->m_value && p_property->m_error.empty() &&
+		is_valid_callback())
+		get_callback()(this, p_property);
+	return p_property->m_error.empty();
+}
+
+rm_property* rm_propertyview::get_selected_property() const noexcept
+{
+	const size_t selected = m_behaviour.selected_index();
+	return selected < m_visible_rows.size() ? m_visible_rows[selected].property : nullptr;
+}
+
+void rm_propertyview::on_draw(NVGcontext* pctx)
+{
+	rebuild_visible_rows();
+	const RmPropertyViewStyle& style = m_theme->propertyview;
+	RmDefaultControlPainter::draw_propertyview_surface(*pctx,
+		{ m_size.x, m_size.y, m_elem_flags.is_focused(), is_enabled() }, style);
+	for (size_t index = 0; index < m_visible_rows.size(); ++index) {
+		const VisibleRow& row = m_visible_rows[index];
+		if (row.y >= m_size.y)
+			break;
+		if (row.group) {
+			RmDefaultControlPainter::draw_propertyview_group(*pctx,
+				{ row.y, m_size.x, get_font(), row.group->m_name.c_str(),
+					row.group->m_expanded, is_enabled(),
+					m_behaviour.hovered_index() == index }, style);
+			continue;
+		}
+		const bool editing = row.property == m_pediting;
+		RmDefaultControlPainter::draw_propertyview_row(*pctx,
+			{ row.y, m_size.x, get_font(), row.property->m_name.c_str(),
+				editing ? m_edit_buffer.c_str() : row.property->m_value.c_str(),
+				row.property->m_error.c_str(), is_enabled(),
+				m_behaviour.hovered_index() == index,
+				m_behaviour.pressed_index() == index,
+				m_behaviour.selected_index() == index, editing,
+				row.property->m_type == RmPropertyType::choice }, style);
+	}
+	if (m_choice_open && m_pediting) {
+		const auto row = std::find_if(m_visible_rows.begin(), m_visible_rows.end(),
+			[this](const VisibleRow& item) { return item.property == m_pediting; });
+		if (row != m_visible_rows.end()) {
+			const float x = value_column_x();
+			float y = row->y + row->height;
+			for (size_t index = 0; index < m_pediting->m_choices.size(); ++index) {
+				if (y + style.row_height > m_size.y)
+					break;
+				RmDefaultControlPainter::draw_propertyview_choice(*pctx,
+					{ x, y, m_size.x - x, style.row_height, get_font(),
+						m_pediting->m_choices[index].c_str(),
+						m_choice_hovered == index,
+						m_edit_buffer == m_pediting->m_choices[index] }, style);
+				y += style.row_height;
+			}
+		}
+	}
+	rm_widget::on_draw(pctx);
+}
+
+void rm_propertyview::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
+{
+	RM_UNUSED(sc);
+	if (state != RM_KEY_STATE::DOWN && state != RM_KEY_STATE::REPEAT)
+		return;
+	if (m_pediting) {
+		if (vk == RM_KEY_ESCAPE) {
+			cancel_edit();
+			return;
+		}
+		if (m_choice_open) {
+			if (vk == RM_KEY_UP || vk == RM_KEY_DOWN) {
+				const int delta = vk == RM_KEY_UP ? -1 : 1;
+				const int current = m_choice_hovered == RmPropertyViewBehaviour::invalid_index
+					? (delta > 0 ? -1 : static_cast<int>(m_pediting->m_choices.size()))
+					: static_cast<int>(m_choice_hovered);
+				if (!m_pediting->m_choices.empty())
+					m_choice_hovered = static_cast<size_t>(std::clamp(current + delta,
+						0, static_cast<int>(m_pediting->m_choices.size()) - 1));
+			}
+			else if (vk == RM_KEY_ENTER &&
+				m_choice_hovered != RmPropertyViewBehaviour::invalid_index)
+				choose_value(m_choice_hovered);
+			return;
+		}
+		if (vk == RM_KEY_BACKSPACE && !m_edit_buffer.empty()) {
+			size_t start = m_edit_buffer.size() - 1;
+			while (start > 0 && (static_cast<unsigned char>(m_edit_buffer[start]) & 0xc0u) == 0x80u)
+				--start;
+			m_edit_buffer.erase(start);
+			m_pediting->m_error = on_validate_property(*m_pediting, m_edit_buffer);
+		}
+		else if (vk == RM_KEY_ENTER)
+			commit_edit();
+		return;
+	}
+
+	if (vk == RM_KEY_UP || vk == RM_KEY_DOWN) {
+		m_behaviour.select_relative(vk == RM_KEY_UP ? -1 : 1);
+		return;
+	}
+	if (vk == RM_KEY_ENTER) {
+		const size_t selected = m_behaviour.selected_index();
+		if (selected >= m_visible_rows.size())
+			return;
+		VisibleRow& row = m_visible_rows[selected];
+		if (row.group)
+			set_group_expanded(row.group, !row.group->m_expanded);
+		else
+			begin_edit(row.property);
+	}
+}
+
+void rm_propertyview::on_text_input(int sym)
+{
+	if (!m_pediting || m_choice_open || sym < 32 || sym > 0x10ffff)
+		return;
+	const uint32_t codepoint = static_cast<uint32_t>(sym);
+	if (codepoint < 0x80u)
+		m_edit_buffer.push_back(static_cast<char>(codepoint));
+	else if (codepoint < 0x800u) {
+		m_edit_buffer.push_back(static_cast<char>(0xc0u | (codepoint >> 6)));
+		m_edit_buffer.push_back(static_cast<char>(0x80u | (codepoint & 0x3fu)));
+	}
+	else if (codepoint < 0x10000u) {
+		m_edit_buffer.push_back(static_cast<char>(0xe0u | (codepoint >> 12)));
+		m_edit_buffer.push_back(static_cast<char>(0x80u | ((codepoint >> 6) & 0x3fu)));
+		m_edit_buffer.push_back(static_cast<char>(0x80u | (codepoint & 0x3fu)));
+	}
+	else {
+		m_edit_buffer.push_back(static_cast<char>(0xf0u | (codepoint >> 18)));
+		m_edit_buffer.push_back(static_cast<char>(0x80u | ((codepoint >> 12) & 0x3fu)));
+		m_edit_buffer.push_back(static_cast<char>(0x80u | ((codepoint >> 6) & 0x3fu)));
+		m_edit_buffer.push_back(static_cast<char>(0x80u | (codepoint & 0x3fu)));
+	}
+	m_pediting->m_error = on_validate_property(*m_pediting, m_edit_buffer);
+}
+
+bool rm_propertyview::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+	RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
+{
+	RM_UNUSED(vk);
+	RM_UNUSED(delta);
+	rebuild_visible_rows();
+	const size_t choice = hit_test_choice(cursor_pos);
+	if (m_choice_open) {
+		if (event == RM_MOUSE_EVENT_MOVE) {
+			m_choice_hovered = choice;
+			return choice == RmPropertyViewBehaviour::invalid_index;
+		}
+		if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::UP &&
+			choice != RmPropertyViewBehaviour::invalid_index) {
+			choose_value(choice);
+			return false;
+		}
+	}
+
+	const size_t index = hit_test_row(cursor_pos);
+	if (event == RM_MOUSE_EVENT_MOVE) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_move(index);
+		return !update.handled;
+	}
+	if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::DOWN) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_down(index);
+		if (update.handled)
+			get_root()->capture_pointer(this);
+		return !update.handled;
+	}
+	if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::UP) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_up(index);
+		if (!update.activated || index >= m_visible_rows.size())
+			return !update.handled;
+		VisibleRow& row = m_visible_rows[index];
+		if (row.group)
+			set_group_expanded(row.group, !row.group->m_expanded);
+		else if (cursor_pos.x - m_pos_of_parent.x >= value_column_x())
+			begin_edit(row.property);
+		else if (m_pediting && m_pediting != row.property)
+			commit_edit();
+		return false;
 	}
 	return true;
 }
