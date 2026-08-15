@@ -555,6 +555,26 @@ void example_widgets(rm_surface* gui)
     RmNumberInputType::floating_point, 0.75f, 0.05f, 0.0f, 1.0f,
     controls_theme);
 
+  rm_theme_preview_panel* ptree_panel = new rm_theme_preview_panel(
+    ptab11, 620, 10, 170, 510, controls_theme);
+  new rm_label(ptree_panel, 12, 18, "Project tree", controls_theme);
+  rm_treeview* ptree = new rm_treeview(12, 50, 146, 444, ptree_panel,
+    [](rm_treeview*, rm_tree_node* p_node) {
+      printf("Tree node selected: %s\n", p_node->name.c_str());
+    }, controls_theme);
+  rm_tree_node* psource = ptree->add_root("Source");
+  psource->expanded = true;
+  rm_tree_node* pcontrols = psource->add_child("Controls");
+  pcontrols->expanded = true;
+  pcontrols->add_child("Button");
+  pcontrols->add_child("TreeView");
+  pcontrols->add_child("TextInput");
+  rm_tree_node* pthemes = ptree->add_root("Themes");
+  pthemes->expanded = true;
+  pthemes->add_child("Dark");
+  pthemes->add_child("Light");
+  ptree->add_root("Resources");
+
   rm_checkbox *pcb = new rm_checkbox(pdiv, 10, 100, 200, "This is checkbox",
     [](rm_checkbox* pcheckbox) {
       printf("checkbox is %s\n", pcheckbox->is_checked() ? "checked" : "unchecked");

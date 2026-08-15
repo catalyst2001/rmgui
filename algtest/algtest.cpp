@@ -99,6 +99,27 @@ void test_number_input_behaviour()
   expect(number.value() == 4.0f, "integer number input rounds assigned values");
 }
 
+void test_treeview_behaviour()
+{
+  RmTreeViewBehaviour tree;
+  tree.set_count(5);
+  tree.pointer_move(2);
+  tree.pointer_down(2);
+  expect(tree.pointer_up(2).activated && tree.selected_index() == 2,
+    "tree view selects a row after a matched press and release");
+  expect(tree.select_relative(1).activated && tree.selected_index() == 3,
+    "tree view supports keyboard navigation through visible rows");
+  tree.select_relative(10);
+  expect(tree.selected_index() == 4,
+    "tree view keyboard navigation clamps at the last visible row");
+  tree.set_count(2);
+  expect(tree.selected_index() == RmTreeViewBehaviour::invalid_index,
+    "tree view clears a selection removed by a visible-row rebuild");
+  tree.set_enabled(false);
+  expect(!tree.pointer_down(0).handled,
+    "disabled tree view ignores pointer selection");
+}
+
 void test_toggle_behaviour()
 {
   RmToggleBehaviour toggle;
@@ -296,6 +317,7 @@ int main()
   test_button_behaviour();
   test_text_input_behaviour();
   test_number_input_behaviour();
+  test_treeview_behaviour();
   test_toggle_behaviour();
   test_combobox_behaviour();
   test_radiobutton_behaviour();

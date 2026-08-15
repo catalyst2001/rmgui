@@ -502,27 +502,38 @@ class rm_treeview;
 using rm_treeview_cb = std::function<void(rm_treeview*, rm_tree_node*)>;
 
 class rm_treeview : public rm_widget, public rm_callback<rm_treeview_cb> {
+  struct VisibleRow {
+    rm_tree_node* node = nullptr;
+    size_t depth = 0;
+  };
+
   std::vector<rm_tree_node*> m_roots;
-  rm_tree_node* m_selected;
-  float                      m_rowHeight;
-  float                      m_indent;
+  std::vector<VisibleRow>    m_visible_rows;
+  rm_tree_node*              m_selected;
+  RmTreeViewBehaviour        m_behaviour;
+  RmThemeRef                 m_theme;
+  size_t                     m_expander_pressed;
+
+  void append_visible(rm_tree_node* p_node, size_t depth);
+  void rebuild_visible_rows();
+  size_t hit_test_row(const rm_vec2& cursor_pos) const;
+  bool hit_test_expander(const rm_vec2& cursor_pos, size_t index) const;
+  void select_index(size_t index, bool notify);
+  void toggle_index(size_t index);
+  void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
+  void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
+  void on_pointer_capture_lost() override {
+    m_behaviour.cancel();
+    m_expander_pressed = RmTreeViewBehaviour::invalid_index;
+  }
 protected:
   virtual void on_draw(NVGcontext* pctx) override;
+  virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 
-  // recursive draw helper
-  float draw_node(NVGcontext* pctx, rm_tree_node* node, float x, float y);
-  // recursive hit-test helper
-  bool hit_test(const rm_vec2& pos, rm_tree_node* node, float x, float& y, rm_tree_node*& out);
-
 public:
-  rm_treeview(int x, int y, int width, int height, rm_widget* p_parent, rm_treeview_cb cb = nullptr)
-    : rm_widget(x, y, width, height, p_parent, "ui_treeview", RM_FLAG_DEFAULT | RM_FLAG_GLOBAL, 0, nullptr),
-    m_selected(nullptr), m_rowHeight(20.0f), m_indent(16.0f)
-  {
-    set_callback(cb);
-    //set_zindex(997);
-  }
+  rm_treeview(int x, int y, int width, int height, rm_widget* p_parent,
+    rm_treeview_cb cb = nullptr, RmThemeRef theme = {});
 
   virtual ~rm_treeview() {
     for (auto root : m_roots) delete root;
@@ -538,12 +549,16 @@ public:
   void clear() {
     for (auto root : m_roots) delete root;
     m_roots.clear();
+    m_visible_rows.clear();
     m_selected = nullptr;
+    m_behaviour.set_count(0);
   }
 
   inline rm_tree_node* get_selected() const { return m_selected; }
-  inline void set_row_height(float h) { m_rowHeight = h; }
-  inline void set_indent(float i) { m_indent = i; }
+  const RmTreeViewBehaviour& behaviour() const noexcept { return m_behaviour; }
+  void set_theme(RmThemeRef theme) {
+    m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme();
+  }
 };
 
 class rm_output_text : public rm_widget

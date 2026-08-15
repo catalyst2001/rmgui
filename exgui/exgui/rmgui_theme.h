@@ -279,6 +279,29 @@ struct RmListViewStyle {
   float font_size = 0.0f;
 };
 
+struct RmTreeViewStyle {
+  RmStateColors row_background;
+  RmStateColors row_text;
+  RmStateColors expander;
+  RmStateColors selected_background;
+  RmStateColors selected_text;
+  NVGcolor background;
+  NVGcolor border;
+  NVGcolor guide;
+  NVGcolor focus_ring;
+  float row_height = 0.0f;
+  float indent = 0.0f;
+  float horizontal_padding = 0.0f;
+  float expander_size = 0.0f;
+  float expander_stroke_width = 0.0f;
+  float corner_radius = 0.0f;
+  float row_corner_radius = 0.0f;
+  float border_width = 0.0f;
+  float focus_ring_width = 0.0f;
+  float font_size = 0.0f;
+  bool show_guides = true;
+};
+
 struct RmSliderStyle {
   RmStateColors track;
   RmStateColors fill;
@@ -414,6 +437,11 @@ struct RmControlMetricsTokens {
   float listview_row_height = 32.0f;
   float listview_horizontal_padding = 10.0f;
   float listview_vertical_padding = 5.0f;
+  float treeview_row_height = 30.0f;
+  float treeview_indent = 20.0f;
+  float treeview_horizontal_padding = 8.0f;
+  float treeview_expander_size = 7.0f;
+  float treeview_expander_stroke_width = 1.5f;
   float slider_track_height = 4.0f;
   float slider_padding = 8.0f;
   float slider_thumb_radius = 10.0f;
@@ -479,6 +507,7 @@ struct RmThemeSnapshot {
   RmRadioButtonStyle radiobutton;
   RmComboBoxStyle combobox;
   RmListViewStyle listview;
+  RmTreeViewStyle treeview;
   RmSliderStyle slider;
   RmScrollbarStyle scrollbar;
   RmProgressStyle progress;
@@ -606,6 +635,11 @@ class RmThemeCompiler {
     sanitize_metric(tokens.controls.listview_row_height, 16.0f, 256.0f, "tokens.controls.listview_row_height", diagnostics);
     sanitize_metric(tokens.controls.listview_horizontal_padding, 0.0f, 256.0f, "tokens.controls.listview_horizontal_padding", diagnostics);
     sanitize_metric(tokens.controls.listview_vertical_padding, 0.0f, 256.0f, "tokens.controls.listview_vertical_padding", diagnostics);
+    sanitize_metric(tokens.controls.treeview_row_height, 16.0f, 256.0f, "tokens.controls.treeview_row_height", diagnostics);
+    sanitize_metric(tokens.controls.treeview_indent, 0.0f, 256.0f, "tokens.controls.treeview_indent", diagnostics);
+    sanitize_metric(tokens.controls.treeview_horizontal_padding, 0.0f, 256.0f, "tokens.controls.treeview_horizontal_padding", diagnostics);
+    sanitize_metric(tokens.controls.treeview_expander_size, 1.0f, 64.0f, "tokens.controls.treeview_expander_size", diagnostics);
+    sanitize_metric(tokens.controls.treeview_expander_stroke_width, 0.0f, 32.0f, "tokens.controls.treeview_expander_stroke_width", diagnostics);
     sanitize_metric(tokens.controls.slider_track_height, 1.0f, 256.0f, "tokens.controls.slider_track_height", diagnostics);
     sanitize_metric(tokens.controls.slider_padding, 0.0f, 256.0f, "tokens.controls.slider_padding", diagnostics);
     sanitize_metric(tokens.controls.slider_thumb_radius, 1.0f, 256.0f, "tokens.controls.slider_thumb_radius", diagnostics);
@@ -929,6 +963,32 @@ public:
     p_theme->listview.border_width = controls.border_width;
     p_theme->listview.focus_ring_width = controls.focus_ring_width;
     p_theme->listview.font_size = tokens.typography.control;
+
+    p_theme->treeview.row_background = { transparent, colors.control_hovered,
+      colors.control_pressed, transparent };
+    p_theme->treeview.row_text = { colors.text, colors.text, colors.text,
+      colors.text_disabled };
+    p_theme->treeview.expander = { colors.text_muted, colors.text,
+      colors.text, colors.text_disabled };
+    p_theme->treeview.selected_background = { colors.accent,
+      colors.accent_hovered, colors.accent_pressed, colors.accent_disabled };
+    p_theme->treeview.selected_text = { colors.text_on_accent,
+      colors.text_on_accent, colors.text_on_accent, colors.text_disabled };
+    p_theme->treeview.background = colors.surface_elevated;
+    p_theme->treeview.border = colors.border;
+    p_theme->treeview.guide = colors.border;
+    p_theme->treeview.focus_ring = colors.focus_ring;
+    p_theme->treeview.row_height = controls.treeview_row_height;
+    p_theme->treeview.indent = controls.treeview_indent;
+    p_theme->treeview.horizontal_padding = controls.treeview_horizontal_padding;
+    p_theme->treeview.expander_size = controls.treeview_expander_size;
+    p_theme->treeview.expander_stroke_width =
+      controls.treeview_expander_stroke_width;
+    p_theme->treeview.corner_radius = tokens.radius.medium;
+    p_theme->treeview.row_corner_radius = tokens.radius.small;
+    p_theme->treeview.border_width = controls.border_width;
+    p_theme->treeview.focus_ring_width = controls.focus_ring_width;
+    p_theme->treeview.font_size = tokens.typography.control;
 
     p_theme->slider.track = { colors.control, colors.control_hovered,
       colors.control_pressed, colors.control_disabled };

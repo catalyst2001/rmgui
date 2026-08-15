@@ -861,6 +861,95 @@ void RmDefaultControlPainter::draw_listview_row(NVGcontext& context,
     visual.y + visual.height * 0.5f, visual.text ? visual.text : "", nullptr);
 }
 
+void RmDefaultControlPainter::draw_treeview_surface(NVGcontext& context,
+  const RmTreeViewSurfaceVisual& visual, const RmTreeViewStyle& style)
+{
+  context.beginPath();
+  context.roundedRect(0.5f, 0.5f, std::max(0.0f, visual.width - 1.0f),
+    std::max(0.0f, visual.height - 1.0f), style.corner_radius);
+  context.fillColor(style.background);
+  context.fill();
+  if (style.border_width > 0.0f) {
+    context.StrokeWidth(style.border_width);
+    context.strokeColor(style.border);
+    context.stroke();
+  }
+  if (visual.focused && visual.enabled && style.focus_ring_width > 0.0f) {
+    const float inset = style.focus_ring_width * 0.5f;
+    context.beginPath();
+    context.roundedRect(inset, inset,
+      std::max(0.0f, visual.width - inset * 2.0f),
+      std::max(0.0f, visual.height - inset * 2.0f), style.corner_radius);
+    context.StrokeWidth(style.focus_ring_width);
+    context.strokeColor(style.focus_ring);
+    context.stroke();
+  }
+}
+
+void RmDefaultControlPainter::draw_treeview_row(NVGcontext& context,
+  const RmTreeViewRowVisual& visual, const RmTreeViewStyle& style)
+{
+  const RmVisualState state = resolve_state(
+    visual.enabled, visual.hovered, visual.pressed);
+  const RmStateColors& backgrounds = visual.selected
+    ? style.selected_background : style.row_background;
+  const RmStateColors& text_colors = visual.selected
+    ? style.selected_text : style.row_text;
+  const float row_x = style.horizontal_padding;
+  const float row_width = std::max(0.0f,
+    visual.width - style.horizontal_padding * 2.0f);
+  const NVGcolor background = backgrounds.resolve(state);
+  if (background.a > 0.0f) {
+    context.beginPath();
+    context.roundedRect(row_x, visual.y, row_width, style.row_height,
+      style.row_corner_radius);
+    context.fillColor(background);
+    context.fill();
+  }
+
+  const float branch_x = style.horizontal_padding +
+    static_cast<float>(visual.depth) * style.indent;
+  if (style.show_guides && visual.depth > 0) {
+    context.beginPath();
+    for (size_t depth = 0; depth < visual.depth; ++depth) {
+      const float guide_x = style.horizontal_padding +
+        (static_cast<float>(depth) + 0.5f) * style.indent;
+      context.moveTo(guide_x, visual.y);
+      context.lineTo(guide_x, visual.y + style.row_height);
+    }
+    context.StrokeWidth(1.0f);
+    context.strokeColor(style.guide);
+    context.stroke();
+  }
+
+  const float expander_x = branch_x + style.indent * 0.5f;
+  const float center_y = visual.y + style.row_height * 0.5f;
+  if (visual.expandable) {
+    const float half = style.expander_size * 0.5f;
+    context.beginPath();
+    if (visual.expanded) {
+      context.moveTo(expander_x - half, center_y - half * 0.5f);
+      context.lineTo(expander_x, center_y + half * 0.5f);
+      context.lineTo(expander_x + half, center_y - half * 0.5f);
+    }
+    else {
+      context.moveTo(expander_x - half * 0.5f, center_y - half);
+      context.lineTo(expander_x + half * 0.5f, center_y);
+      context.lineTo(expander_x - half * 0.5f, center_y + half);
+    }
+    context.StrokeWidth(style.expander_stroke_width);
+    context.strokeColor(style.expander.resolve(state));
+    context.stroke();
+  }
+
+  context.setFontFaceId(static_cast<int>(visual.font.getValue()));
+  context.setFontSize(style.font_size);
+  context.setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+  context.fillColor(text_colors.resolve(state));
+  context.text(branch_x + style.indent, center_y,
+    visual.text ? visual.text : "", nullptr);
+}
+
 void RmDefaultControlPainter::draw_slider(NVGcontext& context,
   const RmSliderVisual& visual, const RmSliderStyle& style)
 {

@@ -1337,134 +1337,223 @@ void rm_tabcontrol::resize(float width, float height)
 	update_pages_geometry();
 }
 
-void rm_treeview::on_draw(NVGcontext* pctx) {
-	//m_bbox.from_rect(m_absolute); //NOTE: K.D. commented
-	pctx->setFontFaceId(((int)get_font().getValue())); //FIXME: wait fontstash refactoring!
-	pctx->setFontSize(m_rowHeight * 0.8f);
-	pctx->setTextAlign(NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+rm_treeview::rm_treeview(int x, int y, int width, int height,
+	rm_widget* p_parent, rm_treeview_cb cb, RmThemeRef theme)
+	: rm_widget(x, y, width, height, p_parent, "ui_treeview",
+		RM_FLAG_DEFAULT | RM_FLAG_GLOBAL | RM_FLAG_OPAQUE),
+	m_selected(nullptr),
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()),
+	m_expander_pressed(RmTreeViewBehaviour::invalid_index)
+{
+	set_callback(std::move(cb));
+}
 
-	// background
-	pctx->beginPath();
-	pctx->rect(0.f, 0.f, m_size.x, m_size.y);
-	pctx->fillColor(NVGcolor::RGBA(245, 245, 245, 255));
-	pctx->fill();
+void rm_treeview::append_visible(rm_tree_node* p_node, size_t depth)
+{
+	if (!p_node)
+		return;
+	m_visible_rows.push_back({ p_node, depth });
+	if (!p_node->expanded)
+		return;
+	for (rm_tree_node* p_child : p_node->children)
+		append_visible(p_child, depth + 1);
+}
 
-	float y = 0.f;
-	for (auto root : m_roots) {
-		y = draw_node(pctx, root, 0.f, y);
-		if (y > m_size.y)
-			break; // clip
+void rm_treeview::rebuild_visible_rows()
+{
+	m_visible_rows.clear();
+	for (rm_tree_node* p_root : m_roots)
+		append_visible(p_root, 0);
+	m_behaviour.set_count(m_visible_rows.size());
+
+	m_behaviour.clear_selection();
+	if (!m_selected)
+		return;
+	const auto selected = std::find_if(m_visible_rows.begin(), m_visible_rows.end(),
+		[this](const VisibleRow& row) { return row.node == m_selected; });
+	if (selected != m_visible_rows.end())
+		m_behaviour.select(static_cast<size_t>(selected - m_visible_rows.begin()));
+}
+
+size_t rm_treeview::hit_test_row(const rm_vec2& cursor_pos) const
+{
+	if (!m_bbox.inside(cursor_pos) || m_theme->treeview.row_height <= 0.0f)
+		return RmTreeViewBehaviour::invalid_index;
+	const float local_y = cursor_pos.y - m_pos_of_parent.y;
+	if (local_y < 0.0f)
+		return RmTreeViewBehaviour::invalid_index;
+	const size_t index = static_cast<size_t>(
+		local_y / m_theme->treeview.row_height);
+	return index < m_visible_rows.size()
+		? index : RmTreeViewBehaviour::invalid_index;
+}
+
+bool rm_treeview::hit_test_expander(const rm_vec2& cursor_pos, size_t index) const
+{
+	if (index >= m_visible_rows.size() ||
+		m_visible_rows[index].node->children.empty())
+		return false;
+	const float local_x = cursor_pos.x - m_pos_of_parent.x;
+	const float branch_x = m_theme->treeview.horizontal_padding +
+		static_cast<float>(m_visible_rows[index].depth) * m_theme->treeview.indent;
+	return local_x >= branch_x && local_x < branch_x + m_theme->treeview.indent;
+}
+
+void rm_treeview::select_index(size_t index, bool notify)
+{
+	if (index >= m_visible_rows.size())
+		return;
+	const rm_tree_node* previous = m_selected;
+	const RmBehaviourUpdate update = m_behaviour.select(index);
+	if (!update.handled)
+		return;
+	m_selected = m_visible_rows[index].node;
+	if (notify && previous != m_selected && is_valid_callback())
+		get_callback()(this, m_selected);
+}
+
+void rm_treeview::toggle_index(size_t index)
+{
+	if (index >= m_visible_rows.size())
+		return;
+	rm_tree_node* p_node = m_visible_rows[index].node;
+	if (p_node->children.empty())
+		return;
+	p_node->expanded = !p_node->expanded;
+	rebuild_visible_rows();
+	root_update();
+}
+
+void rm_treeview::on_draw(NVGcontext* pctx)
+{
+	rebuild_visible_rows();
+	const RmTreeViewStyle& style = m_theme->treeview;
+	RmDefaultControlPainter::draw_treeview_surface(*pctx,
+		{ m_size.x, m_size.y, m_elem_flags.is_focused(), is_enabled() }, style);
+
+	const size_t hovered = m_behaviour.hovered_index();
+	const size_t pressed = m_behaviour.pressed_index();
+	for (size_t index = 0; index < m_visible_rows.size(); ++index) {
+		const float y = static_cast<float>(index) * style.row_height;
+		if (y >= m_size.y)
+			break;
+		const VisibleRow& row = m_visible_rows[index];
+		const RmTreeViewRowVisual visual{
+			y,
+			m_size.x,
+			get_font(),
+			row.node->name.c_str(),
+			row.depth,
+			is_enabled(),
+			hovered == index,
+			pressed == index,
+			row.node == m_selected,
+			!row.node->children.empty(),
+			row.node->expanded
+		};
+		RmDefaultControlPainter::draw_treeview_row(*pctx, visual, style);
 	}
 	rm_widget::on_draw(pctx);
 }
 
-float rm_treeview::draw_node(NVGcontext* pctx, rm_tree_node* node, float x, float y) {
-	// background if selected
-	if (node == m_selected) {
-		pctx->beginPath();
-		pctx->rect(x, y, m_size.x - x, m_rowHeight);
-		pctx->fillColor(NVGcolor::RGBA(200, 230, 255, 255));
-		pctx->fill();
-	}
-	// expand/collapse icon
-	if (!node->children.empty()) {
-		const float sz = m_rowHeight * 0.5f;
-		float cx = x + (m_indent - sz) * 0.5f;
-		float cy = y + (m_rowHeight - sz) * 0.5f;
-		pctx->beginPath();
+void rm_treeview::on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state)
+{
+	RM_UNUSED(sc);
+	if (state != RM_KEY_STATE::DOWN && state != RM_KEY_STATE::REPEAT)
+		return;
+	rebuild_visible_rows();
+	if (m_visible_rows.empty())
+		return;
 
-		//TODO: k.d replace by icons
-		if (node->expanded) {
-			// draw '-'
-			pctx->moveTo(cx, cy + sz / 2);
-			pctx->lineTo(cx + sz, cy + sz / 2);
+	if (vk == RM_KEY_UP || vk == RM_KEY_DOWN) {
+		const rm_tree_node* previous = m_selected;
+		const RmBehaviourUpdate update =
+			m_behaviour.select_relative(vk == RM_KEY_UP ? -1 : 1);
+		if (update.handled) {
+			m_selected = m_visible_rows[m_behaviour.selected_index()].node;
+			if (previous != m_selected && is_valid_callback())
+				get_callback()(this, m_selected);
 		}
-		else {
-			// draw '+'
-			pctx->moveTo(cx, cy + sz / 2);
-			pctx->lineTo(cx + sz, cy + sz / 2);
-			pctx->moveTo(cx + sz / 2, cy);
-			pctx->lineTo(cx + sz / 2, cy + sz);
-		}
-		pctx->strokeColor(NVGcolor::RGBA(100, 100, 100, 255));
-		pctx->stroke();
+		return;
 	}
-	// draw text
-	float tx = x + m_indent;
-	float ty = y + m_rowHeight * 0.5f;
-	pctx->fillColor(NVGcolor::RGBA(0, 0, 0, 255));
-	pctx->text(tx, ty, node->name.c_str(), nullptr);
 
-	y += m_rowHeight;
-	// draw children
-	if (node->expanded) {
-		for (auto child : node->children) {
-			y = draw_node(pctx, child, x + m_indent, y);
-			if (y > m_size.y)
-				break;
-		}
+	size_t selected = m_behaviour.selected_index();
+	if (selected == RmTreeViewBehaviour::invalid_index) {
+		select_index(0, true);
+		return;
 	}
-	return y;
+	rm_tree_node* p_node = m_visible_rows[selected].node;
+	switch (vk) {
+	case RM_KEY_RIGHT:
+		if (!p_node->children.empty()) {
+			if (!p_node->expanded)
+				toggle_index(selected);
+			else if (selected + 1 < m_visible_rows.size())
+				select_index(selected + 1, true);
+		}
+		break;
+	case RM_KEY_LEFT:
+		if (p_node->expanded)
+			toggle_index(selected);
+		else if (p_node->parent) {
+			const auto parent = std::find_if(m_visible_rows.begin(),
+				m_visible_rows.end(), [p_node](const VisibleRow& row) {
+					return row.node == p_node->parent;
+				});
+			if (parent != m_visible_rows.end())
+				select_index(static_cast<size_t>(parent - m_visible_rows.begin()), true);
+		}
+		break;
+	case RM_KEY_ENTER:
+	case RM_KEY_SPACE:
+		toggle_index(selected);
+		break;
+	case RM_KEY_HOME:
+		select_index(0, true);
+		break;
+	case RM_KEY_END:
+		select_index(m_visible_rows.size() - 1, true);
+		break;
+	default:
+		break;
+	}
 }
 
-bool rm_treeview::on_mouse(RM_MOUSE_EVENT event,
-	RM_KEY vk,
-	RM_KEY_STATE state,
-	rm_vec2& cursor_pos, rm_vec2 delta)
+bool rm_treeview::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk,
+	RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta)
 {
-	if (event == RM_MOUSE_EVENT_CLICK && state == DOWN)
-	{
-		rm_tree_node* hitNode = nullptr;
-		float y = m_pos_of_parent.y;
-		if (hit_test(cursor_pos,
-			nullptr,
-			m_pos_of_parent.x,
-			y,
-			hitNode)
-			&& hitNode)
-		{
-			if (!hitNode->children.empty()) {
-				hitNode->expanded = !hitNode->expanded;
-				root_update();
-			}
-			m_selected = hitNode;
-			if (is_valid_callback())
-				get_callback()(this, m_selected);
-			return false;
+	RM_UNUSED(vk);
+	RM_UNUSED(delta);
+	rebuild_visible_rows();
+	const size_t index = hit_test_row(cursor_pos);
+	if (event == RM_MOUSE_EVENT_MOVE) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_move(index);
+		return !update.handled;
+	}
+	if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::DOWN) {
+		const RmBehaviourUpdate update = m_behaviour.pointer_down(index);
+		if (update.handled) {
+			m_expander_pressed = hit_test_expander(cursor_pos, index)
+				? index : RmTreeViewBehaviour::invalid_index;
+			get_root()->capture_pointer(this);
 		}
+		return !update.handled;
+	}
+	if (event == RM_MOUSE_EVENT_CLICK && state == RM_KEY_STATE::UP) {
+		const size_t expander = m_expander_pressed;
+		m_expander_pressed = RmTreeViewBehaviour::invalid_index;
+		const rm_tree_node* previous = m_selected;
+		const RmBehaviourUpdate update = m_behaviour.pointer_up(index);
+		if (update.activated) {
+			m_selected = m_visible_rows[index].node;
+			if (expander == index && hit_test_expander(cursor_pos, index))
+				toggle_index(index);
+			if (previous != m_selected && is_valid_callback())
+				get_callback()(this, m_selected);
+		}
+		return !update.handled;
 	}
 	return true;
-}
-
-bool rm_treeview::hit_test(const rm_vec2& pos,
-	rm_tree_node* node,
-	float x,
-	float& y,
-	rm_tree_node*& out)
-{
-	if (!node) {
-		for (auto root : m_roots) {
-			if (hit_test(pos, root, x, y, out)) return true;
-		}
-		return false;
-	}
-
-	if (pos.x >= x && pos.x <= x + m_size.x &&
-		pos.y >= y && pos.y < y + m_rowHeight)
-	{
-		out = node;
-		return true;
-	}
-
-	y += m_rowHeight;
-
-	if (node->expanded) {
-		for (auto child : node->children) {
-			if (hit_test(pos, child, x + m_indent, y, out)) return true;
-		}
-	}
-
-	return false;
 }
 
 void rm_output_text::on_draw(NVGcontext* pctx)

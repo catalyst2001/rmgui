@@ -165,6 +165,7 @@ void test_theme_document_compilation()
   document.tokens.controls.switch_track_height = 30.0f;
   document.tokens.controls.text_input_horizontal_padding = 13.0f;
   document.tokens.controls.number_input_button_width = 31.0f;
+  document.tokens.controls.treeview_indent = 23.0f;
 
   const RmThemeCompileResult result = RmThemeCompiler::compile(document);
   require(result.succeeded(), "a valid theme document must compile");
@@ -188,6 +189,11 @@ void test_theme_document_compilation()
     "text input selection must derive from the accent token");
   require(result.theme->number_input.button_width == 31.0f,
     "number input recipes must use editable spinner metrics");
+  require(result.theme->treeview.indent == 23.0f,
+    "tree view recipes must use editable hierarchy metrics");
+  require(same_color(result.theme->treeview.selected_background.normal,
+    document.tokens.colors.accent),
+    "tree view selection must use the accent token");
   require(result.theme->tabs.document.tab_height ==
     document.tokens.controls.tab_height,
     "tab recipes must use shared control metrics");

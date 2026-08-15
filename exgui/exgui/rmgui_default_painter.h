@@ -185,6 +185,27 @@ struct RmListViewRowVisual {
   bool selected = false;
 };
 
+struct RmTreeViewSurfaceVisual {
+  float width = 0.0f;
+  float height = 0.0f;
+  bool focused = false;
+  bool enabled = true;
+};
+
+struct RmTreeViewRowVisual {
+  float y = 0.0f;
+  float width = 0.0f;
+  NVGhandle font;
+  const char* text = nullptr;
+  size_t depth = 0;
+  bool enabled = true;
+  bool hovered = false;
+  bool pressed = false;
+  bool selected = false;
+  bool expandable = false;
+  bool expanded = false;
+};
+
 struct RmSliderVisual {
   float width = 0.0f;
   float height = 0.0f;
@@ -263,6 +284,10 @@ public:
     const RmListViewSurfaceVisual& visual, const RmListViewStyle& style);
   static void draw_listview_row(NVGcontext& context,
     const RmListViewRowVisual& visual, const RmListViewStyle& style);
+  static void draw_treeview_surface(NVGcontext& context,
+    const RmTreeViewSurfaceVisual& visual, const RmTreeViewStyle& style);
+  static void draw_treeview_row(NVGcontext& context,
+    const RmTreeViewRowVisual& visual, const RmTreeViewStyle& style);
   static void draw_slider(NVGcontext& context, const RmSliderVisual& visual,
     const RmSliderStyle& style);
   static void draw_scrollbar(NVGcontext& context, const RmScrollbarVisual& visual,
