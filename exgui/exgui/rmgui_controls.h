@@ -35,18 +35,21 @@ class rm_button : public rm_widget {
   std::string m_text;
   RmButtonBehaviour m_behaviour;
   RmThemeRef m_theme;
+  RmButtonVariant m_variant;
   void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
   void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
   void on_pointer_capture_lost() override { m_behaviour.cancel(); }
 public:
   rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text,
-    RmThemeRef theme = {});
+    RmThemeRef theme = {}, RmButtonVariant variant = RmButtonVariant::primary);
   virtual ~rm_button();
   virtual void on_draw(NVGcontext* pctx) override;
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
   const RmButtonBehaviour& behaviour() const { return m_behaviour; }
   void set_theme(RmThemeRef theme) { m_theme = theme ? std::move(theme) : RmThemeSnapshot::default_theme(); }
+  RmButtonVariant get_variant() const noexcept { return m_variant; }
+  void set_variant(RmButtonVariant variant) noexcept { m_variant = variant; }
 };
 
 class rm_label : public rm_widget {

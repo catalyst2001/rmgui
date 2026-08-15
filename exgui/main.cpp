@@ -58,31 +58,40 @@ static void create_theme_preview(rm_widget* p_parent, int x, int y,
     p_parent, x, y, 350, 465, theme);
 
   new rm_label(ppanel, 20, 18, p_document.name, theme);
-  new rm_label(ppanel, 20, 52, "Buttons", theme);
-  new rm_button(ppanel, 20, 78, 145, 38, "Default", theme);
+  new rm_label(ppanel, 20, 46, "Button variants", theme);
+  new rm_button(ppanel, 20, 72, 96, 34, "Primary", theme,
+    RmButtonVariant::primary);
+  new rm_button(ppanel, 127, 72, 96, 34, "Secondary", theme,
+    RmButtonVariant::secondary);
+  new rm_button(ppanel, 234, 72, 96, 34, "Outline", theme,
+    RmButtonVariant::outline);
+  new rm_button(ppanel, 20, 114, 96, 34, "Subtle", theme,
+    RmButtonVariant::subtle);
+  new rm_button(ppanel, 127, 114, 96, 34, "Delete", theme,
+    RmButtonVariant::destructive);
   rm_button* pdisabled_button = new rm_button(
-    ppanel, 185, 78, 145, 38, "Disabled", theme);
+    ppanel, 234, 114, 96, 34, "Disabled", theme);
   pdisabled_button->set_enabled(false);
 
-  new rm_label(ppanel, 20, 138, "Selection", theme);
+  new rm_label(ppanel, 20, 164, "Selection", theme);
   rm_checkbox* pcheckbox = new rm_checkbox(
-    ppanel, 20, 164, 160, "Remember choice", nullptr, theme);
+    ppanel, 20, 190, 160, "Remember choice", nullptr, theme);
   pcheckbox->set_checked(true);
   rm_checkbox* pdisabled_checkbox = new rm_checkbox(
-    ppanel, 185, 164, 145, "Unavailable", nullptr, theme);
+    ppanel, 185, 190, 145, "Unavailable", nullptr, theme);
   pdisabled_checkbox->set_enabled(false);
 
-  new rm_label(ppanel, 20, 210, "Toggle", theme);
-  rm_switch* pswitch = new rm_switch(ppanel, 20, 238, 58, true, nullptr, theme);
+  new rm_label(ppanel, 20, 232, "Toggle", theme);
+  rm_switch* pswitch = new rm_switch(ppanel, 20, 260, 58, true, nullptr, theme);
   pswitch->set_on(true, false);
   rm_switch* pdisabled_switch = new rm_switch(
-    ppanel, 98, 238, 58, false, nullptr, theme);
+    ppanel, 98, 260, 58, false, nullptr, theme);
   pdisabled_switch->set_enabled(false);
 
-  new rm_label(ppanel, 20, 292, "Value", theme);
-  new rm_slider(ppanel, 20, 318, 310, 34, 0.f, 100.f, 64.f, nullptr, theme);
-  new rm_progress(ppanel, 20, 378, 310, 12, 0.68f, theme);
-  new rm_label(ppanel, 20, 414, "Theme tokens compile into immutable styles", theme);
+  new rm_label(ppanel, 20, 310, "Value", theme);
+  new rm_slider(ppanel, 20, 336, 310, 34, 0.f, 100.f, 64.f, nullptr, theme);
+  new rm_progress(ppanel, 20, 392, 310, 12, 0.68f, theme);
+  new rm_label(ppanel, 20, 424, "Theme tokens compile into immutable styles", theme);
 }
 
 #pragma region TEMPLATE1

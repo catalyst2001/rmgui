@@ -20,6 +20,14 @@ enum class RmThemeMode {
   light
 };
 
+enum class RmButtonVariant {
+  primary,
+  secondary,
+  outline,
+  subtle,
+  destructive
+};
+
 struct RmStateColors {
   NVGcolor normal;
   NVGcolor hovered;
@@ -46,6 +54,25 @@ struct RmButtonStyle {
   float border_width = 0.0f;
   float focus_ring_width = 0.0f;
   float font_size = 0.0f;
+};
+
+struct RmButtonStyles {
+  RmButtonStyle primary;
+  RmButtonStyle secondary;
+  RmButtonStyle outline;
+  RmButtonStyle subtle;
+  RmButtonStyle destructive;
+
+  const RmButtonStyle& resolve(RmButtonVariant variant) const noexcept {
+    switch (variant) {
+    case RmButtonVariant::secondary: return secondary;
+    case RmButtonVariant::outline: return outline;
+    case RmButtonVariant::subtle: return subtle;
+    case RmButtonVariant::destructive: return destructive;
+    case RmButtonVariant::primary:
+    default: return primary;
+    }
+  }
 };
 
 struct RmLabelStyle {
@@ -111,6 +138,10 @@ struct RmColorTokens {
   NVGcolor accent_pressed;
   NVGcolor accent_disabled;
   NVGcolor accent_secondary;
+  NVGcolor danger;
+  NVGcolor danger_hovered;
+  NVGcolor danger_pressed;
+  NVGcolor danger_disabled;
   NVGcolor surface;
   NVGcolor surface_elevated;
   NVGcolor control;
@@ -196,7 +227,7 @@ struct RmThemeSnapshot {
   std::string name;
   RmThemeMode mode = RmThemeMode::dark;
   RmThemeTokens tokens;
-  RmButtonStyle button;
+  RmButtonStyles buttons;
   RmLabelStyle label;
   RmCheckboxStyle checkbox;
   RmSliderStyle slider;
@@ -267,7 +298,9 @@ class RmThemeCompiler {
     NVGcolor* colors[] = {
       &tokens.colors.accent, &tokens.colors.accent_hovered,
       &tokens.colors.accent_pressed, &tokens.colors.accent_disabled,
-      &tokens.colors.accent_secondary, &tokens.colors.surface,
+      &tokens.colors.accent_secondary, &tokens.colors.danger,
+      &tokens.colors.danger_hovered, &tokens.colors.danger_pressed,
+      &tokens.colors.danger_disabled, &tokens.colors.surface,
       &tokens.colors.surface_elevated, &tokens.colors.control,
       &tokens.colors.control_hovered, &tokens.colors.control_pressed,
       &tokens.colors.control_disabled, &tokens.colors.border,
@@ -330,17 +363,51 @@ public:
     const RmColorTokens& colors = tokens.colors;
     const RmControlMetricsTokens& controls = tokens.controls;
 
-    p_theme->button.background = { colors.accent, colors.accent_hovered,
-      colors.accent_pressed, colors.accent_disabled };
-    p_theme->button.border = { colors.accent_hovered, colors.focus_ring,
-      colors.accent_pressed, colors.border_disabled };
-    p_theme->button.text = { colors.text_on_accent, colors.text_on_accent,
-      colors.text_on_accent, colors.text_disabled };
-    p_theme->button.focus_ring = colors.focus_ring;
-    p_theme->button.corner_radius = tokens.radius.medium;
-    p_theme->button.border_width = controls.border_width;
-    p_theme->button.focus_ring_width = controls.focus_ring_width;
-    p_theme->button.font_size = tokens.typography.control;
+    const NVGcolor transparent = NVGcolor::RGBA(0, 0, 0, 0);
+    const auto configure_button = [&](RmButtonStyle& style,
+      const RmStateColors& background, const RmStateColors& border,
+      const RmStateColors& text, float border_width) {
+      style.background = background;
+      style.border = border;
+      style.text = text;
+      style.focus_ring = colors.focus_ring;
+      style.corner_radius = tokens.radius.medium;
+      style.border_width = border_width;
+      style.focus_ring_width = controls.focus_ring_width;
+      style.font_size = tokens.typography.control;
+    };
+
+    configure_button(p_theme->buttons.primary,
+      { colors.accent, colors.accent_hovered, colors.accent_pressed,
+        colors.accent_disabled },
+      { colors.accent_hovered, colors.focus_ring, colors.accent_pressed,
+        colors.border_disabled },
+      { colors.text_on_accent, colors.text_on_accent, colors.text_on_accent,
+        colors.text_disabled }, controls.border_width);
+    configure_button(p_theme->buttons.secondary,
+      { colors.control, colors.control_hovered, colors.control_pressed,
+        colors.control_disabled },
+      { colors.border, colors.border_hovered, colors.border_pressed,
+        colors.border_disabled },
+      { colors.text, colors.text, colors.text, colors.text_disabled },
+      controls.border_width);
+    configure_button(p_theme->buttons.outline,
+      { transparent, colors.control_hovered, colors.control_pressed, transparent },
+      { colors.accent, colors.accent_hovered, colors.accent_pressed,
+        colors.border_disabled },
+      { colors.accent, colors.accent_hovered, colors.accent_pressed,
+        colors.text_disabled }, controls.border_width);
+    configure_button(p_theme->buttons.subtle,
+      { transparent, colors.control_hovered, colors.control_pressed, transparent },
+      { transparent, transparent, transparent, transparent },
+      { colors.text, colors.text, colors.text, colors.text_disabled }, 0.0f);
+    configure_button(p_theme->buttons.destructive,
+      { colors.danger, colors.danger_hovered, colors.danger_pressed,
+        colors.danger_disabled },
+      { colors.danger_hovered, colors.focus_ring, colors.danger_pressed,
+        colors.border_disabled },
+      { colors.text_on_accent, colors.text_on_accent, colors.text_on_accent,
+        colors.text_disabled }, controls.border_width);
 
     p_theme->label.text = colors.text;
     p_theme->label.disabled_text = colors.text_disabled;
@@ -418,6 +485,10 @@ inline RmThemeDocument RmThemeDocument::dark_theme()
   colors.accent_pressed = NVGcolor::RGBA(55, 76, 196, 255);
   colors.accent_disabled = NVGcolor::RGBA(82, 91, 135, 255);
   colors.accent_secondary = NVGcolor::RGBA(151, 89, 232, 255);
+  colors.danger = NVGcolor::RGBA(196, 54, 75, 255);
+  colors.danger_hovered = NVGcolor::RGBA(220, 68, 89, 255);
+  colors.danger_pressed = NVGcolor::RGBA(161, 41, 60, 255);
+  colors.danger_disabled = NVGcolor::RGBA(111, 67, 75, 255);
   colors.surface = NVGcolor::RGBA(21, 23, 29, 255);
   colors.surface_elevated = NVGcolor::RGBA(31, 34, 42, 255);
   colors.control = NVGcolor::RGBA(47, 50, 61, 255);
@@ -448,6 +519,10 @@ inline RmThemeDocument RmThemeDocument::light_theme()
   colors.accent_pressed = NVGcolor::RGBA(39, 64, 169, 255);
   colors.accent_disabled = NVGcolor::RGBA(145, 155, 197, 255);
   colors.accent_secondary = NVGcolor::RGBA(125, 69, 190, 255);
+  colors.danger = NVGcolor::RGBA(190, 42, 61, 255);
+  colors.danger_hovered = NVGcolor::RGBA(211, 52, 72, 255);
+  colors.danger_pressed = NVGcolor::RGBA(151, 30, 47, 255);
+  colors.danger_disabled = NVGcolor::RGBA(199, 144, 151, 255);
   colors.surface = NVGcolor::RGBA(245, 247, 251, 255);
   colors.surface_elevated = NVGcolor::RGBA(255, 255, 255, 255);
   colors.control = NVGcolor::RGBA(255, 255, 255, 255);

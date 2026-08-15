@@ -111,9 +111,9 @@ bool rm_image_button::on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE sta
 }
 
 rm_button::rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text,
-	RmThemeRef theme)
+	RmThemeRef theme, RmButtonVariant variant)
 	: rm_widget(x, y, width, height, p_parent, "ui_button"), m_text(text),
-	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme())
+	m_theme(theme ? std::move(theme) : RmThemeSnapshot::default_theme()), m_variant(variant)
 {
 }
 
@@ -130,7 +130,7 @@ void rm_button::on_draw(NVGcontext* pctx) {
 		m_behaviour.is_pressed(),
 		m_elem_flags.is_focused()
 	};
-	RmDefaultControlPainter::draw_button(*pctx, visual, m_theme->button);
+	RmDefaultControlPainter::draw_button(*pctx, visual, m_theme->buttons.resolve(m_variant));
 	rm_widget::on_draw(pctx);
 }
 

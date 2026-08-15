@@ -125,10 +125,17 @@ void test_theme_document_compilation()
   const RmThemeCompileResult result = RmThemeCompiler::compile(document);
   require(result.succeeded(), "a valid theme document must compile");
   require(result.theme->name == "Test theme", "theme display name must be preserved");
-  require(same_color(result.theme->button.background.normal,
+  require(same_color(result.theme->buttons.primary.background.normal,
     document.tokens.colors.accent), "accent token must drive the button recipe");
-  require(result.theme->button.font_size == 17.0f,
+  require(result.theme->buttons.primary.font_size == 17.0f,
     "typography token must drive control font size");
+  require(same_color(result.theme->buttons.secondary.background.normal,
+    document.tokens.colors.control), "secondary buttons must use control tokens");
+  require(result.theme->buttons.subtle.border_width == 0.0f &&
+    result.theme->buttons.subtle.background.normal.a == 0.0f,
+    "subtle buttons must compile as borderless transparent controls");
+  require(same_color(result.theme->buttons.destructive.background.normal,
+    document.tokens.colors.danger), "destructive buttons must use danger tokens");
   require(result.theme->switch_control.track_height == 30.0f,
     "component metric token must drive switch geometry");
   require(result.theme->switch_control.corner_radius == 15.0f,
@@ -143,13 +150,13 @@ void test_theme_document_compilation()
   require(sanitized.succeeded(), "recoverable authoring errors must produce a snapshot");
   require(sanitized.diagnostics.size() >= 4,
     "theme compiler must report every corrected authoring value");
-  require(sanitized.theme->button.font_size == 1.0f,
+  require(sanitized.theme->buttons.primary.font_size == 1.0f,
     "invalid font size must be clamped");
   require(sanitized.theme->checkbox.box_size == 1.0f,
     "invalid component size must be clamped");
-  require(sanitized.theme->button.background.normal.r == 1.0f &&
-    sanitized.theme->button.background.normal.g == 0.0f &&
-    sanitized.theme->button.background.normal.a == 1.0f,
+  require(sanitized.theme->buttons.primary.background.normal.r == 1.0f &&
+    sanitized.theme->buttons.primary.background.normal.g == 0.0f &&
+    sanitized.theme->buttons.primary.background.normal.a == 1.0f,
     "invalid color components must be normalized");
 }
 
