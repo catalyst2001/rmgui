@@ -143,6 +143,23 @@ void test_window_behaviour()
     window.geometry().height == 120.0f,
     "window resizing preserves the opposite edge and applies constraints");
   window.end_interaction();
+
+  window.begin_resize(WCF_LRESIZE | WCF_TRESIZE, 10.0f, 10.0f,
+    { 10.0f, 10.0f, 20.0f, 20.0f });
+  const RmBehaviourUpdate stationary = window.pointer_move(
+    10.0f, 10.0f, 100.0f, 100.0f,
+    50.0f, 50.0f, 0.0f, 0.0f);
+  expect(!stationary.state_changed && window.geometry().width == 20.0f &&
+    window.geometry().height == 20.0f,
+    "an impossible minimum does not snap window geometry on pointer capture");
+  const RmBehaviourUpdate constrained = window.pointer_move(
+    -100.0f, -100.0f, 100.0f, 100.0f,
+    50.0f, 50.0f, 0.0f, 0.0f);
+  expect(constrained.state_changed && window.geometry().x == 0.0f &&
+    window.geometry().y == 0.0f && window.geometry().width == 30.0f &&
+    window.geometry().height == 30.0f,
+    "window resizing handles a minimum larger than the fixed-edge space");
+  window.end_interaction();
 }
 
 void test_treeview_behaviour()

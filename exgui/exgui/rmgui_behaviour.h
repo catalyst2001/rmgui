@@ -128,6 +128,21 @@ public:
     const float dy = pointer_y - m_start_pointer_y;
     RmWindowGeometry next = m_start_geometry;
 
+    // A layout-derived minimum can be larger than the space available between
+    // the dragged edge and the fixed opposite edge. In that case respecting
+    // the parent boundary takes precedence over the requested minimum.
+    const auto clamp_extent = [](float value, float requested_minimum,
+      float requested_maximum, float available,
+      float current_extent) noexcept {
+      const float upper = std::max(0.0f,
+        std::min(requested_maximum, available));
+      // If even the minimum cannot fit, keep an already feasible current size
+      // instead of snapping the window to the available maximum on first move.
+      const float lower = requested_minimum <= upper ? requested_minimum
+        : std::min(std::max(0.0f, current_extent), upper);
+      return std::clamp(value, lower, upper);
+    };
+
     if (m_dragging) {
       next.x = std::clamp(m_start_geometry.x + dx, 0.0f,
         std::max(0.0f, parent_width - next.width));
@@ -135,25 +150,27 @@ public:
         std::max(0.0f, parent_height - next.height));
     } else {
       if (m_resize_edges & WCF_LRESIZE) {
-        next.width = std::clamp(m_start_geometry.width - dx,
-          minimum_width, std::min(maximum_width,
-            m_start_geometry.x + m_start_geometry.width));
+        next.width = clamp_extent(m_start_geometry.width - dx,
+          minimum_width, maximum_width,
+          m_start_geometry.x + m_start_geometry.width,
+          m_start_geometry.width);
         next.x = m_start_geometry.x + m_start_geometry.width - next.width;
       } else if (m_resize_edges & WCF_RRESIZE) {
-        next.width = std::clamp(m_start_geometry.width + dx,
-          minimum_width, std::min(maximum_width,
-            parent_width - m_start_geometry.x));
+        next.width = clamp_extent(m_start_geometry.width + dx,
+          minimum_width, maximum_width,
+          parent_width - m_start_geometry.x, m_start_geometry.width);
       }
 
       if (m_resize_edges & WCF_TRESIZE) {
-        next.height = std::clamp(m_start_geometry.height - dy,
-          minimum_height, std::min(maximum_height,
-            m_start_geometry.y + m_start_geometry.height));
+        next.height = clamp_extent(m_start_geometry.height - dy,
+          minimum_height, maximum_height,
+          m_start_geometry.y + m_start_geometry.height,
+          m_start_geometry.height);
         next.y = m_start_geometry.y + m_start_geometry.height - next.height;
       } else if (m_resize_edges & WCF_BRESIZE) {
-        next.height = std::clamp(m_start_geometry.height + dy,
-          minimum_height, std::min(maximum_height,
-            parent_height - m_start_geometry.y));
+        next.height = clamp_extent(m_start_geometry.height + dy,
+          minimum_height, maximum_height,
+          parent_height - m_start_geometry.y, m_start_geometry.height);
       }
     }
 
