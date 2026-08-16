@@ -91,6 +91,16 @@ public:
   }
 };
 
+class InspectableContext final : public NVGcontext {
+public:
+  using NVGcontext::NVGcontext;
+
+  size_t path_command_count() const { return m_pathCommands.getSize(); }
+  size_t path_argument_count() const { return m_pathArguments.getSize(); }
+  const NVGpathCommand* path_commands() const { return m_pathCommands.getData(); }
+  const float* path_arguments() const { return m_pathArguments.getData(); }
+};
+
 class MemoryIo final : public NVGio {
 public:
   std::vector<uint8_t> bytes;
@@ -423,6 +433,78 @@ void test_narrow_rounded_rectangle_geometry()
     "oversized radius must preserve the long straight side of a narrow rectangle");
 }
 
+void test_separate_path_command_and_argument_buffers()
+{
+  auto renderer = std::make_unique<RecordingRenderer>();
+  RecordingRenderer* recording = renderer.get();
+  InspectableContext context(std::move(renderer), NVGcontextConfig{});
+
+  context.beginFrame(240.0f, 160.0f, 1.0f);
+  context.translate(5.0f, 7.0f);
+  context.beginPath();
+  context.roundedRectVarying(10.0f, 20.0f, 100.0f, 40.0f,
+    3.0f, 4.0f, 5.0f, 6.0f);
+
+  constexpr NVGcommands expected_commands[] = {
+    NVG_MOVETO, NVG_LINETO, NVG_BEZIERTO, NVG_LINETO, NVG_BEZIERTO,
+    NVG_LINETO, NVG_BEZIERTO, NVG_LINETO, NVG_BEZIERTO, NVG_CLOSE
+  };
+  constexpr uint32_t expected_offsets[] = {
+    0, 2, 4, 10, 12, 18, 20, 26, 28, 34
+  };
+  require(context.path_command_count() == std::size(expected_commands),
+    "roundedRectVarying must emit ten compact path descriptors");
+  require(context.path_argument_count() == 34,
+    "roundedRectVarying must store only its coordinate arguments as floats");
+  require(reinterpret_cast<const void*>(context.path_commands()) !=
+    reinterpret_cast<const void*>(context.path_arguments()),
+    "path opcodes and path arguments must use independent allocations");
+
+  for (size_t i = 0; i < std::size(expected_commands); ++i) {
+    require(context.path_commands()[i].getType() == expected_commands[i],
+      "a path descriptor must preserve its opcode");
+    require(context.path_commands()[i].getArgumentOffset() == expected_offsets[i],
+      "a path descriptor must point at its first argument");
+  }
+  require(std::fabs(context.path_arguments()[0] - 15.0f) < 1.0e-4f &&
+    std::fabs(context.path_arguments()[1] - 30.0f) < 1.0e-4f,
+    "path arguments must retain NanoVG's current transform semantics");
+
+  context.fillColor(NVGcolor::RGB(255, 255, 255));
+  context.fill();
+  require(recording->fill_calls == 1 && !recording->last_fill_vertices.empty(),
+    "the separated buffers must flatten into renderable rounded geometry");
+
+  context.beginPath();
+  require(context.path_command_count() == 0 &&
+    context.path_argument_count() == 0,
+    "beginPath must reset both path buffers together");
+
+  context.moveTo(1.0f, 2.0f);
+  context.lineTo(3.0f, 4.0f);
+  context.bezierTo(4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f);
+  context.quadTo(10.0f, 11.0f, 12.0f, 13.0f);
+  context.closePath();
+  context.pathWinding(NVG_HOLE);
+  constexpr NVGcommands basic_commands[] = {
+    NVG_MOVETO, NVG_LINETO, NVG_BEZIERTO,
+    NVG_BEZIERTO, NVG_CLOSE, NVG_WINDING
+  };
+  constexpr uint32_t basic_offsets[] = { 0, 2, 4, 10, 16, 16 };
+  require(context.path_command_count() == std::size(basic_commands) &&
+    context.path_argument_count() == 17,
+    "basic path APIs must write descriptors and arguments independently");
+  for (size_t i = 0; i < std::size(basic_commands); ++i) {
+    require(context.path_commands()[i].getType() == basic_commands[i] &&
+      context.path_commands()[i].getArgumentOffset() == basic_offsets[i],
+      "every basic path API must emit a valid compact descriptor");
+  }
+  require(std::fabs(context.path_arguments()[10] - (5.0f + 28.0f / 3.0f)) <
+    1.0e-4f,
+    "quadTo must derive its first control point from the previous endpoint");
+  context.endFrame();
+}
+
 bool same_color(const NVGcolor& lhs, const NVGcolor& rhs)
 {
   return std::fabs(lhs.r - rhs.r) < 1.0e-6f &&
@@ -576,6 +658,7 @@ int main()
   test_custom_triangle_forwarding();
   test_nested_scissor_intersection();
   test_narrow_rounded_rectangle_geometry();
+  test_separate_path_command_and_argument_buffers();
   test_command_buffer_runtime();
   test_theme_document_compilation();
   std::cout << "All NanoVG, command, and theme tests passed\n";

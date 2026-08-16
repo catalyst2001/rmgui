@@ -954,45 +954,58 @@ static float nvg__distPtSeg(float x, float y, float px, float py, float qx, floa
 	return dx * dx + dy * dy;
 }
 
-void NVGcontext::appendCommands(float* vals, int nvals)
+void NVGcontext::appendCommand(NVGcommands command,
+	std::initializer_list<float> arguments)
 {
-	NVGstate* state = getState();
-	int i;
-	if ((int)vals[0] != NVG_CLOSE && (int)vals[0] != NVG_WINDING) {
-		m_commandx = vals[nvals - 2];
-		m_commandy = vals[nvals - 1];
+	if (command < NVG_MOVETO || command > NVG_WINDING) {
+		assert(false && "invalid NanoVG path command");
+		return;
+	}
+	const uint32_t argument_count = nvgPathCommandArgumentCount(command);
+	if (arguments.size() != argument_count || argument_count > 6) {
+		assert(false && "NanoVG path command argument count mismatch");
+		return;
+	}
+	if (m_pathArguments.getSize() > NVGpathCommand::MAX_ARGUMENT_OFFSET -
+		argument_count) {
+		assert(false && "NanoVG path argument buffer is too large");
+		return;
 	}
 
-	// transform commands
-	i = 0;
-	while (i < nvals) {
-		int cmd = (int)vals[i];
-		switch (cmd) {
-		case NVG_MOVETO:
-			NVGcontext::TransformPoint(&vals[i + 1], &vals[i + 2], state->xform, vals[i + 1], vals[i + 2]);
-			i += 3;
-			break;
-		case NVG_LINETO:
-			NVGcontext::TransformPoint(&vals[i + 1], &vals[i + 2], state->xform, vals[i + 1], vals[i + 2]);
-			i += 3;
-			break;
-		case NVG_BEZIERTO:
-			NVGcontext::TransformPoint(&vals[i + 1], &vals[i + 2], state->xform, vals[i + 1], vals[i + 2]);
-			NVGcontext::TransformPoint(&vals[i + 3], &vals[i + 4], state->xform, vals[i + 3], vals[i + 4]);
-			NVGcontext::TransformPoint(&vals[i + 5], &vals[i + 6], state->xform, vals[i + 5], vals[i + 6]);
-			i += 7;
-			break;
-		case NVG_CLOSE:
-			i++;
-			break;
-		case NVG_WINDING:
-			i += 2;
-			break;
-		default:
-			i++;
-		}
+	float transformed[6]{};
+	std::copy(arguments.begin(), arguments.end(), transformed);
+	if (command == NVG_MOVETO || command == NVG_LINETO) {
+		m_commandx = transformed[0];
+		m_commandy = transformed[1];
 	}
-	m_commands.appendBack(vals, nvals);
+	else if (command == NVG_BEZIERTO) {
+		m_commandx = transformed[4];
+		m_commandy = transformed[5];
+	}
+
+	NVGstate* state = getState();
+	if (command == NVG_MOVETO || command == NVG_LINETO) {
+		TransformPoint(&transformed[0], &transformed[1], state->xform,
+			transformed[0], transformed[1]);
+	}
+	else if (command == NVG_BEZIERTO) {
+		TransformPoint(&transformed[0], &transformed[1], state->xform,
+			transformed[0], transformed[1]);
+		TransformPoint(&transformed[2], &transformed[3], state->xform,
+			transformed[2], transformed[3]);
+		TransformPoint(&transformed[4], &transformed[5], state->xform,
+			transformed[4], transformed[5]);
+	}
+
+	if (!m_pathCommands.availCapacity(1) ||
+		!m_pathArguments.availCapacity(argument_count))
+		return;
+	const uint32_t argument_offset =
+		static_cast<uint32_t>(m_pathArguments.getSize());
+	if (argument_count > 0)
+		m_pathArguments.appendBack(transformed, argument_count);
+	const NVGpathCommand descriptor(command, argument_offset);
+	m_pathCommands.appendBack(&descriptor, 1);
 }
 
 static float nvg__getAverageScale(float* t)
@@ -1048,54 +1061,55 @@ static void nvg__vset(NVGvertex* vtx, float x, float y, float u, float v)
 void NVGcontext::flattenPaths()
 {
 	NVGpoint* last;
-	size_t i;
-	float* cp1;
-	float* cp2;
-	float* p;
+	const float* cp1;
+	const float* cp2;
+	const float* p;
 
 	if (m_pathCache->getNumPaths() > 0)
 		return;
 
 	// Flatten
-	i = 0;
-	while (i < m_commands.getSize()) {
-		int cmd = (int)m_commands[i];
-		switch (cmd) {
+	const NVGpathCommand* commands = m_pathCommands.getData();
+	const float* arguments = m_pathArguments.getData();
+	for (size_t i = 0; i < m_pathCommands.getSize(); ++i) {
+		const NVGpathCommand& descriptor = commands[i];
+		const NVGcommands command = descriptor.getType();
+		const uint32_t argument_offset = descriptor.getArgumentOffset();
+		const uint32_t argument_count = nvgPathCommandArgumentCount(command);
+		assert(argument_offset + argument_count <= m_pathArguments.getSize());
+		const float* command_arguments = arguments + argument_offset;
+		switch (command) {
 		case NVG_MOVETO:
 			m_pathCache->addPath();
-			p = &m_commands[i + 1];
+			p = command_arguments;
 			m_pathCache->addPoint(p[0], p[1], NVG_PT_CORNER, m_distTol);
-			i += 3;
 			break;
 		case NVG_LINETO:
-			p = &m_commands[i + 1];
+			p = command_arguments;
 			m_pathCache->addPoint(p[0], p[1], NVG_PT_CORNER, m_distTol);
-			i += 3;
 			break;
 		case NVG_BEZIERTO:
 			last = m_pathCache->getLastPoint();
 			if (last != NULL) {
-				cp1 = &m_commands[i + 1];
-				cp2 = &m_commands[i + 3];
-				p = &m_commands[i + 5];
+				cp1 = command_arguments;
+				cp2 = command_arguments + 2;
+				p = command_arguments + 4;
 				m_pathCache->tesselateBezier(last->x, last->y,
 					cp1[0], cp1[1],
 					cp2[0], cp2[1],
 					p[0], p[1],
 					0, NVG_PT_CORNER, m_tessTol);
 			}
-			i += 7;
 			break;
 		case NVG_CLOSE:
 			m_pathCache->closePath();
-			i++;
 			break;
 		case NVG_WINDING:
-			m_pathCache->pathWinding((int)m_commands[i + 1]);
-			i += 2;
+			m_pathCache->pathWinding(static_cast<int>(command_arguments[0]));
 			break;
 		default:
-			i++;
+			assert(false && "invalid NanoVG path command");
+			break;
 		}
 	}
 	m_pathCache->updateCache(m_distTol);
@@ -1338,39 +1352,36 @@ static NVGvertex* nvg__roundCapEnd(NVGvertex* dst, NVGpoint* p,
 // Draw
 void NVGcontext::beginPath()
 {
-	m_commands.clear();
+	m_pathCommands.clear();
+	m_pathArguments.clear();
 	m_pathCache->clearPathCache();
 }
 
 void NVGcontext::moveTo(float x, float y)
 {
-	float vals[] = { NVG_MOVETO, x, y };
-	appendCommands(vals, NVG_COUNTOF(vals));
+	appendCommand(NVG_MOVETO, { x, y });
 }
 
 void NVGcontext::lineTo(float x, float y)
 {
-	float vals[] = { NVG_LINETO, x, y };
-	appendCommands(vals, NVG_COUNTOF(vals));
+	appendCommand(NVG_LINETO, { x, y });
 }
 
 void NVGcontext::bezierTo(float c1x, float c1y, float c2x, float c2y, float x, float y)
 {
-	float vals[] = { NVG_BEZIERTO, c1x, c1y, c2x, c2y, x, y };
-	appendCommands(vals, NVG_COUNTOF(vals));
+	appendCommand(NVG_BEZIERTO, { c1x, c1y, c2x, c2y, x, y });
 }
 
 void NVGcontext::quadTo(float cx, float cy, float x, float y)
 {
 	float x0 = m_commandx;
 	float y0 = m_commandy;
-	float vals[] = {
-		NVG_BEZIERTO,
-			x0 + 2.0f / 3.0f * (cx - x0), y0 + 2.0f / 3.0f * (cy - y0),
-			x + 2.0f / 3.0f * (cx - x), y + 2.0f / 3.0f * (cy - y),
-			x, y
-	};
-	appendCommands(vals, NVG_COUNTOF(vals));
+	appendCommand(NVG_BEZIERTO, {
+		x0 + 2.0f / 3.0f * (cx - x0),
+		y0 + 2.0f / 3.0f * (cy - y0),
+		x + 2.0f / 3.0f * (cx - x),
+		y + 2.0f / 3.0f * (cy - y), x, y
+	});
 }
 
 void NVGcontext::arcTo(float x1, float y1, float x2, float y2, float radius)
@@ -1380,7 +1391,7 @@ void NVGcontext::arcTo(float x1, float y1, float x2, float y2, float radius)
 	float dx0, dy0, dx1, dy1, a, d, cx, cy, a0, a1;
 	int dir;
 
-	if (m_commands.isEmpty())
+	if (m_pathCommands.isEmpty())
 		return;
 
 	// Handle degenerate cases.
@@ -1429,14 +1440,12 @@ void NVGcontext::arcTo(float x1, float y1, float x2, float y2, float radius)
 
 void NVGcontext::closePath()
 {
-	float vals[] = { NVG_CLOSE };
-	appendCommands(vals, NVG_COUNTOF(vals));
+	appendCommand(NVG_CLOSE, {});
 }
 
 void NVGcontext::pathWinding(int dir)
 {
-	float vals[] = { NVG_WINDING, (float)dir };
-	appendCommands(vals, NVG_COUNTOF(vals));
+	appendCommand(NVG_WINDING, { static_cast<float>(dir) });
 }
 
 void NVGcontext::arc(float cx, float cy, float r, float a0, float a1, int dir)
@@ -1444,9 +1453,8 @@ void NVGcontext::arc(float cx, float cy, float r, float a0, float a1, int dir)
 	float a = 0, da = 0, hda = 0, kappa = 0;
 	float dx = 0, dy = 0, x = 0, y = 0, tanx = 0, tany = 0;
 	float px = 0, py = 0, ptanx = 0, ptany = 0;
-	float vals[3 + 5 * 7 + 100];
-	int i, ndivs, nvals;
-	int move = m_commands.getSize() > 0 ? NVG_LINETO : NVG_MOVETO;
+	int i, ndivs;
+	NVGcommands move = m_pathCommands.isEmpty() ? NVG_MOVETO : NVG_LINETO;
 
 	// Clamp angles
 	da = a1 - a0;
@@ -1475,7 +1483,6 @@ void NVGcontext::arc(float cx, float cy, float r, float a0, float a1, int dir)
 	if (dir == NVG_CCW)
 		kappa = -kappa;
 
-	nvals = 0;
 	for (i = 0; i <= ndivs; i++) {
 		a = a0 + da * (i / (float)ndivs);
 		dx = nvg__cosf(a);
@@ -1486,37 +1493,26 @@ void NVGcontext::arc(float cx, float cy, float r, float a0, float a1, int dir)
 		tany = dx * r * kappa;
 
 		if (i == 0) {
-			vals[nvals++] = (float)move;
-			vals[nvals++] = x;
-			vals[nvals++] = y;
+			appendCommand(move, { x, y });
 		}
 		else {
-			vals[nvals++] = NVG_BEZIERTO;
-			vals[nvals++] = px + ptanx;
-			vals[nvals++] = py + ptany;
-			vals[nvals++] = x - tanx;
-			vals[nvals++] = y - tany;
-			vals[nvals++] = x;
-			vals[nvals++] = y;
+			appendCommand(NVG_BEZIERTO, { px + ptanx, py + ptany,
+				x - tanx, y - tany, x, y });
 		}
 		px = x;
 		py = y;
 		ptanx = tanx;
 		ptany = tany;
 	}
-	appendCommands(vals, nvals);
 }
 
 void NVGcontext::rect(float x, float y, float w, float h)
 {
-	float vals[] = {
-		NVG_MOVETO, x,y,
-		NVG_LINETO, x,y + h,
-		NVG_LINETO, x + w,y + h,
-		NVG_LINETO, x + w,y,
-		NVG_CLOSE
-	};
-	appendCommands(vals, NVG_COUNTOF(vals));
+	appendCommand(NVG_MOVETO, { x, y });
+	appendCommand(NVG_LINETO, { x, y + h });
+	appendCommand(NVG_LINETO, { x + w, y + h });
+	appendCommand(NVG_LINETO, { x + w, y });
+	appendCommand(NVG_CLOSE, {});
 }
 
 void NVGcontext::roundedRect(float x, float y, float w, float h, float r)
@@ -1546,33 +1542,40 @@ void NVGcontext::roundedRectVarying(float x, float y, float w, float h, float ra
 		float rxBR = rBR * nvg__signf(w), ryBR = rBR * nvg__signf(h);
 		float rxTR = rTR * nvg__signf(w), ryTR = rTR * nvg__signf(h);
 		float rxTL = rTL * nvg__signf(w), ryTL = rTL * nvg__signf(h);
-		float vals[] = {
-			NVG_MOVETO, x, y + ryTL,
-			NVG_LINETO, x, y + h - ryBL,
-			NVG_BEZIERTO, x, y + h - ryBL * (1 - NVG_KAPPA90), x + rxBL * (1 - NVG_KAPPA90), y + h, x + rxBL, y + h,
-			NVG_LINETO, x + w - rxBR, y + h,
-			NVG_BEZIERTO, x + w - rxBR * (1 - NVG_KAPPA90), y + h, x + w, y + h - ryBR * (1 - NVG_KAPPA90), x + w, y + h - ryBR,
-			NVG_LINETO, x + w, y + ryTR,
-			NVG_BEZIERTO, x + w, y + ryTR * (1 - NVG_KAPPA90), x + w - rxTR * (1 - NVG_KAPPA90), y, x + w - rxTR, y,
-			NVG_LINETO, x + rxTL, y,
-			NVG_BEZIERTO, x + rxTL * (1 - NVG_KAPPA90), y, x, y + ryTL * (1 - NVG_KAPPA90), x, y + ryTL,
-			NVG_CLOSE
-		};
-		appendCommands(vals, NVG_COUNTOF(vals));
+		appendCommand(NVG_MOVETO, { x, y + ryTL });
+		appendCommand(NVG_LINETO, { x, y + h - ryBL });
+		appendCommand(NVG_BEZIERTO, {
+			x, y + h - ryBL * (1 - NVG_KAPPA90),
+			x + rxBL * (1 - NVG_KAPPA90), y + h, x + rxBL, y + h });
+		appendCommand(NVG_LINETO, { x + w - rxBR, y + h });
+		appendCommand(NVG_BEZIERTO, {
+			x + w - rxBR * (1 - NVG_KAPPA90), y + h,
+			x + w, y + h - ryBR * (1 - NVG_KAPPA90),
+			x + w, y + h - ryBR });
+		appendCommand(NVG_LINETO, { x + w, y + ryTR });
+		appendCommand(NVG_BEZIERTO, {
+			x + w, y + ryTR * (1 - NVG_KAPPA90),
+			x + w - rxTR * (1 - NVG_KAPPA90), y, x + w - rxTR, y });
+		appendCommand(NVG_LINETO, { x + rxTL, y });
+		appendCommand(NVG_BEZIERTO, {
+			x + rxTL * (1 - NVG_KAPPA90), y,
+			x, y + ryTL * (1 - NVG_KAPPA90), x, y + ryTL });
+		appendCommand(NVG_CLOSE, {});
 	}
 }
 
 void NVGcontext::ellipse(float cx, float cy, float rx, float ry)
 {
-	float vals[] = {
-		NVG_MOVETO, cx - rx, cy,
-		NVG_BEZIERTO, cx - rx, cy + ry * NVG_KAPPA90, cx - rx * NVG_KAPPA90, cy + ry, cx, cy + ry,
-		NVG_BEZIERTO, cx + rx * NVG_KAPPA90, cy + ry, cx + rx, cy + ry * NVG_KAPPA90, cx + rx, cy,
-		NVG_BEZIERTO, cx + rx, cy - ry * NVG_KAPPA90, cx + rx * NVG_KAPPA90, cy - ry, cx, cy - ry,
-		NVG_BEZIERTO, cx - rx * NVG_KAPPA90, cy - ry, cx - rx, cy - ry * NVG_KAPPA90, cx - rx, cy,
-		NVG_CLOSE
-	};
-	appendCommands(vals, NVG_COUNTOF(vals));
+	appendCommand(NVG_MOVETO, { cx - rx, cy });
+	appendCommand(NVG_BEZIERTO, { cx - rx, cy + ry * NVG_KAPPA90,
+		cx - rx * NVG_KAPPA90, cy + ry, cx, cy + ry });
+	appendCommand(NVG_BEZIERTO, { cx + rx * NVG_KAPPA90, cy + ry,
+		cx + rx, cy + ry * NVG_KAPPA90, cx + rx, cy });
+	appendCommand(NVG_BEZIERTO, { cx + rx, cy - ry * NVG_KAPPA90,
+		cx + rx * NVG_KAPPA90, cy - ry, cx, cy - ry });
+	appendCommand(NVG_BEZIERTO, { cx - rx * NVG_KAPPA90, cy - ry,
+		cx - rx, cy - ry * NVG_KAPPA90, cx - rx, cy });
+	appendCommand(NVG_CLOSE, {});
 }
 
 void NVGcontext::circle(float cx, float cy, float r)
@@ -2491,7 +2494,8 @@ NVGcontext::NVGcontext(std::unique_ptr<NVGrenderer> renderer, const NVGcontextCo
 	, m_fillTriCount(0)
 	, m_strokeTriCount(0)
 	, m_textTriCount(0)
-	, m_commands(NVG_INIT_COMMANDS_SIZE)
+	, m_pathCommands(NVG_INIT_PATH_COMMANDS_SIZE)
+	, m_pathArguments(NVG_INIT_PATH_ARGUMENTS_SIZE)
 {
 	m_renderer = std::move(renderer);
 	m_rendererCreated = 1;

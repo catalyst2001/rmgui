@@ -50,6 +50,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <cassert>
+#include <initializer_list>
 
 #ifdef RGB
 #undef RGB
@@ -65,7 +66,8 @@
 #define NVG_INIT_FONTIMAGE_SIZE  512
 #define NVG_MAX_FONTIMAGE_SIZE   2048
 
-#define NVG_INIT_COMMANDS_SIZE 256
+#define NVG_INIT_PATH_COMMANDS_SIZE 64
+#define NVG_INIT_PATH_ARGUMENTS_SIZE 256
 #define NVG_INIT_POINTS_SIZE 128
 #define NVG_INIT_PATHS_SIZE 16
 #define NVG_INIT_VERTS_SIZE 256
@@ -173,6 +175,7 @@ public:
 	}
 
 	inline _type* getData() { return m_pdata; }
+	inline const _type* getData() const { return m_pdata; }
 	inline size_t getSize() const { return m_size; }
 	inline size_t getCapacity() const { return m_capacity; }
 
@@ -793,6 +796,42 @@ enum NVGcommands {
 	NVG_WINDING = 4,
 };
 
+/** Compact path opcode plus an offset into the separate float argument buffer. */
+struct NVGpathCommand {
+	static constexpr uint32_t TYPE_BITS = 3;
+	static constexpr uint32_t TYPE_MASK = (1u << TYPE_BITS) - 1u;
+	static constexpr uint32_t MAX_ARGUMENT_OFFSET = UINT32_MAX >> TYPE_BITS;
+
+	uint32_t encoded = 0;
+
+	NVGpathCommand() = default;
+	NVGpathCommand(NVGcommands type, uint32_t argumentOffset) noexcept
+		: encoded((argumentOffset << TYPE_BITS) | static_cast<uint32_t>(type)) {
+		assert(static_cast<uint32_t>(type) <= TYPE_MASK);
+		assert(argumentOffset <= MAX_ARGUMENT_OFFSET);
+	}
+
+	NVGcommands getType() const noexcept {
+		return static_cast<NVGcommands>(encoded & TYPE_MASK);
+	}
+	uint32_t getArgumentOffset() const noexcept { return encoded >> TYPE_BITS; }
+};
+static_assert(sizeof(NVGpathCommand) == sizeof(uint32_t),
+	"NVGpathCommand must remain a compact 32-bit descriptor");
+static_assert(static_cast<uint32_t>(NVG_WINDING) <= NVGpathCommand::TYPE_MASK,
+	"NVG path command type no longer fits into its descriptor");
+
+inline uint32_t nvgPathCommandArgumentCount(NVGcommands command) noexcept {
+	switch (command) {
+	case NVG_MOVETO:
+	case NVG_LINETO:   return 2;
+	case NVG_BEZIERTO: return 6;
+	case NVG_CLOSE:    return 0;
+	case NVG_WINDING:  return 1;
+	default:           return 0;
+	}
+}
+
 enum NVGpointFlags {
 	NVG_PT_CORNER = 0x01,
 	NVG_PT_LEFT = 0x02,
@@ -949,7 +988,8 @@ protected:
 	std::unique_ptr<NVGrenderer> m_renderer;
 	int              m_rendererCreated;
 	NVGcontextConfig m_config;
-	NVGbuffer<float> m_commands;
+	NVGbuffer<NVGpathCommand> m_pathCommands;
+	NVGbuffer<float> m_pathArguments;
 	float  m_commandx, m_commandy;
 	NVGstackFixed<NVGstate, NVG_MAX_STATES> m_states;
 	NVGpathCache* m_pathCache;
@@ -975,7 +1015,8 @@ private:
 	NVGpathCache* allocPathCache(void);
 	void setDevicePixelRatio(float ratio);
 	NVGstate* getState();
-	void appendCommands(float* vals, int nvals);
+	void appendCommand(NVGcommands command,
+		std::initializer_list<float> arguments);
 	//NVGpath* getLastPath(NVGcontext* ctx);
 	//void nvg__addPath(NVGcontext* ctx);
 	//NVGpoint* nvg__lastPoint(NVGcontext* ctx);
