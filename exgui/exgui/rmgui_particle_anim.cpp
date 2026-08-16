@@ -166,10 +166,20 @@ void RmParticleAnimBehaviour::update(float delta_time, float width,
       const float distance_squared = dx * dx + dy * dy;
       if (distance_squared > 0.0001f && distance_squared < break_radius_squared) {
         const float distance = std::sqrt(distance_squared);
-        const float force = (1.0f - distance / break_radius) *
+        const float direction_x = dx / distance;
+        const float direction_y = dy / distance;
+        const float penetration = 1.0f - distance / break_radius;
+        const float displacement = penetration *
           m_config.cursor_repulsion * dt;
-        particle.velocity.x += dx / distance * force;
-        particle.velocity.y += dy / distance * force;
+        particle.position.x += direction_x * displacement;
+        particle.position.y += direction_y * displacement;
+
+        // Keep part of the impulse after the cursor passes so the web moves
+        // naturally instead of snapping back to its previous trajectory.
+        const float impulse = penetration * m_config.cursor_repulsion *
+          dt * 0.35f;
+        particle.velocity.x += direction_x * impulse;
+        particle.velocity.y += direction_y * impulse;
       }
     }
 

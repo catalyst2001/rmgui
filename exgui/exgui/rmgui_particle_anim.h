@@ -16,7 +16,8 @@ struct RmParticleAnimConfig {
   float maximum_radius = 1.7f;
   float connection_distance = 118.0f;
   float cursor_break_radius = 82.0f;
-  float cursor_repulsion = 0.0f;
+  // Maximum particle displacement speed inside the cursor radius, in px/s.
+  float cursor_repulsion = 110.0f;
   bool bounce_at_bounds = true;
   bool fill_connection_triangles = true;
 };

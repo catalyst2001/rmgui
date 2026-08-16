@@ -29,7 +29,7 @@ int main(int argc, char** argv)
 	particle_config.particle_count = 96;
 	particle_config.connection_distance = 132.0f;
 	particle_config.cursor_break_radius = 96.0f;
-	particle_config.cursor_repulsion = 18.0f;
+	particle_config.cursor_repulsion = 135.0f;
 	rm_particle_anim* p_home_background = new rm_particle_anim(
 		g_gui, 0, 0, 1280, 720, particle_config,
 		RmParticleAnimStyle::designer_home());
