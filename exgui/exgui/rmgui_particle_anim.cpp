@@ -24,35 +24,11 @@ RmParticleAnimConfig normalize_config(RmParticleAnimConfig config) noexcept
     config.maximum_radius);
   config.connection_distance = std::max(1.0f,
     config.connection_distance);
-  config.cursor_break_radius = std::max(0.0f,
-    config.cursor_break_radius);
+  config.cursor_radius = std::max(0.0f, config.cursor_radius);
   config.cursor_repulsion = std::max(0.0f, config.cursor_repulsion);
   if (config.random_seed == 0)
     config.random_seed = 0x524D4755u;
   return config;
-}
-
-float squared_distance_to_segment(const rm_vec2& point,
-  const rm_vec2& start, const rm_vec2& end) noexcept
-{
-  const float segment_x = end.x - start.x;
-  const float segment_y = end.y - start.y;
-  const float length_squared = segment_x * segment_x +
-    segment_y * segment_y;
-  if (length_squared <= std::numeric_limits<float>::epsilon()) {
-    const float dx = point.x - start.x;
-    const float dy = point.y - start.y;
-    return dx * dx + dy * dy;
-  }
-  const float projection = std::clamp(
-    ((point.x - start.x) * segment_x +
-      (point.y - start.y) * segment_y) / length_squared,
-    0.0f, 1.0f);
-  const float nearest_x = start.x + segment_x * projection;
-  const float nearest_y = start.y + segment_y * projection;
-  const float dx = point.x - nearest_x;
-  const float dy = point.y - nearest_y;
-  return dx * dx + dy * dy;
 }
 
 NVGcolor with_alpha(NVGcolor color, float multiplier) noexcept
@@ -122,7 +98,7 @@ void RmParticleAnimBehaviour::reset(float width, float height)
     m_particles.push_back(particle);
   }
   m_initialized = true;
-  rebuild_graph(nullptr);
+  rebuild_graph();
 }
 
 void RmParticleAnimBehaviour::resize(float width, float height)
@@ -157,18 +133,18 @@ void RmParticleAnimBehaviour::update(float delta_time, float width,
     resize(next_width, next_height);
 
   const float dt = std::clamp(delta_time, 0.0f, 0.05f);
-  const float break_radius = m_config.cursor_break_radius;
-  const float break_radius_squared = break_radius * break_radius;
+  const float cursor_radius = m_config.cursor_radius;
+  const float cursor_radius_squared = cursor_radius * cursor_radius;
   for (RmParticleAnimParticle& particle : m_particles) {
-    if (p_cursor && m_config.cursor_repulsion > 0.0f && break_radius > 0.0f) {
+    if (p_cursor && m_config.cursor_repulsion > 0.0f && cursor_radius > 0.0f) {
       const float dx = particle.position.x - p_cursor->x;
       const float dy = particle.position.y - p_cursor->y;
       const float distance_squared = dx * dx + dy * dy;
-      if (distance_squared > 0.0001f && distance_squared < break_radius_squared) {
+      if (distance_squared > 0.0001f && distance_squared < cursor_radius_squared) {
         const float distance = std::sqrt(distance_squared);
         const float direction_x = dx / distance;
         const float direction_y = dy / distance;
-        const float penetration = 1.0f - distance / break_radius;
+        const float penetration = 1.0f - distance / cursor_radius;
         const float displacement = penetration *
           m_config.cursor_repulsion * dt;
         particle.position.x += direction_x * displacement;
@@ -220,10 +196,10 @@ void RmParticleAnimBehaviour::update(float delta_time, float width,
       if (particle.position.y > m_height) particle.position.y -= m_height;
     }
   }
-  rebuild_graph(p_cursor);
+  rebuild_graph();
 }
 
-void RmParticleAnimBehaviour::rebuild_graph(const rm_vec2* p_cursor)
+void RmParticleAnimBehaviour::rebuild_graph()
 {
   m_connections.clear();
   m_triangles.clear();
@@ -233,8 +209,6 @@ void RmParticleAnimBehaviour::rebuild_graph(const rm_vec2* p_cursor)
 
   const float maximum_distance = m_config.connection_distance;
   const float maximum_distance_squared = maximum_distance * maximum_distance;
-  const float cursor_radius_squared = m_config.cursor_break_radius *
-    m_config.cursor_break_radius;
   std::vector<float> graph(count * count, 0.0f);
   for (size_t first = 0; first < count; ++first) {
     for (size_t second = first + 1; second < count; ++second) {
@@ -245,11 +219,6 @@ void RmParticleAnimBehaviour::rebuild_graph(const rm_vec2* p_cursor)
       const float distance_squared = dx * dx + dy * dy;
       if (distance_squared > maximum_distance_squared)
         continue;
-      if (p_cursor && m_config.cursor_break_radius > 0.0f &&
-        squared_distance_to_segment(*p_cursor, start, end) <=
-          cursor_radius_squared)
-        continue;
-
       const float strength = 1.0f -
         std::sqrt(distance_squared) / maximum_distance;
       m_connections.push_back({ static_cast<uint32_t>(first),
