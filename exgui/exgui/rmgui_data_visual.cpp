@@ -29,10 +29,8 @@ void set_error(std::string* p_error, const char* message)
 bool has_safe_embedded_commands(const NVGcmdBuf& program,
   std::string* p_error)
 {
-  const uint8_t* argument_counts = nvgCmdArgCount();
-  uint32_t cursor = 0;
-  while (cursor < program.cells.size()) {
-    const uint32_t op = program.cells[cursor++].u;
+  for (const NVGcmdInstruction& instruction : program.commands) {
+    const uint32_t op = instruction.op;
     if (op == NVG_CMD_RESET || op == NVG_CMD_RESET_TRANSFORM ||
       op == NVG_CMD_SCISSOR || op == NVG_CMD_RESET_SCISSOR ||
       op == NVG_CMD_SET_ZINDEX) {
@@ -40,10 +38,6 @@ bool has_safe_embedded_commands(const NVGcmdBuf& program,
         "draw program contains a command which can escape widget rendering state");
       return false;
     }
-    const uint32_t argument_count = argument_counts[op];
-    if (argument_count > 0)
-      ++cursor;
-    cursor += argument_count;
   }
   return true;
 }
@@ -183,6 +177,7 @@ void RmDrawProgramBinding::reset() noexcept
   m_pschema = nullptr;
   m_schema_revision = 0;
   m_layout_variables.clear();
+  m_arguments.clear();
   m_valid = false;
   m_error.clear();
 }
@@ -391,7 +386,13 @@ bool RmDataDrivenPainter::draw_surface(NVGcontext& context,
   context.save();
   context.intersectScissor(data.x, data.y, data.width, data.height);
   const NVGcmdLayout layout = binding.get_layout();
-  nvgEvalValidated(context, program.m_program, variables.get_data(), &layout);
+  if (!nvgCmdResolveArguments(binding.get_arguments(), program.m_program,
+    variables.get_data(), &layout)) {
+    context.restore();
+    set_error(p_error, "draw program arguments could not be resolved");
+    return false;
+  }
+  nvgEvalResolved(context, program.m_program, binding.get_arguments());
   context.restore();
   set_error(p_error, "");
   return true;

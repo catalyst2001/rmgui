@@ -879,6 +879,7 @@ class RmDrawProgramBinding {
   const RmDrawVariableSchema* m_pschema = nullptr;
   uint64_t m_schema_revision = 0;
   std::vector<NVGcmdVar> m_layout_variables;
+  NVGcmdArgBuffer m_arguments;
   bool m_valid = false;
   std::string m_error;
 
@@ -889,6 +890,7 @@ public:
   bool compile(rm_resource_id program_id, const NVGcmdBuf& program,
     const RmDrawVariableSchema& schema, std::string* p_error = nullptr);
   NVGcmdLayout get_layout() const noexcept;
+  NVGcmdArgBuffer& get_arguments() noexcept { return m_arguments; }
   bool is_valid() const noexcept { return m_valid; }
   const std::string& get_error() const noexcept { return m_error; }
 };

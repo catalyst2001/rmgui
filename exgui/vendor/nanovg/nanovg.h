@@ -977,6 +977,7 @@ struct NVGtransform {
 // Forward declarations for data-driven command system (nvg_cmd.h)
 struct NVGcmdBuf;
 struct NVGcmdLayout;
+class NVGcmdArgBuffer;
 
 /**
 * @brief NanoVG context.
@@ -1179,8 +1180,8 @@ public:
 	void debugDumpPathCache();
 
 	// Data-driven command evaluation (see nvg_cmd.h).
-	void eval(const NVGcmdBuf& buf, const void* data = nullptr,
-	         const NVGcmdLayout* layout = nullptr);
+	void eval(const NVGcmdBuf& buf, NVGcmdArgBuffer& arguments,
+		const void* data = nullptr, const NVGcmdLayout* layout = nullptr);
 
 	inline NVGrenderer* getRenderer() { return m_renderer.get(); }
 };

@@ -175,6 +175,9 @@ void test_command_buffer_runtime()
 
   require(nvgCmdValidate(commands, &layout).succeeded(),
     "a typed data-driven command buffer must validate");
+  require(reinterpret_cast<const void*>(commands.data()) !=
+    reinterpret_cast<const void*>(commands.argumentData()),
+    "data-driven instructions and source arguments must be separate arrays");
 
   NVGcmdArgLocation width_location;
   require(commands.locateArgument(3, 2, width_location),
@@ -206,8 +209,8 @@ void test_command_buffer_runtime()
   require(commands.setLiteralFloat(color_location, 0.5f) &&
     commands.bindProperty(color_location, "red"),
     "a literal command argument must bind to a named property");
-  require(!commands.locateArgumentAtCell(2, 0, color_location),
-    "an arbitrary cell inside a command must not be accepted as an opcode");
+  require(!commands.locateArgument(99, 0, color_location),
+    "an argument location must reject a missing command index");
 
   NVGcmdBuf structurally_changed = commands;
   NVGcmdArgLocation stale_location;
@@ -242,12 +245,24 @@ void test_command_buffer_runtime()
     nvgCmdValidate(binary_roundtrip, &layout).succeeded(),
     "binary command format must round-trip with validation");
 
+  MemoryIo obsolete_binary = binary;
+  obsolete_binary.cursor = 0;
+  const uint32_t obsolete_version = 2;
+  std::memcpy(obsolete_binary.bytes.data() + sizeof(uint32_t),
+    &obsolete_version, sizeof(obsolete_version));
+  NVGcmdBuf rejects_obsolete = commands;
+  const uint32_t preserved_command_count = rejects_obsolete.size();
+  require(!rejects_obsolete.loadBinary(obsolete_binary) &&
+    rejects_obsolete.size() == preserved_command_count,
+    "the modernized binary loader must reject the legacy interleaved format");
+
   auto renderer = std::make_unique<RecordingRenderer>();
   RecordingRenderer* recording = renderer.get();
   NVGcontext context(std::move(renderer), NVGcontextConfig{});
+  NVGcmdArgBuffer first_arguments;
   context.beginFrame(200.0f, 100.0f, 1.0f);
   const NVGcmdEvalResult evaluated = nvgEvalChecked(
-    context, binary_roundtrip, &data, &layout);
+    context, binary_roundtrip, first_arguments, &data, &layout);
   context.endFrame();
   require(evaluated.succeeded() && evaluated.commands_executed == 7,
     "checked command execution must report every executed command");
@@ -259,25 +274,63 @@ void test_command_buffer_runtime()
     first_max_x = std::max(first_max_x, vertex.x);
   DrawData resized_data = data;
   resized_data.width = 144.0f;
+  NVGcmdArgBuffer resized_arguments;
   context.beginFrame(200.0f, 100.0f, 1.0f);
   const NVGcmdEvalResult resized_evaluation = nvgEvalChecked(
-    context, binary_roundtrip, &resized_data, &layout);
+    context, binary_roundtrip, resized_arguments, &resized_data, &layout);
   context.endFrame();
   float resized_max_x = 0.0f;
   for (const NVGvertex& vertex : recording->last_fill_vertices)
     resized_max_x = std::max(resized_max_x, vertex.x);
   require(resized_evaluation.succeeded() && resized_max_x > first_max_x + 40.0f,
     "one immutable command buffer must respond to different widget sizes");
+  require(first_arguments.size() == binary_roundtrip.argumentCount() &&
+    resized_arguments.size() == binary_roundtrip.argumentCount() &&
+    first_arguments.data() != resized_arguments.data(),
+    "each widget instance must own an independent resolved argument buffer");
+  const NVGcmdInstruction& rounded_rect = binary_roundtrip.commands[3];
+  require(std::fabs(first_arguments.data()[rounded_rect.argumentOffset + 2].f -
+    84.0f) < 1.0e-4f &&
+    std::fabs(resized_arguments.data()[rounded_rect.argumentOffset + 2].f -
+      144.0f) < 1.0e-4f,
+    "instance argument buffers must resolve the same command against different data");
+  require(binary_roundtrip.arguments[rounded_rect.argumentOffset + 2].u == 0,
+    "runtime resolution must not mutate the shared variable reference");
+
+  NVGcmdBuf edited_program = binary_roundtrip;
+  NVGcmdArgBuffer edited_arguments;
+  require(nvgCmdResolveArguments(edited_arguments, edited_program, &data,
+    &layout), "an editable program must resolve before mutation");
+  NVGcmdArgLocation edited_width;
+  require(edited_program.locateArgument(3, 2, edited_width) &&
+    edited_program.setLiteralFloat(edited_width, 101.0f) &&
+    nvgEvalResolved(context, edited_program, edited_arguments) == 0,
+    "source argument edits must invalidate previously resolved instance data");
+  require(nvgCmdResolveArguments(edited_arguments, edited_program, &data,
+    &layout) &&
+    std::fabs(edited_arguments.data()[
+      edited_program.commands[3].argumentOffset + 2].f - 101.0f) < 1.0e-4f,
+    "an invalidated instance buffer must accept freshly resolved values");
+
+  struct TextData { const char* text; } text_data{ "runtime text" };
+  const NVGcmdVar text_variables[] = {
+    NVG_VAR_ENTRY(TextData, text, NVG_VAR_STRING)
+  };
+  const NVGcmdLayout text_layout{ text_variables, 1, sizeof(TextData) };
+  NVGcmdBuf text_program;
+  text_program.meta.addVar("text", NVG_VAR_STRING);
+  text_program.text(0.0f, 0.0f, V(0));
+  NVGcmdArgBuffer text_arguments;
+  require(nvgCmdValidate(text_program, &text_layout).succeeded() &&
+    nvgCmdResolveArguments(text_arguments, text_program, &text_data,
+      &text_layout) &&
+    reinterpret_cast<const char*>(text_arguments.data()[2].pointer) ==
+      text_data.text,
+    "per-instance arguments must preserve pointer-sized values on 64-bit builds");
 
   NVGcmdBuf truncated;
-  NVGcmdCell cell{};
-  cell.u = NVG_CMD_RECT;
-  truncated.cells.push_back(cell);
-  cell.u = 0;
-  truncated.cells.push_back(cell);
-  truncated.cells.push_back(float_cell(0.0f));
-  truncated.cells.push_back(float_cell(0.0f));
-  truncated.cells.push_back(float_cell(10.0f));
+  truncated.rect(0.0f, 0.0f, 10.0f, 10.0f);
+  truncated.arguments.pop_back();
   require(nvgCmdValidate(truncated).code ==
     NVGcmdValidationCode::truncated_command,
     "validator must reject a truncated command stream");

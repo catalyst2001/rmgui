@@ -5,12 +5,9 @@
 // enabling visual-editor–authored UI element schemas to be
 // evaluated at runtime against live widget data.
 //
-// Format of a command in the buffer (all cells are 4 bytes):
-//   0-arg commands:  [opcode]
-//   N-arg commands:  [opcode] [varmask] [arg0] … [argN-1]
-//
-// When bit K of varmask is set, argK is a variable index resolved
-// through the NVGcmdLayout at eval-time.
+// Commands and source arguments live in independent arrays. An instruction
+// stores an opcode, an argument offset and a reference mask. At runtime each
+// widget resolves the shared source arguments into its own argument buffer.
 //
 
 #ifndef NVG_CMD_H
@@ -257,6 +254,34 @@ union NVGcmdCell {
 };
 static_assert(sizeof(NVGcmdCell) == 4, "NVGcmdCell must be 4 bytes");
 
+// Compact immutable instruction. Argument count is defined by the opcode.
+struct NVGcmdInstruction {
+	uint32_t argumentOffset = 0;
+	uint16_t referenceMask = 0;
+	uint8_t op = static_cast<uint8_t>(NVG_CMD__COUNT);
+	uint8_t reserved = 0;
+
+	NVGcmdOp getOp() const noexcept { return static_cast<NVGcmdOp>(op); }
+};
+static_assert(sizeof(NVGcmdInstruction) == 8,
+	"NVGcmdInstruction must remain an 8-byte descriptor");
+static_assert(NVG_CMD__COUNT <= UINT8_MAX,
+	"NVG command opcode no longer fits into its instruction descriptor");
+
+// Resolved per-instance value. Pointer-sized storage is required for string
+// and image-handle arguments on 64-bit builds.
+union NVGcmdRuntimeArg {
+	float f;
+	int32_t i;
+	uint32_t u;
+	uintptr_t pointer;
+	NVGhandle::_handle_type handle;
+
+	NVGcmdRuntimeArg() noexcept : pointer(0) {}
+};
+static_assert(sizeof(NVGcmdRuntimeArg) >= sizeof(NVGhandle),
+	"runtime command arguments must hold an NVG handle");
+
 // Single entry in a variable layout — maps a variable index
 // to a byte offset inside the element data block.
 struct NVGcmdVar {
@@ -356,24 +381,24 @@ struct NVGcmdMeta {
 // ─────────────────────────────────────────────────────────────
 struct NVGcmdArg {
 	NVGcmdCell cell;
-	bool       isVar;
+	bool       isReference;
 
 	// Implicit constructors for literal values.
-	NVGcmdArg(float v)    : isVar(false) { cell.f = v; }
-	NVGcmdArg(int32_t v)  : isVar(false) { cell.i = v; }
-	NVGcmdArg(uint32_t v) : isVar(false) { cell.u = v; }
+	NVGcmdArg(float v)    : isReference(false) { cell.f = v; }
+	NVGcmdArg(int32_t v)  : isReference(false) { cell.i = v; }
+	NVGcmdArg(uint32_t v) : isReference(false) { cell.u = v; }
 
 	// Named constructor for variable reference.
 	static NVGcmdArg var(uint32_t varIndex) {
 		NVGcmdArg a(0.0f);
-		a.isVar  = true;
+		a.isReference = true;
 		a.cell.u = varIndex;
 		return a;
 	}
 	// Named constructor for property reference.
 	static NVGcmdArg prop(uint32_t propIndex) {
 		NVGcmdArg a(0.0f);
-		a.isVar  = true;
+		a.isReference = true;
 		a.cell.u = propIndex | NVG_CMD_PROP_BIT;
 		return a;
 	}
@@ -385,14 +410,14 @@ inline NVGcmdArg V(uint32_t idx) { return NVGcmdArg::var(idx); }
 inline NVGcmdArg P(uint32_t idx) { return NVGcmdArg::prop(idx); }
 
 // Stable while the command stream structure is unchanged. A location is
-// validated before every read/write and can never address an opcode cell.
+// validated before every read/write and can never address an instruction.
 struct NVGcmdArgLocation {
-	uint32_t commandCell = ~0u;
+	uint32_t commandIndex = ~0u;
 	uint32_t argumentIndex = ~0u;
 	uint32_t streamRevision = 0;
 
 	explicit operator bool() const noexcept {
-		return commandCell != ~0u && argumentIndex != ~0u;
+		return commandIndex != ~0u && argumentIndex != ~0u;
 	}
 };
 
@@ -416,19 +441,32 @@ struct NVGcmdArgumentInfo {
 // ─────────────────────────────────────────────────────────────
 struct NVGcmdBuf {
 	NVGcmdMeta              meta;
-	std::vector<NVGcmdCell> cells;
+	std::vector<NVGcmdInstruction> commands;
+	std::vector<NVGcmdCell> arguments;
 	std::vector<NVGcmdProperty> props;   // schema-local properties
 	uint32_t                 streamRevision = 1;
+	uint32_t                 contentRevision = 1;
+
+	void touchContent() noexcept {
+		++contentRevision;
+		if (contentRevision == 0) contentRevision = 1;
+	}
 
 	void clear() {
 		meta.clear();
-		cells.clear();
+		commands.clear();
+		arguments.clear();
 		props.clear();
 		++streamRevision;
 		if (streamRevision == 0) streamRevision = 1;
+		touchContent();
 	}
-	uint32_t size()  const         { return (uint32_t)cells.size(); }
-	const NVGcmdCell* data() const { return cells.data(); }
+	uint32_t size() const { return static_cast<uint32_t>(commands.size()); }
+	uint32_t argumentCount() const {
+		return static_cast<uint32_t>(arguments.size());
+	}
+	const NVGcmdInstruction* data() const { return commands.data(); }
+	const NVGcmdCell* argumentData() const { return arguments.data(); }
 
 	// ── Property helpers ─────────────────────────────────────
 
@@ -442,6 +480,7 @@ struct NVGcmdBuf {
 		p.values.push_back(value);
 		uint32_t idx = (uint32_t)props.size();
 		props.push_back(std::move(p));
+		touchContent();
 		return idx;
 	}
 
@@ -459,6 +498,7 @@ struct NVGcmdBuf {
 		p.values.assign(values);
 		uint32_t idx = (uint32_t)props.size();
 		props.push_back(std::move(p));
+		touchContent();
 		return idx;
 	}
 
@@ -469,12 +509,10 @@ struct NVGcmdBuf {
 		return -1;
 	}
 
-	// Locate an argument either by command ordinal or by its opcode cell.
+	// Locate an argument by command ordinal.
 	// Returned locations remain valid across value changes, but not insertions,
 	// removals, clear(), load(), or emit().
 	bool locateArgument(uint32_t commandIndex, uint32_t argumentIndex,
-		NVGcmdArgLocation& location) const noexcept;
-	bool locateArgumentAtCell(uint32_t commandCell, uint32_t argumentIndex,
 		NVGcmdArgLocation& location) const noexcept;
 	bool inspectArgument(const NVGcmdArgLocation& location,
 		NVGcmdArgumentInfo& info) const noexcept;
@@ -503,29 +541,32 @@ struct NVGcmdBuf {
 			return false;
 		const uint8_t expected = nvgCmdArgCount()[(uint32_t)op];
 		assert(args.size() == expected && "arg count mismatch");
-		if (args.size() != expected)
+		if (args.size() != expected || expected > sizeof(uint16_t) * 8u)
 			return false;
 
-		cells.reserve(cells.size() + 1 + (args.size() > 0 ? 1 + args.size() : 0));
+		if (arguments.size() > UINT32_MAX - args.size())
+			return false;
+		commands.reserve(commands.size() + 1);
+		arguments.reserve(arguments.size() + args.size());
 
-		NVGcmdCell c;
-		c.u = (uint32_t)op;
-		cells.push_back(c);
-
+		NVGcmdInstruction instruction;
+		instruction.op = static_cast<uint8_t>(op);
+		instruction.argumentOffset = static_cast<uint32_t>(arguments.size());
 		if (args.size() > 0) {
-			uint32_t mask = 0;
+			uint16_t mask = 0;
 			uint32_t bit  = 0;
 			for (auto& a : args) {
-				if (a.isVar) mask |= (1u << bit);
+				if (a.isReference) mask |= static_cast<uint16_t>(1u << bit);
 				++bit;
 			}
-			c.u = mask;
-			cells.push_back(c);
+			instruction.referenceMask = mask;
 			for (auto& a : args)
-				cells.push_back(a.cell);
+				arguments.push_back(a.cell);
 		}
+		commands.push_back(instruction);
 		++streamRevision;
 		if (streamRevision == 0) streamRevision = 1;
+		touchContent();
 		return true;
 	}
 
@@ -759,11 +800,33 @@ struct NVGcmdBuf {
 	}
 };
 
+/** Per-widget resolved argument storage for one shared command program. */
+class NVGcmdArgBuffer {
+	std::vector<NVGcmdRuntimeArg> m_values;
+	uint32_t m_programRevision = 0;
+
+	friend bool nvgCmdResolveArguments(NVGcmdArgBuffer& destination,
+		const NVGcmdBuf& program, const void* data,
+		const NVGcmdLayout* layout);
+	friend uint32_t nvgEvalResolved(NVGcontext& context,
+		const NVGcmdBuf& program, const NVGcmdArgBuffer& arguments) noexcept;
+
+public:
+	void clear() noexcept {
+		m_values.clear();
+		m_programRevision = 0;
+	}
+	uint32_t size() const noexcept {
+		return static_cast<uint32_t>(m_values.size());
+	}
+	const NVGcmdRuntimeArg* data() const noexcept { return m_values.data(); }
+};
+
 enum class NVGcmdValidationCode : uint32_t {
 	ok = 0,
 	invalid_opcode,
 	truncated_command,
-	invalid_variable_mask,
+	invalid_reference_mask,
 	variable_out_of_range,
 	property_out_of_range,
 	invalid_variable_type,
@@ -771,12 +834,13 @@ enum class NVGcmdValidationCode : uint32_t {
 	duplicate_name,
 	restore_without_save,
 	unbalanced_save_restore,
-	layout_mismatch
+	layout_mismatch,
+	argument_resolution_failed
 };
 
 struct NVGcmdValidationResult {
 	NVGcmdValidationCode code = NVGcmdValidationCode::ok;
-	uint32_t cell_index = 0;
+	uint32_t command_index = 0;
 	std::string message;
 
 	bool succeeded() const noexcept { return code == NVGcmdValidationCode::ok; }
@@ -800,20 +864,21 @@ NVGcmdValidationResult nvgCmdValidate(const NVGcmdBuf& buf,
 // data   — pointer to the element's data block (may be nullptr
 //          if no variable references are used).
 // layout — variable layout for this element class.
-void nvgEval(NVGcontext& ctx,
-             const NVGcmdBuf& buf,
-             const void* data        = nullptr,
-             const NVGcmdLayout* layout = nullptr);
+bool nvgCmdResolveArguments(NVGcmdArgBuffer& destination,
+	const NVGcmdBuf& program, const void* data = nullptr,
+	const NVGcmdLayout* layout = nullptr);
+
+void nvgEval(NVGcontext& ctx, const NVGcmdBuf& buf,
+	NVGcmdArgBuffer& arguments, const void* data = nullptr,
+	const NVGcmdLayout* layout = nullptr);
 
 NVGcmdEvalResult nvgEvalChecked(NVGcontext& ctx,
-	const NVGcmdBuf& buf, const void* data = nullptr,
+	const NVGcmdBuf& buf, NVGcmdArgBuffer& arguments,
+	const void* data = nullptr,
 	const NVGcmdLayout* layout = nullptr);
 
-// Executes a command buffer which has already been validated against layout.
-// Intended for immutable runtime resources; authoring code should use
-// nvgEvalChecked instead.
-uint32_t nvgEvalValidated(NVGcontext& ctx,
-	const NVGcmdBuf& buf, const void* data = nullptr,
-	const NVGcmdLayout* layout = nullptr);
+// Executes immutable commands against an already resolved per-instance buffer.
+uint32_t nvgEvalResolved(NVGcontext& ctx, const NVGcmdBuf& buf,
+	const NVGcmdArgBuffer& arguments) noexcept;
 
 #endif // NVG_CMD_H
