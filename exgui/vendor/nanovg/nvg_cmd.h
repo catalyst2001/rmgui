@@ -226,6 +226,17 @@ enum NVGcmdVarType : uint16_t {
 	NVG_VAR_HANDLE,      // NVGhandle    (platform-sized)
 };
 
+inline uint32_t nvgCmdVarTypeSize(NVGcmdVarType type) noexcept {
+	switch (type) {
+	case NVG_VAR_FLOAT:  return static_cast<uint32_t>(sizeof(float));
+	case NVG_VAR_INT32:  return static_cast<uint32_t>(sizeof(int32_t));
+	case NVG_VAR_UINT32: return static_cast<uint32_t>(sizeof(uint32_t));
+	case NVG_VAR_STRING: return static_cast<uint32_t>(sizeof(const char*));
+	case NVG_VAR_HANDLE: return static_cast<uint32_t>(sizeof(NVGhandle));
+	default:             return 0;
+	}
+}
+
 static constexpr uint32_t NVG_CMD_MAX_NAME = 64;
 
 inline void nvgCmdCopyName(char* destination, size_t capacity,
@@ -251,6 +262,7 @@ static_assert(sizeof(NVGcmdCell) == 4, "NVGcmdCell must be 4 bytes");
 struct NVGcmdVar {
 	uint32_t      offset;  // byte offset from the data pointer
 	NVGcmdVarType type;    // how to interpret bytes at that offset
+	uint32_t      size;    // size of the registered value in bytes
 };
 
 // Layout descriptor: an array of variable entries.
@@ -258,6 +270,7 @@ struct NVGcmdVar {
 struct NVGcmdLayout {
 	const NVGcmdVar* vars;
 	uint32_t         count;
+	uint32_t         dataSize;
 
 	inline const NVGcmdVar& operator[](uint32_t i) const {
 		assert(i < count);
@@ -268,7 +281,8 @@ struct NVGcmdLayout {
 // Helper macro for defining layout entries.
 // Usage: NVG_VAR_ENTRY(MyWidget, x, NVG_VAR_FLOAT)
 #define NVG_VAR_ENTRY(cls, member, vtype) \
-	NVGcmdVar{ (uint32_t)offsetof(cls, member), vtype }
+	NVGcmdVar{ (uint32_t)offsetof(cls, member), vtype, \
+		(uint32_t)sizeof(((cls*)nullptr)->member) }
 
 // Variable type name for text serialization.
 const char*   nvgCmdVarTypeName(NVGcmdVarType type);
@@ -370,6 +384,33 @@ inline NVGcmdArg V(uint32_t idx) { return NVGcmdArg::var(idx); }
 // Shorthand: P(idx) creates a property reference argument.
 inline NVGcmdArg P(uint32_t idx) { return NVGcmdArg::prop(idx); }
 
+// Stable while the command stream structure is unchanged. A location is
+// validated before every read/write and can never address an opcode cell.
+struct NVGcmdArgLocation {
+	uint32_t commandCell = ~0u;
+	uint32_t argumentIndex = ~0u;
+	uint32_t streamRevision = 0;
+
+	explicit operator bool() const noexcept {
+		return commandCell != ~0u && argumentIndex != ~0u;
+	}
+};
+
+enum class NVGcmdArgSource : uint8_t {
+	literal,
+	variable,
+	property
+};
+
+struct NVGcmdArgumentInfo {
+	NVGcmdOp op = NVG_CMD__COUNT;
+	uint32_t argumentIndex = 0;
+	NVGcmdArgSource source = NVGcmdArgSource::literal;
+	NVGcmdVarType type = NVG_VAR_FLOAT;
+	NVGcmdCell value{};
+	uint32_t referenceIndex = ~0u;
+};
+
 // ─────────────────────────────────────────────────────────────
 //  Command buffer — serialisable list of drawing commands
 // ─────────────────────────────────────────────────────────────
@@ -377,11 +418,14 @@ struct NVGcmdBuf {
 	NVGcmdMeta              meta;
 	std::vector<NVGcmdCell> cells;
 	std::vector<NVGcmdProperty> props;   // schema-local properties
+	uint32_t                 streamRevision = 1;
 
 	void clear() {
 		meta.clear();
 		cells.clear();
 		props.clear();
+		++streamRevision;
+		if (streamRevision == 0) streamRevision = 1;
 	}
 	uint32_t size()  const         { return (uint32_t)cells.size(); }
 	const NVGcmdCell* data() const { return cells.data(); }
@@ -425,6 +469,28 @@ struct NVGcmdBuf {
 		return -1;
 	}
 
+	// Locate an argument either by command ordinal or by its opcode cell.
+	// Returned locations remain valid across value changes, but not insertions,
+	// removals, clear(), load(), or emit().
+	bool locateArgument(uint32_t commandIndex, uint32_t argumentIndex,
+		NVGcmdArgLocation& location) const noexcept;
+	bool locateArgumentAtCell(uint32_t commandCell, uint32_t argumentIndex,
+		NVGcmdArgLocation& location) const noexcept;
+	bool inspectArgument(const NVGcmdArgLocation& location,
+		NVGcmdArgumentInfo& info) const noexcept;
+	bool setLiteralFloat(const NVGcmdArgLocation& location,
+		float value) noexcept;
+	bool setLiteralInt(const NVGcmdArgLocation& location,
+		int32_t value) noexcept;
+	bool bindVariable(const NVGcmdArgLocation& location,
+		uint32_t variableIndex) noexcept;
+	bool bindVariable(const NVGcmdArgLocation& location,
+		const char* variableName) noexcept;
+	bool bindProperty(const NVGcmdArgLocation& location,
+		uint32_t propertyIndex) noexcept;
+	bool bindProperty(const NVGcmdArgLocation& location,
+		const char* propertyName) noexcept;
+
 	// ── Serialization ────────────────────────────────────────
 	bool saveBinary(NVGio& io) const;
 	bool loadBinary(NVGio& io);
@@ -458,6 +524,8 @@ struct NVGcmdBuf {
 			for (auto& a : args)
 				cells.push_back(a.cell);
 		}
+		++streamRevision;
+		if (streamRevision == 0) streamRevision = 1;
 		return true;
 	}
 

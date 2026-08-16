@@ -418,11 +418,199 @@ bool validVarType(NVGcmdVarType type)
 	return type >= NVG_VAR_FLOAT && type <= NVG_VAR_HANDLE;
 }
 
+struct NVGcmdResolvedLocation {
+	uint32_t op = NVG_CMD__COUNT;
+	uint32_t maskCell = ~0u;
+	uint32_t argumentCell = ~0u;
+};
+
+bool resolveLocation(const NVGcmdBuf& buf,
+	const NVGcmdArgLocation& location,
+	NVGcmdResolvedLocation& resolved) noexcept
+{
+	if (!location || location.streamRevision != buf.streamRevision)
+		return false;
+	const uint8_t* argument_counts = nvgCmdArgCount();
+	uint32_t cursor = 0;
+	while (cursor < buf.cells.size()) {
+		const uint32_t command_cell = cursor;
+		const uint32_t op = buf.cells[cursor++].u;
+		if (op >= NVG_CMD__COUNT)
+			return false;
+		const uint32_t argument_count = argument_counts[op];
+		uint32_t mask_cell = ~0u;
+		if (argument_count > 0) {
+			if (cursor >= buf.cells.size())
+				return false;
+			mask_cell = cursor++;
+		}
+		if (cursor + argument_count > buf.cells.size())
+			return false;
+		if (command_cell == location.commandCell) {
+			if (location.argumentIndex >= argument_count)
+				return false;
+			resolved.op = op;
+			resolved.maskCell = mask_cell;
+			resolved.argumentCell = cursor + location.argumentIndex;
+			return true;
+		}
+		if (command_cell > location.commandCell)
+			return false;
+		cursor += argument_count;
+	}
+	return false;
+}
+
 } // namespace
+
+bool NVGcmdBuf::locateArgument(uint32_t commandIndex,
+	uint32_t argumentIndex, NVGcmdArgLocation& location) const noexcept
+{
+	const uint8_t* argument_counts = nvgCmdArgCount();
+	uint32_t cursor = 0;
+	uint32_t command = 0;
+	while (cursor < cells.size()) {
+		const uint32_t command_cell = cursor;
+		const uint32_t op = cells[cursor++].u;
+		if (op >= NVG_CMD__COUNT)
+			return false;
+		const uint32_t argument_count = argument_counts[op];
+		if (command == commandIndex)
+			return locateArgumentAtCell(command_cell, argumentIndex, location);
+		if (argument_count > 0)
+			++cursor;
+		if (cursor + argument_count > cells.size())
+			return false;
+		cursor += argument_count;
+		++command;
+	}
+	return false;
+}
+
+bool NVGcmdBuf::locateArgumentAtCell(uint32_t commandCell,
+	uint32_t argumentIndex, NVGcmdArgLocation& location) const noexcept
+{
+	NVGcmdArgLocation candidate;
+	candidate.commandCell = commandCell;
+	candidate.argumentIndex = argumentIndex;
+	candidate.streamRevision = streamRevision;
+	NVGcmdResolvedLocation resolved;
+	if (!resolveLocation(*this, candidate, resolved))
+		return false;
+	location = candidate;
+	return true;
+}
+
+bool NVGcmdBuf::inspectArgument(const NVGcmdArgLocation& location,
+	NVGcmdArgumentInfo& info) const noexcept
+{
+	NVGcmdResolvedLocation resolved;
+	if (!resolveLocation(*this, location, resolved))
+		return false;
+	const uint32_t mask = cells[resolved.maskCell].u;
+	const bool is_reference = ((mask >> location.argumentIndex) & 1u) != 0;
+	const NVGcmdCell& cell = cells[resolved.argumentCell];
+	info = {};
+	info.op = static_cast<NVGcmdOp>(resolved.op);
+	info.argumentIndex = location.argumentIndex;
+	info.value = cell;
+	const NVGcmdExpectedType expected = expectedType(resolved.op,
+		location.argumentIndex);
+	info.type = expected == NVGcmdExpectedType::integer
+		? NVG_VAR_INT32 : expected == NVGcmdExpectedType::string
+		? NVG_VAR_STRING : expected == NVGcmdExpectedType::handle
+		? NVG_VAR_HANDLE : NVG_VAR_FLOAT;
+	if (!is_reference)
+		return true;
+	if ((cell.u & NVG_CMD_PROP_BIT) != 0) {
+		info.source = NVGcmdArgSource::property;
+		info.referenceIndex = cell.u & ~NVG_CMD_PROP_BIT;
+		if (info.referenceIndex < props.size())
+			info.type = props[info.referenceIndex].type;
+	}
+	else {
+		info.source = NVGcmdArgSource::variable;
+		info.referenceIndex = cell.u;
+		if (info.referenceIndex < meta.vars.size())
+			info.type = meta.vars[info.referenceIndex].type;
+	}
+	return true;
+}
+
+bool NVGcmdBuf::setLiteralFloat(const NVGcmdArgLocation& location,
+	float value) noexcept
+{
+	NVGcmdResolvedLocation resolved;
+	if (!resolveLocation(*this, location, resolved) ||
+		expectedType(resolved.op, location.argumentIndex) !=
+			NVGcmdExpectedType::number)
+		return false;
+	cells[resolved.maskCell].u &= ~(1u << location.argumentIndex);
+	cells[resolved.argumentCell].f = value;
+	return true;
+}
+
+bool NVGcmdBuf::setLiteralInt(const NVGcmdArgLocation& location,
+	int32_t value) noexcept
+{
+	NVGcmdResolvedLocation resolved;
+	if (!resolveLocation(*this, location, resolved) ||
+		expectedType(resolved.op, location.argumentIndex) !=
+			NVGcmdExpectedType::integer)
+		return false;
+	cells[resolved.maskCell].u &= ~(1u << location.argumentIndex);
+	cells[resolved.argumentCell].i = value;
+	return true;
+}
+
+bool NVGcmdBuf::bindVariable(const NVGcmdArgLocation& location,
+	uint32_t variableIndex) noexcept
+{
+	NVGcmdResolvedLocation resolved;
+	if (!resolveLocation(*this, location, resolved) ||
+		variableIndex >= meta.vars.size() ||
+		!compatibleType(expectedType(resolved.op, location.argumentIndex),
+			meta.vars[variableIndex].type))
+		return false;
+	cells[resolved.maskCell].u |= 1u << location.argumentIndex;
+	cells[resolved.argumentCell].u = variableIndex;
+	return true;
+}
+
+bool NVGcmdBuf::bindVariable(const NVGcmdArgLocation& location,
+	const char* variableName) noexcept
+{
+	const int index = meta.findVar(variableName);
+	return index >= 0 && bindVariable(location, static_cast<uint32_t>(index));
+}
+
+bool NVGcmdBuf::bindProperty(const NVGcmdArgLocation& location,
+	uint32_t propertyIndex) noexcept
+{
+	NVGcmdResolvedLocation resolved;
+	if (!resolveLocation(*this, location, resolved) ||
+		propertyIndex >= props.size() ||
+		!compatibleType(expectedType(resolved.op, location.argumentIndex),
+			props[propertyIndex].type))
+		return false;
+	cells[resolved.maskCell].u |= 1u << location.argumentIndex;
+	cells[resolved.argumentCell].u = propertyIndex | NVG_CMD_PROP_BIT;
+	return true;
+}
+
+bool NVGcmdBuf::bindProperty(const NVGcmdArgLocation& location,
+	const char* propertyName) noexcept
+{
+	const int index = findProperty(propertyName);
+	return index >= 0 && bindProperty(location, static_cast<uint32_t>(index));
+}
 
 NVGcmdValidationResult nvgCmdValidate(const NVGcmdBuf& buf,
 	const NVGcmdLayout* layout)
 {
+	if (layout && layout->count > 0 && !layout->vars)
+		return validationError(NVGcmdValidationCode::layout_mismatch, 0,
+			"runtime layout has no variable table");
 	std::unordered_set<std::string> names;
 	for (size_t index = 0; index < buf.meta.vars.size(); ++index) {
 		const NVGcmdVarInfo& variable = buf.meta.vars[index];
@@ -439,9 +627,19 @@ NVGcmdValidationResult nvgCmdValidate(const NVGcmdBuf& buf,
 			if (index >= layout->count)
 				return validationError(NVGcmdValidationCode::layout_mismatch, 0,
 					"runtime layout has fewer variables than the schema");
-			if ((*layout)[static_cast<uint32_t>(index)].type != variable.type)
+			const NVGcmdVar& runtime_variable =
+				(*layout)[static_cast<uint32_t>(index)];
+			const uint32_t expected_size = nvgCmdVarTypeSize(variable.type);
+			if (runtime_variable.type != variable.type)
 				return validationError(NVGcmdValidationCode::layout_mismatch, 0,
 					"runtime layout variable type differs from the schema");
+			if (runtime_variable.size != expected_size)
+				return validationError(NVGcmdValidationCode::layout_mismatch, 0,
+					"runtime layout variable size differs from its declared type");
+			if (runtime_variable.offset > layout->dataSize ||
+				runtime_variable.size > layout->dataSize - runtime_variable.offset)
+				return validationError(NVGcmdValidationCode::layout_mismatch, 0,
+					"runtime layout variable exceeds the supplied data block");
 		}
 	}
 

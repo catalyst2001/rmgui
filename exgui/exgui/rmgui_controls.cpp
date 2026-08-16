@@ -101,6 +101,29 @@ rm_window::rm_window(rm_widget* p_parent, int x, int y, int width, int height,
 	set_max_size(rm_vec2(0.0f, 0.0f));
 }
 
+const RmDrawVariableSchema& rm_button::get_draw_variable_schema() const
+{
+	static const RmDrawVariableSchema schema = [] {
+		RmDrawVariableSchema result;
+		result.include(rm_widget::base_draw_variable_schema());
+		result.add_variable("text", NVG_VAR_STRING);
+		result.add_variable("icon_index", NVG_VAR_UINT32);
+		result.add_variable("pressed", NVG_VAR_UINT32);
+		result.add_variable("variant", NVG_VAR_UINT32);
+		return result;
+	}();
+	return schema;
+}
+
+void rm_button::update_draw_variables(RmDrawVariableBlock& variables) const
+{
+	const char* p_text = m_text.c_str();
+	variables.set_value("text", NVG_VAR_STRING, &p_text, sizeof(p_text));
+	variables.set_uint32("icon_index", m_icon);
+	variables.set_uint32("pressed", m_behaviour.is_pressed() ? 1u : 0u);
+	variables.set_uint32("variant", static_cast<uint32_t>(m_variant));
+}
+
 rm_button::rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text,
 	RmThemeRef theme, RmButtonVariant variant, rm_button_cb callback)
 	: rm_widget(x, y, width, height, p_parent, "ui_button"), m_text(text),
@@ -130,12 +153,15 @@ void rm_button::on_draw(NVGcontext* pctx) {
 	const RmButtonStyle& style = m_theme->buttons.resolve(m_variant);
 	const rm_draw_program* program = get_root()
 		? get_root()->resolve_draw_program(get_draw_program_id()) : nullptr;
+	const RmDrawVisualState draw_state = RmDataDrivenPainter::button_state(
+		visual.enabled, visual.hovered, visual.pressed);
 	const RmDrawSurfaceData surface = RmDrawSurfaceData::from_bounds(
-		0.0f, 0.0f, m_size.x, m_size.y,
-		RmDataDrivenPainter::button_state(visual.enabled, visual.hovered,
-			visual.pressed));
+		0.0f, 0.0f, m_size.x, m_size.y, draw_state);
+	RmDrawVariableBlock& variables = prepare_draw_variables(0.0f, 0.0f,
+		m_size.x, m_size.y, static_cast<uint32_t>(draw_state));
 	if (!program || !RmDataDrivenPainter::draw_surface(*pctx, *program,
-		RmDrawProgramTarget::button_surface, surface))
+		RmDrawProgramTarget::button_surface, surface, variables,
+		get_draw_program_binding()))
 		RmDefaultControlPainter::draw_button_surface(*pctx, visual, style);
 	RmDefaultControlPainter::draw_button_content(*pctx, visual, style);
 	rm_widget::on_draw(pctx);
@@ -1820,6 +1846,31 @@ void rm_splitter::set_theme(RmThemeRef theme)
 	apply_layout();
 }
 
+const RmDrawVariableSchema& rm_tabcontrol::get_draw_variable_schema() const
+{
+	static const RmDrawVariableSchema schema = [] {
+		RmDrawVariableSchema result;
+		result.include(rm_widget::base_draw_variable_schema());
+		result.add_variable("text", NVG_VAR_STRING);
+		result.add_variable("tab_id", NVG_VAR_UINT32);
+		result.add_variable("tab_index", NVG_VAR_UINT32);
+		result.add_variable("selected", NVG_VAR_UINT32);
+		result.add_variable("pressed", NVG_VAR_UINT32);
+		result.add_variable("closable", NVG_VAR_UINT32);
+		result.add_variable("pinned", NVG_VAR_UINT32);
+		result.add_variable("variant", NVG_VAR_UINT32);
+		result.add_variable("placement", NVG_VAR_UINT32);
+		return result;
+	}();
+	return schema;
+}
+
+void rm_tabcontrol::update_draw_variables(RmDrawVariableBlock& variables) const
+{
+	variables.set_uint32("variant", static_cast<uint32_t>(m_variant));
+	variables.set_uint32("placement", static_cast<uint32_t>(m_placement));
+}
+
 rm_tabcontrol::rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height,
 	rm_tabcontrol_cb p_callback, RmThemeRef theme, RmTabVariant variant,
 	RmTabPlacement placement) :
@@ -2078,12 +2129,24 @@ void rm_tabcontrol::on_draw(NVGcontext* pctx)
 			m_tabs[i].is_closable() && !m_tabs[i].is_pinned(),
 			m_close_hovered == i
 		};
+		const RmDrawVisualState draw_state = RmDataDrivenPainter::tab_state(
+			visual.enabled, visual.hovered, visual.pressed, visual.selected);
 		const RmDrawSurfaceData surface = RmDrawSurfaceData::from_bounds(
-			bounds.x, bounds.y, bounds.width, bounds.height,
-			RmDataDrivenPainter::tab_state(visual.enabled, visual.hovered,
-				visual.pressed, visual.selected));
+			bounds.x, bounds.y, bounds.width, bounds.height, draw_state);
+		RmDrawVariableBlock& variables = prepare_draw_variables(bounds.x,
+			bounds.y, bounds.width, bounds.height,
+			static_cast<uint32_t>(draw_state));
+		const char* p_text = m_tabs[i].get_name();
+		variables.set_value("text", NVG_VAR_STRING, &p_text, sizeof(p_text));
+		variables.set_uint32("tab_id", m_tabs[i].get_id());
+		variables.set_uint32("tab_index", static_cast<uint32_t>(i));
+		variables.set_uint32("selected", visual.selected ? 1u : 0u);
+		variables.set_uint32("pressed", visual.pressed ? 1u : 0u);
+		variables.set_uint32("closable", m_tabs[i].is_closable() ? 1u : 0u);
+		variables.set_uint32("pinned", m_tabs[i].is_pinned() ? 1u : 0u);
 		if (!program || !RmDataDrivenPainter::draw_surface(*pctx, *program,
-			RmDrawProgramTarget::tab_surface, surface))
+			RmDrawProgramTarget::tab_surface, surface, variables,
+			get_draw_program_binding()))
 			RmDefaultControlPainter::draw_tab_surface(*pctx, visual, style);
 		RmDefaultControlPainter::draw_tab_content(*pctx, visual, style);
 	}

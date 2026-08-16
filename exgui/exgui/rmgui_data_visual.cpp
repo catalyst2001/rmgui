@@ -11,38 +11,6 @@ namespace {
 
 constexpr uint32_t RM_DRAW_PROGRAM_VERSION = 1;
 
-const NVGcmdVar g_surface_vars[] = {
-  NVG_VAR_ENTRY(RmDrawSurfaceData, x, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, y, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, width, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, height, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, right, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, bottom, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, center_x, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, center_y, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, inner_x, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, inner_y, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, inner_width, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, inner_height, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, inner_right, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, inner_bottom, NVG_VAR_FLOAT),
-  NVG_VAR_ENTRY(RmDrawSurfaceData, state, NVG_VAR_UINT32)
-};
-
-constexpr const char* g_surface_var_names[] = {
-  "x", "y", "width", "height", "right", "bottom", "center_x",
-  "center_y", "inner_x", "inner_y", "inner_width", "inner_height",
-  "inner_right", "inner_bottom", "state"
-};
-
-constexpr NVGcmdVarType g_surface_var_types[] = {
-  NVG_VAR_FLOAT, NVG_VAR_FLOAT, NVG_VAR_FLOAT, NVG_VAR_FLOAT,
-  NVG_VAR_FLOAT, NVG_VAR_FLOAT, NVG_VAR_FLOAT, NVG_VAR_FLOAT,
-  NVG_VAR_FLOAT, NVG_VAR_FLOAT, NVG_VAR_FLOAT, NVG_VAR_FLOAT,
-  NVG_VAR_FLOAT, NVG_VAR_FLOAT,
-  NVG_VAR_UINT32
-};
-
 const char* target_class_name(RmDrawProgramTarget target) noexcept
 {
   switch (target) {
@@ -80,7 +48,7 @@ bool has_safe_embedded_commands(const NVGcmdBuf& program,
   return true;
 }
 
-bool validate_surface_schema(const NVGcmdBuf& program,
+bool validate_draw_program(const NVGcmdBuf& program,
   RmDrawProgramTarget target, std::string* p_error)
 {
   if (program.meta.version != RM_DRAW_PROGRAM_VERSION) {
@@ -95,24 +63,7 @@ bool validate_surface_schema(const NVGcmdBuf& program,
     set_error(p_error, "draw program has no element name");
     return false;
   }
-  constexpr size_t expected_count = sizeof(g_surface_var_names) /
-    sizeof(g_surface_var_names[0]);
-  if (program.meta.vars.size() != expected_count) {
-    set_error(p_error, "draw program does not use the canonical surface schema");
-    return false;
-  }
-  for (size_t index = 0; index < expected_count; ++index) {
-    if (std::strcmp(program.meta.vars[index].name,
-        g_surface_var_names[index]) != 0 ||
-      program.meta.vars[index].type != g_surface_var_types[index]) {
-      set_error(p_error,
-        "draw program variable order or type differs from the surface schema");
-      return false;
-    }
-  }
-
-  const NVGcmdValidationResult validation = nvgCmdValidate(program,
-    &RmDataDrivenPainter::surface_layout());
+  const NVGcmdValidationResult validation = nvgCmdValidate(program);
   if (!validation) {
     if (p_error)
       *p_error = validation.message;
@@ -151,6 +102,145 @@ public:
 
 } // namespace
 
+bool RmDrawVariableSchema::add_variable(std::string name,
+  NVGcmdVarType type)
+{
+  const uint32_t size = nvgCmdVarTypeSize(type);
+  if (name.empty() || size == 0 || find_variable(name) >= 0)
+    return false;
+  RmDrawVariableDesc variable;
+  variable.name = std::move(name);
+  variable.type = type;
+  variable.offset = m_data_size;
+  variable.size = size;
+  m_variables.push_back(std::move(variable));
+  m_data_size += size;
+  ++m_revision;
+  if (m_revision == 0) m_revision = 1;
+  return true;
+}
+
+bool RmDrawVariableSchema::include(const RmDrawVariableSchema& schema)
+{
+  for (uint32_t index = 0; index < schema.get_num_variables(); ++index) {
+    const RmDrawVariableDesc* variable = schema.get_variable(index);
+    if (!variable || !add_variable(variable->name, variable->type))
+      return false;
+  }
+  return true;
+}
+
+int RmDrawVariableSchema::find_variable(std::string_view name) const noexcept
+{
+  for (size_t index = 0; index < m_variables.size(); ++index)
+    if (m_variables[index].name == name)
+      return static_cast<int>(index);
+  return -1;
+}
+
+const RmDrawVariableDesc* RmDrawVariableSchema::get_variable(
+  uint32_t index) const noexcept
+{
+  return index < m_variables.size() ? &m_variables[index] : nullptr;
+}
+
+void RmDrawVariableBlock::reset(const RmDrawVariableSchema& schema)
+{
+  if (m_pschema == &schema && m_schema_revision == schema.get_revision())
+    return;
+  m_pschema = &schema;
+  m_schema_revision = schema.get_revision();
+  m_data.assign(schema.get_data_size(), uint8_t{});
+}
+
+bool RmDrawVariableBlock::set_value(uint32_t index, NVGcmdVarType type,
+  const void* p_value, uint32_t size) noexcept
+{
+  if (!m_pschema || !p_value)
+    return false;
+  const RmDrawVariableDesc* variable = m_pschema->get_variable(index);
+  if (!variable || variable->type != type || variable->size != size ||
+    variable->offset > m_data.size() ||
+    size > m_data.size() - variable->offset)
+    return false;
+  std::memcpy(m_data.data() + variable->offset, p_value, size);
+  return true;
+}
+
+bool RmDrawVariableBlock::set_value(std::string_view name,
+  NVGcmdVarType type, const void* p_value, uint32_t size) noexcept
+{
+  if (!m_pschema)
+    return false;
+  const int index = m_pschema->find_variable(name);
+  return index >= 0 && set_value(static_cast<uint32_t>(index), type,
+    p_value, size);
+}
+
+void RmDrawProgramBinding::reset() noexcept
+{
+  m_program_id = RM_INVALID_RESOURCE_ID;
+  m_pschema = nullptr;
+  m_schema_revision = 0;
+  m_layout_variables.clear();
+  m_valid = false;
+  m_error.clear();
+}
+
+bool RmDrawProgramBinding::matches(rm_resource_id program_id,
+  const RmDrawVariableSchema& schema) const noexcept
+{
+  return m_program_id == program_id && m_pschema == &schema &&
+    m_schema_revision == schema.get_revision();
+}
+
+bool RmDrawProgramBinding::compile(rm_resource_id program_id,
+  const NVGcmdBuf& program, const RmDrawVariableSchema& schema,
+  std::string* p_error)
+{
+  reset();
+  m_program_id = program_id;
+  m_pschema = &schema;
+  m_schema_revision = schema.get_revision();
+  const auto fail = [this, p_error](std::string message) {
+    m_error = std::move(message);
+    if (p_error) *p_error = m_error;
+    return false;
+  };
+  std::vector<NVGcmdVar> variables;
+  variables.reserve(program.meta.vars.size());
+  for (const NVGcmdVarInfo& requested : program.meta.vars) {
+    const int index = schema.find_variable(requested.name);
+    if (index < 0)
+      return fail(std::string("widget does not provide draw variable '") +
+        requested.name + "'");
+    const RmDrawVariableDesc* supplied = schema.get_variable(
+      static_cast<uint32_t>(index));
+    if (!supplied || supplied->type != requested.type)
+      return fail(std::string("draw variable type mismatch for '") +
+        requested.name + "'");
+    variables.push_back({ supplied->offset, supplied->type, supplied->size });
+  }
+
+  const NVGcmdLayout layout{ variables.data(),
+    static_cast<uint32_t>(variables.size()), schema.get_data_size() };
+  const NVGcmdValidationResult validation = nvgCmdValidate(program, &layout);
+  if (!validation)
+    return fail(validation.message);
+  m_layout_variables = std::move(variables);
+  m_valid = true;
+  m_error.clear();
+  set_error(p_error, "");
+  return true;
+}
+
+NVGcmdLayout RmDrawProgramBinding::get_layout() const noexcept
+{
+  return { m_layout_variables.data(),
+    static_cast<uint32_t>(m_layout_variables.size()),
+    m_pschema ? m_pschema->get_data_size() : 0 };
+}
+
 RmDrawSurfaceData RmDrawSurfaceData::from_bounds(float x, float y,
   float width, float height, RmDrawVisualState visual_state) noexcept
 {
@@ -173,6 +263,80 @@ RmDrawSurfaceData RmDrawSurfaceData::from_bounds(float x, float y,
   return result;
 }
 
+void RmDrawSurfaceData::write_to(RmDrawVariableBlock& variables) const noexcept
+{
+  variables.set_float("x", x);
+  variables.set_float("y", y);
+  variables.set_float("width", width);
+  variables.set_float("height", height);
+  variables.set_float("right", right);
+  variables.set_float("bottom", bottom);
+  variables.set_float("center_x", center_x);
+  variables.set_float("center_y", center_y);
+  variables.set_float("inner_x", inner_x);
+  variables.set_float("inner_y", inner_y);
+  variables.set_float("inner_width", inner_width);
+  variables.set_float("inner_height", inner_height);
+  variables.set_float("inner_right", inner_right);
+  variables.set_float("inner_bottom", inner_bottom);
+  variables.set_uint32("state", state);
+}
+
+const RmDrawVariableSchema& rm_widget::base_draw_variable_schema()
+{
+  static const RmDrawVariableSchema schema = [] {
+    RmDrawVariableSchema result;
+    const char* float_variables[] = {
+      "x", "y", "width", "height", "right", "bottom", "center_x",
+      "center_y", "inner_x", "inner_y", "inner_width", "inner_height",
+      "inner_right", "inner_bottom", "widget_x", "widget_y",
+      "content_width", "content_height", "viewport_width",
+      "viewport_height", "content_offset_x", "content_offset_y"
+    };
+    for (const char* name : float_variables)
+      result.add_variable(name, NVG_VAR_FLOAT);
+    result.add_variable("state", NVG_VAR_UINT32);
+    result.add_variable("enabled", NVG_VAR_UINT32);
+    result.add_variable("focused", NVG_VAR_UINT32);
+    result.add_variable("hovered", NVG_VAR_UINT32);
+    result.add_variable("z_index", NVG_VAR_INT32);
+    return result;
+  }();
+  return schema;
+}
+
+const RmDrawVariableSchema& rm_widget::get_draw_variable_schema() const
+{
+  return base_draw_variable_schema();
+}
+
+RmDrawVariableBlock& rm_widget::prepare_draw_variables(float x, float y,
+  float width, float height, uint32_t state) const
+{
+  const RmDrawVariableSchema& schema = get_draw_variable_schema();
+  m_draw_variable_block.reset(schema);
+  const RmDrawSurfaceData surface = RmDrawSurfaceData::from_bounds(x, y,
+    width, height, static_cast<RmDrawVisualState>(state));
+  surface.write_to(m_draw_variable_block);
+  m_draw_variable_block.set_float("widget_x", m_pos_of_parent.x);
+  m_draw_variable_block.set_float("widget_y", m_pos_of_parent.y);
+  m_draw_variable_block.set_float("content_width", m_content_extent.x);
+  m_draw_variable_block.set_float("content_height", m_content_extent.y);
+  m_draw_variable_block.set_float("viewport_width", m_content_area.width);
+  m_draw_variable_block.set_float("viewport_height", m_content_area.height);
+  m_draw_variable_block.set_float("content_offset_x", m_content_offset.x);
+  m_draw_variable_block.set_float("content_offset_y", m_content_offset.y);
+  m_draw_variable_block.set_uint32("enabled",
+    m_elem_flags.has_active() ? 1u : 0u);
+  m_draw_variable_block.set_uint32("focused",
+    m_elem_flags.is_focused() ? 1u : 0u);
+  m_draw_variable_block.set_uint32("hovered",
+    m_elem_flags.is_hovered() ? 1u : 0u);
+  m_draw_variable_block.set_int32("z_index", m_zindex);
+  update_draw_variables(m_draw_variable_block);
+  return m_draw_variable_block;
+}
+
 rm_draw_program::rm_draw_program(rm_resource_id resource_id,
   std::string name, RmDrawProgramTarget target, NVGcmdBuf program) noexcept
   : m_resource_id(resource_id), m_name(std::move(name)), m_target(target),
@@ -184,15 +348,6 @@ RmDrawProgramResourceSnapshot rm_draw_program::snapshot() const
 {
   return { m_resource_id, m_name, m_target, m_program.meta.elementName,
     m_program.meta.version };
-}
-
-const NVGcmdLayout& RmDataDrivenPainter::surface_layout() noexcept
-{
-  static const NVGcmdLayout layout{
-    g_surface_vars,
-    static_cast<uint32_t>(sizeof(g_surface_vars) / sizeof(g_surface_vars[0]))
-  };
-  return layout;
 }
 
 RmDrawVisualState RmDataDrivenPainter::button_state(bool enabled,
@@ -218,16 +373,27 @@ RmDrawVisualState RmDataDrivenPainter::tab_state(bool enabled, bool hovered,
 
 bool RmDataDrivenPainter::draw_surface(NVGcontext& context,
   const rm_draw_program& program, RmDrawProgramTarget expected_target,
-  const RmDrawSurfaceData& data) noexcept
+  const RmDrawSurfaceData& data, const RmDrawVariableBlock& variables,
+  RmDrawProgramBinding& binding, std::string* p_error)
 {
   if (program.m_target != expected_target || data.width <= 0.0f ||
-    data.height <= 0.0f)
+    data.height <= 0.0f || !variables.get_schema())
     return false;
+
+  if (!binding.matches(program.m_resource_id, *variables.get_schema()))
+    binding.compile(program.m_resource_id, program.m_program,
+      *variables.get_schema(), p_error);
+  if (!binding.is_valid()) {
+    if (p_error) *p_error = binding.get_error();
+    return false;
+  }
 
   context.save();
   context.intersectScissor(data.x, data.y, data.width, data.height);
-  nvgEvalValidated(context, program.m_program, &data, &surface_layout());
+  const NVGcmdLayout layout = binding.get_layout();
+  nvgEvalValidated(context, program.m_program, variables.get_data(), &layout);
   context.restore();
+  set_error(p_error, "");
   return true;
 }
 
@@ -242,7 +408,7 @@ rm_resource_id rm_surface::register_draw_program(const char* p_resource_name,
     set_error(p_error, "draw program resource name is already registered");
     return RM_INVALID_RESOURCE_ID;
   }
-  if (!validate_surface_schema(program, target, p_error))
+  if (!validate_draw_program(program, target, p_error))
     return RM_INVALID_RESOURCE_ID;
 
   const rm_resource_id resource_id =

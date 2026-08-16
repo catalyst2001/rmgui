@@ -2,6 +2,7 @@
 #include "nvg_cmd.h"
 #include "../exgui/exgui/rmgui_theme.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -139,7 +140,7 @@ void test_command_buffer_runtime()
     NVG_VAR_ENTRY(DrawData, z_index, NVG_VAR_INT32)
   };
   const NVGcmdLayout layout{ variables,
-    static_cast<uint32_t>(std::size(variables)) };
+    static_cast<uint32_t>(std::size(variables)), sizeof(DrawData) };
 
   NVGcmdBuf commands;
   nvgCmdCopyName(commands.meta.className, NVG_CMD_MAX_NAME, "rm_button");
@@ -164,6 +165,58 @@ void test_command_buffer_runtime()
 
   require(nvgCmdValidate(commands, &layout).succeeded(),
     "a typed data-driven command buffer must validate");
+
+  NVGcmdArgLocation width_location;
+  require(commands.locateArgument(3, 2, width_location),
+    "command arguments must be addressable without exposing raw cells");
+  NVGcmdArgumentInfo width_info;
+  require(commands.inspectArgument(width_location, width_info) &&
+    width_info.op == NVG_CMD_ROUNDED_RECT &&
+    width_info.source == NVGcmdArgSource::variable &&
+    width_info.referenceIndex == 0,
+    "argument inspection must preserve variable references");
+  require(commands.setLiteralFloat(width_location, 96.0f) &&
+    commands.inspectArgument(width_location, width_info) &&
+    width_info.source == NVGcmdArgSource::literal &&
+    width_info.value.f == 96.0f,
+    "a coordinate variable must be replaceable with a checked literal");
+  require(!commands.setLiteralInt(width_location, 96),
+    "a float command argument must reject integer mutation");
+  require(commands.bindVariable(width_location, "width") &&
+    nvgCmdValidate(commands, &layout).succeeded(),
+    "a mutated coordinate must bind back to a runtime variable");
+
+  NVGcmdArgLocation color_location;
+  NVGcmdArgumentInfo color_info;
+  require(commands.locateArgument(4, 0, color_location) &&
+    commands.inspectArgument(color_location, color_info) &&
+    color_info.source == NVGcmdArgSource::property &&
+    color_info.referenceIndex == red,
+    "property-backed command arguments must be inspectable");
+  require(commands.setLiteralFloat(color_location, 0.5f) &&
+    commands.bindProperty(color_location, "red"),
+    "a literal command argument must bind to a named property");
+  require(!commands.locateArgumentAtCell(2, 0, color_location),
+    "an arbitrary cell inside a command must not be accepted as an opcode");
+
+  NVGcmdBuf structurally_changed = commands;
+  NVGcmdArgLocation stale_location;
+  require(structurally_changed.locateArgument(3, 2, stale_location),
+    "a location must be obtainable before a structural edit");
+  structurally_changed.beginPath();
+  require(!structurally_changed.inspectArgument(stale_location, width_info),
+    "structural edits must invalidate previously cached argument locations");
+
+  const NVGcmdLayout undersized_layout{ variables,
+    static_cast<uint32_t>(std::size(variables)), sizeof(float) };
+  require(nvgCmdValidate(commands, &undersized_layout).code ==
+    NVGcmdValidationCode::layout_mismatch,
+    "runtime variable offsets must stay inside the declared data block");
+  const NVGcmdLayout missing_table_layout{ nullptr,
+    static_cast<uint32_t>(std::size(variables)), sizeof(DrawData) };
+  require(nvgCmdValidate(commands, &missing_table_layout).code ==
+    NVGcmdValidationCode::layout_mismatch,
+    "a non-empty runtime layout must provide its variable table");
 
   MemoryIo text;
   require(commands.saveText(text), "command buffer must serialize to text");
@@ -190,6 +243,21 @@ void test_command_buffer_runtime()
     "checked command execution must report every executed command");
   require(recording->fill_calls == 1 && recording->last_z_index == 23,
     "validated commands must reach NanoVG with bound runtime values");
+
+  float first_max_x = 0.0f;
+  for (const NVGvertex& vertex : recording->last_fill_vertices)
+    first_max_x = std::max(first_max_x, vertex.x);
+  DrawData resized_data = data;
+  resized_data.width = 144.0f;
+  context.beginFrame(200.0f, 100.0f, 1.0f);
+  const NVGcmdEvalResult resized_evaluation = nvgEvalChecked(
+    context, binary_roundtrip, &resized_data, &layout);
+  context.endFrame();
+  float resized_max_x = 0.0f;
+  for (const NVGvertex& vertex : recording->last_fill_vertices)
+    resized_max_x = std::max(resized_max_x, vertex.x);
+  require(resized_evaluation.succeeded() && resized_max_x > first_max_x + 40.0f,
+    "one immutable command buffer must respond to different widget sizes");
 
   NVGcmdBuf truncated;
   NVGcmdCell cell{};

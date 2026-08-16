@@ -38,6 +38,7 @@ struct RmDrawSurfaceData {
 
   static RmDrawSurfaceData from_bounds(float x, float y, float width,
     float height, RmDrawVisualState state) noexcept;
+  void write_to(RmDrawVariableBlock& variables) const noexcept;
 };
 
 /** Immutable, validated drawing resource. Controls only keep its resource ID. */
@@ -69,12 +70,12 @@ public:
 
 class RmDataDrivenPainter final {
 public:
-  static const NVGcmdLayout& surface_layout() noexcept;
   static RmDrawVisualState button_state(bool enabled, bool hovered,
     bool pressed) noexcept;
   static RmDrawVisualState tab_state(bool enabled, bool hovered,
     bool pressed, bool selected) noexcept;
   static bool draw_surface(NVGcontext& context,
     const rm_draw_program& program, RmDrawProgramTarget expected_target,
-    const RmDrawSurfaceData& data) noexcept;
+    const RmDrawSurfaceData& data, const RmDrawVariableBlock& variables,
+    RmDrawProgramBinding& binding, std::string* p_error = nullptr);
 };

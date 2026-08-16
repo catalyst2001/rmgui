@@ -62,10 +62,12 @@ class rm_button : public rm_widget, public rm_callback<rm_button_cb>,
   RmButtonBehaviour m_behaviour;
   RmThemeRef m_theme;
   RmButtonVariant m_variant;
+  void update_draw_variables(RmDrawVariableBlock& variables) const override;
   void on_enabled_changed(bool enabled) override { m_behaviour.set_enabled(enabled); }
   void on_focus_changed(bool focused) override { if (!focused) m_behaviour.cancel(); }
   void on_pointer_capture_lost() override { m_behaviour.cancel(); }
 public:
+  const RmDrawVariableSchema& get_draw_variable_schema() const override;
   rm_button(rm_widget* p_parent, int x, int y, int width, int height, const std::string& text,
     RmThemeRef theme = {}, RmButtonVariant variant = RmButtonVariant::primary,
     rm_button_cb callback = nullptr);
@@ -610,6 +612,7 @@ class rm_tabcontrol : public rm_widget, public rm_callback<rm_tabcontrol_cb>,
   size_t m_close_hovered;
   size_t m_close_pressed;
 
+  void update_draw_variables(RmDrawVariableBlock& variables) const override;
   const RmTabStyle& tab_style() const;
   bool is_horizontal() const noexcept;
   rm_rect get_bar_bounds() const;
@@ -633,6 +636,7 @@ protected:
   virtual void on_keybd(int sc, RM_KEY vk, RM_KEY_STATE state) override;
   virtual bool on_mouse(RM_MOUSE_EVENT event, RM_KEY vk, RM_KEY_STATE state, rm_vec2& cursor_pos, rm_vec2 delta) override;
 public:
+  const RmDrawVariableSchema& get_draw_variable_schema() const override;
   rm_tabcontrol(rm_widget* p_parent, int x, int y, int width, int height,
     rm_tabcontrol_cb p_callback = nullptr, RmThemeRef theme = {},
     RmTabVariant variant = RmTabVariant::document,

@@ -34,9 +34,9 @@
 #include <string_view>
 #include <unordered_map>
 #include "rmgui_resources.h"
+#include "nvg_cmd.h"
 
 struct RmThemeSnapshot;
-struct NVGcmdBuf;
 class rm_draw_program;
 
 /* utils */
@@ -818,6 +818,81 @@ struct RmVisualResourceSnapshot {
   std::vector<RmDrawProgramResourceSnapshot> draw_programs;
 };
 
+struct RmDrawVariableDesc {
+  std::string name;
+  NVGcmdVarType type = NVG_VAR_FLOAT;
+  uint32_t offset = 0;
+  uint32_t size = 0;
+};
+
+/** Immutable-after-registration description shared by widget instances. */
+class RmDrawVariableSchema {
+  std::vector<RmDrawVariableDesc> m_variables;
+  uint32_t m_data_size = 0;
+  uint64_t m_revision = 1;
+
+public:
+  bool add_variable(std::string name, NVGcmdVarType type);
+  bool include(const RmDrawVariableSchema& schema);
+  int find_variable(std::string_view name) const noexcept;
+  const RmDrawVariableDesc* get_variable(uint32_t index) const noexcept;
+  uint32_t get_num_variables() const noexcept {
+    return static_cast<uint32_t>(m_variables.size());
+  }
+  uint32_t get_data_size() const noexcept { return m_data_size; }
+  uint64_t get_revision() const noexcept { return m_revision; }
+};
+
+/** Per-widget values stored independently from the C++ object ABI. */
+class RmDrawVariableBlock {
+  const RmDrawVariableSchema* m_pschema = nullptr;
+  uint64_t m_schema_revision = 0;
+  std::vector<uint8_t> m_data;
+
+public:
+  void reset(const RmDrawVariableSchema& schema);
+  bool set_value(uint32_t index, NVGcmdVarType type,
+    const void* p_value, uint32_t size) noexcept;
+  bool set_value(std::string_view name, NVGcmdVarType type,
+    const void* p_value, uint32_t size) noexcept;
+  bool set_float(std::string_view name, float value) noexcept {
+    return set_value(name, NVG_VAR_FLOAT, &value, sizeof(value));
+  }
+  bool set_int32(std::string_view name, int32_t value) noexcept {
+    return set_value(name, NVG_VAR_INT32, &value, sizeof(value));
+  }
+  bool set_uint32(std::string_view name, uint32_t value) noexcept {
+    return set_value(name, NVG_VAR_UINT32, &value, sizeof(value));
+  }
+  const RmDrawVariableSchema* get_schema() const noexcept { return m_pschema; }
+  const void* get_data() const noexcept {
+    return m_data.empty() ? nullptr : m_data.data();
+  }
+  uint32_t get_data_size() const noexcept {
+    return static_cast<uint32_t>(m_data.size());
+  }
+};
+
+/** Cached name/type binding from a draw program to a widget variable block. */
+class RmDrawProgramBinding {
+  rm_resource_id m_program_id = RM_INVALID_RESOURCE_ID;
+  const RmDrawVariableSchema* m_pschema = nullptr;
+  uint64_t m_schema_revision = 0;
+  std::vector<NVGcmdVar> m_layout_variables;
+  bool m_valid = false;
+  std::string m_error;
+
+public:
+  void reset() noexcept;
+  bool matches(rm_resource_id program_id,
+    const RmDrawVariableSchema& schema) const noexcept;
+  bool compile(rm_resource_id program_id, const NVGcmdBuf& program,
+    const RmDrawVariableSchema& schema, std::string* p_error = nullptr);
+  NVGcmdLayout get_layout() const noexcept;
+  bool is_valid() const noexcept { return m_valid; }
+  const std::string& get_error() const noexcept { return m_error; }
+};
+
 /**
 * Non-visual horizontal strip of equally-sized square icons. Texture and
 * source coordinates are deliberately private; only rm_utl can render them.
@@ -879,18 +954,27 @@ public:
 class rm_draw_program_host
 {
   rm_resource_id m_draw_program_id = RM_INVALID_RESOURCE_ID;
+  RmDrawProgramBinding m_draw_program_binding;
 
 protected:
   rm_resource_id get_draw_program_id() const noexcept {
     return m_draw_program_id;
   }
+  RmDrawProgramBinding& get_draw_program_binding() noexcept {
+    return m_draw_program_binding;
+  }
 
 public:
+  const std::string& get_draw_program_error() const noexcept {
+    return m_draw_program_binding.get_error();
+  }
   void set_draw_program(rm_resource_id draw_program_id) noexcept {
     m_draw_program_id = draw_program_id;
+    m_draw_program_binding.reset();
   }
   void clear_draw_program() noexcept {
     m_draw_program_id = RM_INVALID_RESOURCE_ID;
+    m_draw_program_binding.reset();
   }
 };
 
@@ -1013,6 +1097,9 @@ protected:
   virtual void on_enabled_changed(bool enabled) { RM_UNUSED(enabled); }
   virtual void on_focus_changed(bool focused) { RM_UNUSED(focused); }
   virtual void on_pointer_capture_lost() {}
+  virtual void update_draw_variables(RmDrawVariableBlock& variables) const {
+    RM_UNUSED(variables);
+  }
 
 protected:
   using _childs_vec = std::vector<rm_widget*>;
@@ -1033,6 +1120,7 @@ protected:
   rm_rect          m_content_area;
   rm_vec2          m_content_extent;
   rm_vec2          m_content_offset;
+  mutable RmDrawVariableBlock m_draw_variable_block;
   std::string      m_tooltip;
   int              m_zindex;
 
@@ -1058,12 +1146,17 @@ protected:
   static void move_to(rm_widget* proot_widget, float xpos, float ypos);
   void        resize_nolayout(float width, float height);
   void        destroy_children();
+  RmDrawVariableBlock& prepare_draw_variables(float x, float y,
+    float width, float height, uint32_t state) const;
 
   inline bool dispatch_event(RM_EVENT event, rm_widget* p_from, rm_event_data* pevent_data) {
     return on_event(event, p_from, pevent_data);
   }
 
 public:
+  static const RmDrawVariableSchema& base_draw_variable_schema();
+  virtual const RmDrawVariableSchema& get_draw_variable_schema() const;
+
   void set_classname(const char* p_clsn) {
     strncpy(m_szclass, p_clsn, sizeof(m_szclass) - 1);
     m_szclass[sizeof(m_szclass) - 1] = '\0';
